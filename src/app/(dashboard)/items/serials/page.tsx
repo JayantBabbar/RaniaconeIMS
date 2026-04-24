@@ -151,7 +151,7 @@ export default function SerialsPage() {
 
 
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KPICard
             label="In Stock"
             value={String(counts["in_stock"] || 0)}

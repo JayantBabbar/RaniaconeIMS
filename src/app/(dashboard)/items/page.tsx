@@ -18,6 +18,7 @@ import {
   ColumnFilter,
   ActiveFilterBar,
 } from "@/components/ui/table-toolkit";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useTableFilters, type ColumnDef } from "@/hooks";
 import { useToast } from "@/components/ui/toast";
 import { itemService, brandService, categoryService } from "@/services/items.service";
@@ -33,8 +34,6 @@ import {
   Trash2,
   Box,
   X,
-  ChevronLeft,
-  ChevronRight,
   Tag,
 } from "lucide-react";
 
@@ -480,16 +479,8 @@ export default function ItemsListPage() {
               </table>
             </div>
 
-            {/* Pagination placeholder */}
-            <div className="px-3.5 py-2.5 border-t border-hairline flex items-center gap-2.5 text-xs text-foreground-muted">
-              <span>
-                Showing {rows.length}
-                {rows.length !== items.length ? ` of ${items.length}` : ""}
-              </span>
-              <div className="flex-1" />
-              <Button size="sm" icon={<ChevronLeft size={12} />}>Prev</Button>
-              <Button size="sm" iconRight={<ChevronRight size={12} />}>Next</Button>
-            </div>
+            <TablePagination visible={rows.length} total={items.length} />
+
           </>
         )}
       </div>

@@ -125,8 +125,8 @@ export default function CountDetailPage() {
         </button>
 
         {/* Summary */}
-        <div className="bg-white border border-hairline rounded-md p-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="bg-white border border-hairline rounded-md p-4 md:p-5">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="flex-1 min-w-0">
               <PageHeader
                 title={count.count_number}
@@ -137,7 +137,8 @@ export default function CountDetailPage() {
                 {formatDate(count.count_date)} · {loc?.code} {loc?.name}
               </div>
             </div>
-            <div className="flex gap-3 text-sm flex-shrink-0">
+            {/* KPIs: 3 equal cards on mobile (edge-to-edge), tight right-aligned row on md+ */}
+            <div className="grid grid-cols-3 md:flex md:gap-3 gap-2 text-sm md:flex-shrink-0 -mx-1 md:mx-0">
               <Kpi label="Lines" value={totalLines.toString()} />
               <Kpi label="Completed" value={completedLines.toString()} />
               <Kpi label="Variances" value={variances.length.toString()}
@@ -282,7 +283,7 @@ export default function CountDetailPage() {
 
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: "amber" | "green" }) {
   return (
-    <div className="text-right">
+    <div className="text-center md:text-right bg-surface md:bg-transparent rounded p-2 md:p-0">
       <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">{label}</div>
       <div className={
         "text-lg font-semibold tabular-nums mt-0.5 " +

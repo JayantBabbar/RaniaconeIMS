@@ -16,6 +16,7 @@ import {
   ColumnFilter,
   ActiveFilterBar,
 } from "@/components/ui/table-toolkit";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useTableFilters, type ColumnDef } from "@/hooks";
 import { useToast } from "@/components/ui/toast";
 import { tenantService, currencyService } from "@/services/platform.service";
@@ -28,8 +29,6 @@ import {
   Eye,
   Edit,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -328,13 +327,11 @@ export default function TenantManagementPage() {
                   </tbody>
                 </table>
 
-                {/* Pagination */}
-                <div className="px-3.5 py-2.5 border-t border-hairline flex items-center text-xs text-foreground-muted">
-                  <span>Showing 1–{filteredTenants.length} of {tenants.length}</span>
-                  <div className="flex-1" />
-                  <Button size="sm" icon={<ChevronLeft size={12} />}>Prev</Button>
-                  <Button size="sm" iconRight={<ChevronRight size={12} />} className="ml-1">Next</Button>
-                </div>
+                <TablePagination
+                  start={filteredTenants.length > 0 ? 1 : 0}
+                  end={filteredTenants.length}
+                  total={tenants.length}
+                />
               </>
             )}
           </div>
