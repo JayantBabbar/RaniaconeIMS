@@ -1,0 +1,111 @@
+/* ═══════════════════════════════════════════════════════════════════════
+ * theme.css — RaniacOne design tokens (source of truth)
+ *
+ * Every color, radius, shadow, and font used in the app is defined here
+ * as a CSS custom property. Tailwind classes resolve these variables at
+ * runtime, so swapping this file (or overriding :root at the document
+ * level) re-themes the entire application without a rebuild.
+ *
+ * White-labeling a tenant = inject an extra :root block with overriding
+ * vars (see BrandingProvider). The cascade does the rest.
+ *
+ * Naming convention
+ *   --color-<semantic>           e.g. --color-brand, --color-surface
+ *   --color-<semantic>-<variant> e.g. --color-brand-light, --color-status-red-bg
+ *   --radius-<size>              --radius-sm | md | lg
+ *   --shadow-<purpose>           --shadow-card | raised | overlay | btn-primary
+ *   --font-<stack>               --font-sans | mono
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand ────────────────────────────────────────────────────────── */
+  --color-brand:          #2563eb;
+  --color-brand-light:    #eff6ff;
+  --color-brand-dark:     #1d4ed8;
+  --color-brand-50:       #eff6ff;
+  --color-brand-100:      #dbeafe;
+  --color-brand-500:      #2563eb;
+  --color-brand-600:      #1d4ed8;
+  --color-brand-700:      #1e40af;
+
+  /* ── Surfaces ─────────────────────────────────────────────────────── */
+  --color-background:           #ffffff;
+  --color-surface:              #fafafa;
+  --color-surface-secondary:    #f5f5f5;
+
+  /* ── Hairlines / borders ─────────────────────────────────────────── */
+  --color-hairline:        #eaeaea;
+  --color-hairline-light:  #f0f0f0;
+
+  /* ── Text ────────────────────────────────────────────────────────── */
+  --color-foreground:             #0a0a0a;
+  --color-foreground-secondary:   #525252;
+  --color-foreground-muted:       #6b6b6b;   /* darker than #a3a3a3 — passes WCAG AA small-text on white */
+  --color-foreground-faint:       #d4d4d4;
+
+  /* ── Status ──────────────────────────────────────────────────────── */
+  --color-status-green:       #16a34a;
+  --color-status-green-bg:    #f0fdf4;
+  --color-status-green-text:  #15803d;
+
+  --color-status-red:         #dc2626;
+  --color-status-red-bg:      #fef2f2;
+  --color-status-red-text:    #b91c1c;
+
+  --color-status-amber:       #d97706;
+  --color-status-amber-bg:    #fffbeb;
+  --color-status-amber-text:  #b45309;
+
+  --color-status-blue:        #2563eb;
+  --color-status-blue-bg:     #eff6ff;
+  --color-status-blue-text:   #1d4ed8;
+
+  --color-status-gray:        #737373;
+  --color-status-gray-bg:     #f5f5f5;
+  --color-status-gray-text:   #404040;
+
+  /* ── Sidebar (dark) ──────────────────────────────────────────────── */
+  --color-sidebar-bg:         #0a0a0a;
+  --color-sidebar-bg-hover:   #171717;
+  --color-sidebar-text:       #fafafa;
+  --color-sidebar-text-muted: #a3a3a3;
+  --color-sidebar-border:     #262626;
+
+  /* ── Shadows ─────────────────────────────────────────────────────── */
+  --shadow-card:    0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-raised:  0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-btn-primary: 0 1px 2px rgba(37, 99, 235, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-btn-success: 0 1px 2px rgba(22, 163, 74, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-btn-dark:    0 1px 2px rgba(0, 0, 0, 0.12),    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+
+  /* ── Radius ──────────────────────────────────────────────────────── */
+  --radius-sm:      4px;
+  --radius-base:    6px;
+  --radius-md:      8px;
+  --radius-lg:     12px;
+
+  /* ── Typography ──────────────────────────────────────────────────── */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  /* ── Focus ring ──────────────────────────────────────────────────── */
+  --ring-color: rgba(37, 99, 235, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * Per-tenant overrides
+ *
+ * To white-label an instance, add a second :root selector below with
+ * overriding vars. The BrandingProvider can also inject these at runtime
+ * based on the active tenant's ui_theme config entry. Example:
+ *
+ *   :root[data-tenant="acme"] {
+ *     --color-brand:       #8B5CF6;
+ *     --color-brand-light: #F3E8FF;
+ *     --color-brand-dark:  #6D28D9;
+ *   }
+ *
+ * Only the three brand vars above are the bare minimum — everything else
+ * cascades or is already neutral.
+ * ═══════════════════════════════════════════════════════════════════════ */
