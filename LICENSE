@@ -1,0 +1,267 @@
+© 2025 Raniac Technologies. All rights reserved.
+
+RANIAC TECHNOLOGIES PROPRIETARY SOFTWARE LICENSE AGREEMENT
+(STRICT / PROPRIETARY / CONFIDENTIAL)
+
+THIS LICENSE AGREEMENT ("Agreement") is made effective as of the date of creation
+of this file, by and between Raniac Technologies ("Owner", "Licensor") and any
+person or entity obtaining access to the repository or the Software ("Recipient",
+"You", "Licensee").
+
+1.  DEFINITIONS
+    a. "Software" means all source code, binaries, executables, object code,
+       scripts, configuration files, documentation, sample data, test data,
+       third-party components included with the repository, and any other
+       materials contained in or distributed with this repository or accompanying
+       files, whether in whole or in part.
+    b. "Repository" means the Git repository and any copies, clones, mirrors,
+       backups or patches of it, and any services, systems, infrastructure or
+       storage that holds or serves the Software.
+    c. "Authorized Personnel" means those individuals or entities explicitly
+       authorized in writing by Raniac Technologies to access, view, use,
+       distribute or modify the Software.
+    d. "Confidential Information" means the Software and any non-public
+       information related to the Owner’s business, technical or operational
+       information that is disclosed or accessible through the Repository.
+
+2.  OWNERSHIP
+    a. The Software is the exclusive property of Raniac Technologies. All rights,
+       title and interest in and to the Software — including all copyrights,
+       trade secrets, patents, moral rights, and other intellectual property
+       rights — are and shall remain vested exclusively in Raniac Technologies.
+    b. No rights or licenses are granted to any Recipient except as explicitly
+       stated in this Agreement. The presence of this Agreement in the Repository
+       does not imply or constitute any implied license.
+
+3.  LICENSE GRANT
+    a. NO LICENSE GRANTED. Unless Raniac Technologies provides an express,
+       separate, written license agreement signed by an authorized officer of
+       Raniac Technologies, Recipient is not granted any right, title, or
+       interest to the Software. Access to a private repository alone does not
+       grant any rights to copy, distribute, modify, sell, sublicense, or otherwise
+       use the Software.
+    b. If a separate written license is executed, its terms shall govern and shall
+       supersede any conflicting terms in this Agreement.
+
+4.  ACCESS, USE AND AUTHORIZED PERSONNEL
+    a. Access to the Repository and the Software is strictly limited to
+       Authorized Personnel. Any access, use, copying, modification, distribution
+       or disclosure by any other person or entity is strictly prohibited.
+    b. If you are an Authorized Personnel, you shall:
+       i.  Use the Software only for the limited, authorized internal purposes
+           expressly set out in a signed agreement with Raniac Technologies.
+       ii. Maintain strict confidentiality and take reasonable measures to
+           protect the Software from unauthorized access, disclosure or use.
+       iii. Not share credentials, keys, tokens, or repository access with
+           unauthorized persons.
+    c. All Authorized Personnel must comply with the security, handling and
+       confidentiality obligations contained in this Agreement and any
+       additional policies provided in writing by Raniac Technologies.
+
+5.  RESTRICTIONS (PROHIBITED CONDUCT)
+    Without limitation, Recipient shall NOT:
+    a. Copy, reproduce, distribute, publish, display, sublicense, sell, rent,
+       lease, assign, transfer, convey, or otherwise make available the Software
+       to any third party, in whole or in part.
+    b. Reverse engineer, decompile, disassemble, decrypt, derive source code
+       from object code, or attempt to discover any trade secrets, algorithms,
+       patterns, or other confidential information from the Software.
+    c. Modify, adapt, translate, create derivative works of, or prepare
+       derivative versions of the Software except as expressly permitted in a
+       separate signed agreement.
+    d. Remove, alter, or obscure any proprietary notices, labels, or marks on
+       the Software, including copyright, trademark, patent or other proprietary
+       notices.
+    e. Use the Software to create competing products or services.
+    f. Use the Software in violation of any applicable law, regulation, export
+       control, sanctions or privacy requirement.
+    g. Publicly disclose the existence, nature, content, or results of the
+       Software without prior written consent of Raniac Technologies.
+    h. Use the Software to train, benchmark or otherwise improve a machine
+       learning model or service without express written permission.
+
+6.  CONFIDENTIALITY
+    a. The Software is Confidential Information and must be held in strict
+       confidence. Recipient shall not disclose or permit disclosure of the
+       Software to any third party except to Authorized Personnel who have
+       executed written confidentiality obligations no less protective than this
+       Agreement.
+    b. Recipient shall take all reasonable measures to protect Confidential
+       Information from unauthorized disclosure, including, without limitation,
+       implementing administrative, physical and technical safeguards sufficient
+       to protect the confidentiality, integrity and availability of the Software.
+    c. Upon termination or upon request by Raniac Technologies, Recipient shall
+       promptly return or irretrievably destroy all copies of Confidential
+       Information and provide a written certificate of destruction if requested.
+
+7.  SECURITY, STORAGE & BACKUP
+    a. Recipient shall not store copies of the Software on systems external to
+       those authorized by Raniac Technologies without prior written permission.
+    b. Where backups are necessary, Recipient shall ensure backups are encrypted
+       and stored only on systems approved by Raniac Technologies and access is
+       strictly limited to Authorized Personnel.
+    c. Recipient shall promptly notify Raniac Technologies in the event of any
+       suspected or actual security breach or unauthorized disclosure.
+
+8.  AUDIT AND INSPECTION
+    a. Raniac Technologies reserves the right to audit, inspect, and verify
+       compliance with this Agreement, including requiring information about
+       systems or locations where the Software is stored or used. Recipient
+       shall cooperate and provide reasonable access and assistance.
+    b. Audits shall be conducted during normal business hours and with
+       reasonable notice, except in cases where Raniac Technologies reasonably
+       believes a material breach has occurred.
+
+9.  EXPORT CONTROL
+    Recipient shall comply with all applicable export control laws and
+    regulations. Recipient shall not export, re-export, divert, or transfer the
+    Software or any direct product thereof in violation of any export control
+    or sanctions laws.
+
+10. DATA PROTECTION
+    a. If the Software processes any personal data, the parties shall comply
+       with applicable data protection laws and maintain appropriate safeguards.
+    b. Recipient shall not attempt to identify, extract, or use personal data
+       that belongs to Raniac Technologies’ customers, users or employees unless
+       expressly authorized in writing.
+
+11. NO WARRANTY; "AS IS"
+    a. THE SOFTWARE IS PROVIDED "AS IS" AND RANIAC TECHNOLOGIES DISCLAIMS ALL
+       WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY OR OTHERWISE, INCLUDING
+       WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+       A PARTICULAR PURPOSE, TITLE, QUIET ENJOYMENT, OR NON-INFRINGEMENT.
+    b. Raniac Technologies does not warrant that the Software will be error-
+       free, secure, free of vulnerabilities, or that operation will be
+       uninterrupted.
+
+12. LIMITATION OF LIABILITY
+    a. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+       RANIAC TECHNOLOGIES, ITS AFFILIATES, LICENSORS OR SUPPLIERS BE LIABLE FOR
+       ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE
+       DAMAGES, OR FOR LOSS OF PROFITS, LOSS OF REVENUE, LOSS OF DATA, LOSS OF
+       GOODWILL, OR LOSS OF USE, ARISING OUT OF OR IN CONNECTION WITH THIS
+       AGREEMENT OR THE SOFTWARE, EVEN IF RANIAC TECHNOLOGIES HAS BEEN ADVISED
+       OF THE POSSIBILITY OF SUCH DAMAGES.
+    b. Raniac Technologies’ aggregate liability for claims arising out of or
+       relating to this Agreement shall not exceed the greater of (i) direct
+       damages proven by Recipient and (ii) the sum of INR 100,000 (one hundred
+       thousand Indian Rupees), unless otherwise agreed in a separate written
+       license.
+
+13. INDEMNIFICATION
+    Recipient shall indemnify, defend and hold harmless Raniac Technologies and
+    its officers, directors, employees and agents from and against any and all
+    claims, liabilities, losses, damages, costs and expenses (including
+    reasonable attorneys' fees) arising out of or resulting from Recipient's
+    breach of this Agreement, negligent or willful misconduct, or unauthorized
+    use or disclosure of the Software.
+
+14. TERMINATION
+    a. This Agreement is effective until terminated. Raniac Technologies may
+       terminate or suspend Recipient’s access to the Software at any time, for
+       any reason, with or without notice.
+    b. Upon termination, Recipient must cease all use of the Software and
+       promptly return or destroy all copies of the Software in its possession
+       or control, and certify in writing that it has done so.
+    c. Sections 2, 4, 5, 6, 7, 9, 10, 11, 12, 13, 15, 16 and 18 shall survive
+       termination or expiration of this Agreement.
+
+15. REMEDIES
+    a. Recipient acknowledges that monetary damages may not be an adequate remedy
+       for a breach of this Agreement and that Raniac Technologies shall be
+       entitled to seek injunctive or other equitable relief in addition to any
+       other remedies available at law or in equity.
+    b. Raniac Technologies shall be entitled to recover costs and attorneys'
+       fees incurred in enforcing its rights under this Agreement to the extent
+       permitted by law.
+
+16. THIRD-PARTY COMPONENTS
+    a. The Software may contain third-party components subject to separate
+       license terms. Recipient must comply with all such third-party license
+       obligations; however, nothing in this Agreement grants Recipient any
+       additional rights with respect to third-party components beyond those
+       provided by the third-party license.
+
+17. ASSIGNMENT
+    This Agreement and any rights hereunder may not be assigned or transferred
+    by Recipient without the prior written consent of Raniac Technologies.
+    Raniac Technologies may assign this Agreement in whole or in part.
+
+18. SEVERABILITY
+    If any provision of this Agreement is held to be unenforceable or
+    invalid, such provision shall be modified to the minimum extent necessary
+    to make it enforceable, and the remaining provisions shall remain in full
+    force and effect.
+
+19. NOTICES
+    Any notice required or permitted by this Agreement shall be in writing and
+    shall be deemed given when delivered personally, by reputable overnight
+    courier, by confirmed email to an authorized contact, or by certified mail
+    (return receipt requested) to the addresses designated by the parties.
+
+20. GOVERNING LAW & JURISDICTION
+    This Agreement shall be governed by and construed in accordance with the
+    laws of India. The courts of [Specify City/State—e.g., New Delhi, National
+    Capital Territory of Delhi] shall have exclusive jurisdiction over any
+    disputes arising out of or relating to this Agreement. (Replace bracketed
+    text with your preferred forum if desired.)
+
+21. ENTIRE AGREEMENT; AMENDMENT
+    This Agreement constitutes the entire agreement between the parties with
+    respect to the subject matter hereof and supersedes all prior oral or
+    written understandings. Any amendment or modification to this Agreement
+    must be in writing and signed by an authorized representative of Raniac
+    Technologies.
+
+22. SURVIVAL
+    All provisions that by their nature should survive termination or expiration
+    of this Agreement shall so survive.
+
+23. INTERPRETATION
+    Headings are for convenience only and do not affect interpretation. Any
+    ambiguity in this Agreement shall not be construed against the drafter.
+    Remedies are cumulative unless expressly stated otherwise.
+
+24. PUBLICITY
+    Recipient shall not issue any press release, public statement or other
+    communication regarding its access to the Software, its relationship with
+    Raniac Technologies, or the contents of the Software without Raniac
+    Technologies’ prior written consent.
+
+25. ENFORCEMENT
+    a. Raniac Technologies reserves all rights and remedies available under
+       applicable law for any breach of this Agreement, including criminal,
+       civil and injunctive relief.
+    b. Raniac Technologies may seek and obtain provisional remedies (including
+       injunctive relief) without posting bond, to prevent unauthorized use or
+       dissemination of the Software.
+
+26. MISCELLANEOUS
+    a. This Agreement does not create any joint venture, partnership, employment
+       or agency relationship between the parties.
+    b. No third party shall have any right to enforce any provision of this
+       Agreement unless expressly provided herein.
+    c. The inclusion of this license file in a private repository does not
+       supersede or replace any company policies, employment agreements,
+       contractor agreements, or NDAs which may separately govern access to or
+       use of the Software.
+
+27. CONTACT
+    For permission requests, notices, or any questions related to this Agreement:
+    Raniac Technologies
+    [Address line 1]
+    [Address line 2]
+    [Email: legal@raniac.tech]   <-- Replace with your actual contact email
+    [Phone: +91-XXXXXXXXXX]     <-- Optional: replace with your actual phone
+
+SIGNATURE:
+Raniac Technologies
+Authorized Representative
+Aayush Rana, Co-Founder
+11 November 2025
+
+DISCLAIMER: This license template is provided for convenience and informational
+purposes only and does not constitute legal advice. For enforceability,
+customization, and legal compliance (including specific jurisdiction selection,
+monetary limits, and any country-specific requirements), please consult a
+qualified attorney.
