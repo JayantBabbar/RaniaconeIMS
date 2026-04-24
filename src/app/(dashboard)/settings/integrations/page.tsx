@@ -57,7 +57,7 @@ export default function IntegrationsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Integrations"
           description="Saved connections to external systems — shipping providers, ERP systems, payment gateways, anything your team needs to sync with."
@@ -65,7 +65,7 @@ export default function IntegrationsPage() {
           badge={<Badge tone="neutral">{rows.length}</Badge>}
         />
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -82,7 +82,7 @@ export default function IntegrationsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">Name</th>
@@ -242,7 +242,7 @@ function IntegrationFormModal({ target, onClose }: { target?: Integration; onClo
             {serverError}
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Name"
             placeholder="Stripe Production"

@@ -155,7 +155,7 @@ export default function LotsPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Lots"
           description="Batch records for every batch-tracked item. Track manufacturing date, expiry date, and received quantity per lot."
@@ -165,7 +165,7 @@ export default function LotsPage() {
 
 
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <KPICard
             label="Total Lots"
             value={String(counts.all)}
@@ -214,7 +214,7 @@ export default function LotsPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {itemsLoading || lotsQuery.isLoading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -251,7 +251,7 @@ export default function LotsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5">
@@ -473,7 +473,7 @@ function AddLotModal({
         )}
         <FormField label="Item" required error={errors.item_id?.message} help="Only items you've flagged as batch-tracked appear here.">
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
             disabled={submitting}
             {...register("item_id")}
           >
@@ -494,7 +494,7 @@ function AddLotModal({
           disabled={submitting}
           {...register("lot_number")}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             type="date"
             label="Mfg Date"

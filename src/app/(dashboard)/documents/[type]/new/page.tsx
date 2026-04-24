@@ -201,7 +201,7 @@ export default function NewDocumentPage() {
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Documents", typeInfo.label, "New"]} />
-      <div className="p-5 space-y-4 max-w-2xl">
+      <div className="p-4 md:p-5 space-y-4 max-w-2xl">
         <button onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground">
           <ArrowLeft size={14} /> Back
@@ -232,7 +232,7 @@ export default function NewDocumentPage() {
             >
               <select
                 className={cn(
-                  "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                  "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                   errors.document_type_id ? "border-status-red" : "border-hairline"
                 )}
                 disabled={submitting}
@@ -244,7 +244,7 @@ export default function NewDocumentPage() {
             </FormField>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Document number"
               placeholder="Auto"
@@ -272,7 +272,7 @@ export default function NewDocumentPage() {
           >
             <select
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                 errors.party_id ? "border-status-red" : "border-hairline"
               )}
               disabled={submitting}
@@ -292,7 +292,7 @@ export default function NewDocumentPage() {
             >
               <select
                 className={cn(
-                  "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                  "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                   errors.source_location_id ? "border-status-red" : "border-hairline"
                 )}
                 disabled={submitting}
@@ -312,7 +312,7 @@ export default function NewDocumentPage() {
             >
               <select
                 className={cn(
-                  "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                  "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                   errors.destination_location_id ? "border-status-red" : "border-hairline"
                 )}
                 disabled={submitting}

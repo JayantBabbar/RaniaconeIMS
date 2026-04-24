@@ -38,26 +38,27 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
       <div
         className={cn(
-          "relative w-full mx-4 bg-white rounded-lg shadow-overlay animate-scale-in",
+          "relative w-full bg-white shadow-overlay animate-scale-in flex flex-col",
+          "rounded-t-xl sm:rounded-lg sm:mx-4 sm:my-6 max-h-[92vh]",
           widthStyles[width],
           className
         )}
       >
         {/* Header */}
         {(title || description) && (
-          <div className="px-5 pt-5 pb-0">
+          <div className="px-5 pt-5 pb-0 flex-shrink-0">
             {title && (
-              <h2 className="text-base font-semibold tracking-tight">
+              <h2 className="text-base font-semibold tracking-tight pr-8">
                 {title}
               </h2>
             )}
@@ -69,12 +70,12 @@ export function Dialog({
           </div>
         )}
 
-        {/* Content */}
-        <div className="px-5 py-4">{children}</div>
+        {/* Content — scrollable if too tall */}
+        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-5 pb-4 pt-0 flex items-center justify-end gap-2">
+          <div className="px-5 pb-4 pt-0 flex items-center justify-end gap-2 flex-shrink-0 border-t border-hairline-light sm:border-t-0 pt-3 sm:pt-0">
             {footer}
           </div>
         )}
@@ -82,7 +83,8 @@ export function Dialog({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-7 h-7 rounded flex items-center justify-center text-foreground-muted hover:bg-surface-secondary transition-colors"
+          className="absolute top-3 right-3 w-8 h-8 rounded flex items-center justify-center text-foreground-muted hover:bg-surface-secondary transition-colors"
+          aria-label="Close"
         >
           <svg
             width="14"

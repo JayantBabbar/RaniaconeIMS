@@ -163,7 +163,7 @@ export default function DocumentDetailPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <button onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground">
           <ArrowLeft size={14} /> Back
@@ -195,7 +195,7 @@ export default function DocumentDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-hairline-light text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 pt-4 border-t border-hairline-light text-sm">
             <Row label="Party" value={party ? `${party.code} — ${party.name}` : "—"} />
             <Row label="Source" value={sourceLoc ? `${sourceLoc.code}` : "—"} />
             <Row label="Destination" value={destLoc ? `${destLoc.code}` : "—"} />
@@ -212,7 +212,7 @@ export default function DocumentDetailPage() {
         </div>
 
         {/* Lines */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-5 py-3 flex items-center justify-between border-b border-hairline-light">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Line items</h2>
@@ -233,7 +233,7 @@ export default function DocumentDetailPage() {
               action={!posted && canWrite && <Button kind="primary" icon={<Plus size={13} />} onClick={() => setShowAddLine(true)}>Add your first line</Button>}
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-right px-3 py-2.5 w-12">#</th>
@@ -435,7 +435,7 @@ function AddLineModal({
         <FormField label="Item" required error={errors.item_id?.message} help="The item being ordered, transferred, or received on this line.">
           <select
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
               errors.item_id ? "border-status-red" : "border-hairline"
             )}
             disabled={submitting}
@@ -445,7 +445,7 @@ function AddLineModal({
             {items.map((i) => <option key={i.id} value={i.id}>{i.item_code} — {i.name}</option>)}
           </select>
         </FormField>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Input
             label="Quantity"
             type="number"
@@ -460,7 +460,7 @@ function AddLineModal({
           <FormField label="UoM" required error={errors.uom_id?.message} help="Unit for the quantity above. Must match one of the item's configured UoMs.">
             <select
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                 errors.uom_id ? "border-status-red" : "border-hairline"
               )}
               disabled={submitting}

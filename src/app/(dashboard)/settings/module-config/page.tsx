@@ -127,7 +127,7 @@ export default function ModuleConfigPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight">
@@ -143,7 +143,7 @@ export default function ModuleConfigPage() {
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-[30px] w-[280px]">
+          <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-9 md:h-[30px] w-full sm:w-[280px]">
             <Search size={13} className="text-foreground-muted" />
             <input
               type="text"
@@ -220,7 +220,7 @@ export default function ModuleConfigPage() {
             {Array.from(grouped.entries()).map(([module, rows]) => (
               <div
                 key={module}
-                className="bg-white border border-hairline rounded-md overflow-hidden"
+                className="bg-white border border-hairline rounded-md overflow-x-auto"
               >
                 <div className="flex items-center gap-2.5 px-4 py-3 border-b border-hairline bg-surface">
                   <div className="w-6 h-6 rounded bg-brand-light flex items-center justify-center">
@@ -229,7 +229,7 @@ export default function ModuleConfigPage() {
                   <h2 className="text-sm font-semibold capitalize">{module}</h2>
                   <Badge tone="neutral">{rows.length}</Badge>
                 </div>
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                       <th className="text-left px-4 py-2 w-64">Key</th>
@@ -404,7 +404,7 @@ function ModuleConfigModal({
             Module
           </label>
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             value={module}
             onChange={(e) => setModule(e.target.value)}
             disabled={mode === "edit"}

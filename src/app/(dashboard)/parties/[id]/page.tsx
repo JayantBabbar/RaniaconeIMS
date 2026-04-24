@@ -45,7 +45,7 @@ export default function PartyDetailPage() {
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Parties", party.name]} />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <button
           onClick={() => router.push("/parties")}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground"
@@ -155,7 +155,7 @@ function AddressesTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
           description="Add at least one address so you can ship-to or bill-to this party on future documents."
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {rows.map((a) => (
             <div key={a.id} className="bg-white border border-hairline rounded-md p-4">
               <div className="flex items-start gap-2">
@@ -267,7 +267,7 @@ function AddressFormModal({ partyId, onClose }: { partyId: string; onClose: () =
         )}
         <FormField label="Type" help="What this address is for — helps filter addresses when picking one on a document.">
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
             disabled={submitting}
             {...register("address_type")}
           >
@@ -294,7 +294,7 @@ function AddressFormModal({ partyId, onClose }: { partyId: string; onClose: () =
           disabled={submitting}
           {...register("line2")}
         />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Input label="City" placeholder="Bengaluru" error={errors.city?.message} disabled={submitting} {...register("city")} />
           <Input label="State" placeholder="Karnataka" error={errors.state?.message} disabled={submitting} {...register("state")} />
           <Input label="Postal code" placeholder="560001" error={errors.postal_code?.message} disabled={submitting} {...register("postal_code")} />
@@ -340,8 +340,8 @@ function ContactsTab({ partyId, canWrite }: { partyId: string; canWrite: boolean
           description="Add a contact person so documents tied to this party have someone to name for approvals, notifications, or deliveries."
         />
       ) : (
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                 <th className="text-left px-4 py-2.5">Name</th>

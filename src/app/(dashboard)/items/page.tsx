@@ -236,7 +236,7 @@ export default function ItemsListPage() {
       )}
 
       {/* Table */}
-      <div className="mx-5 mb-5 bg-white border border-hairline rounded-md overflow-hidden flex-1 flex flex-col">
+      <div className="mx-5 mb-5 bg-white border border-hairline rounded-md overflow-x-auto flex-1 flex flex-col">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <Spinner size={24} />
@@ -266,8 +266,59 @@ export default function ItemsListPage() {
           />
         ) : (
           <>
-            <div className="overflow-auto flex-1">
-              <table className="w-full text-sm">
+            {/* Mobile card list */}
+            <div className="md:hidden divide-y divide-hairline-light flex-1 overflow-auto">
+              {rows.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/items/${item.id}`}
+                  className="block px-4 py-3 hover:bg-surface/50 active:bg-surface transition-colors"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-mono text-[11px] text-brand-dark font-medium">
+                          {item.item_code}
+                        </span>
+                        <StatusBadge status={item.is_active ? "active" : "inactive"} />
+                      </div>
+                      <div className="font-medium text-sm truncate">{item.name}</div>
+                      <div className="text-xs text-foreground-secondary mt-0.5 truncate">
+                        {[catMap.get(item.category_id || ""), brandMap.get(item.brand_id || "")]
+                          .filter(Boolean)
+                          .join(" · ") || "Uncategorized"}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                        <Badge tone="neutral">{item.item_type}</Badge>
+                        {item.is_batch_tracked && <Badge tone="blue">Batch</Badge>}
+                        {item.is_serial_tracked && <Badge tone="blue">Serial</Badge>}
+                      </div>
+                    </div>
+                    {canWrite && (
+                      <div onClick={(e) => e.preventDefault()} className="flex-shrink-0">
+                        <ActionMenu
+                          items={[
+                            { label: "View", icon: <Eye size={12} />, href: `/items/${item.id}` },
+                            { label: "Edit", icon: <Edit size={12} />, href: `/items/${item.id}?edit=true` },
+                            { divider: true, label: "" },
+                            {
+                              label: "Delete",
+                              icon: <Trash2 size={12} />,
+                              danger: true,
+                              onClick: () => setDeleteTarget(item),
+                            },
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-auto flex-1">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                     <th className="text-left px-3 py-2.5 w-8">
@@ -443,21 +494,25 @@ export default function ItemsListPage() {
         )}
       </div>
 
-      {/* Bulk actions bar */}
+      {/* Bulk actions bar — horizontal scroll on narrow screens to prevent clipping */}
       {selectedItems.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-white rounded-md px-4 py-2 flex items-center gap-3 text-sm shadow-overlay animate-fade-in z-50">
-          <button onClick={() => setSelectedItems(new Set())}>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-foreground text-white rounded-md px-3 py-2 flex items-center gap-3 text-sm shadow-overlay animate-fade-in z-50 max-w-[calc(100vw-2rem)] overflow-x-auto whitespace-nowrap">
+          <button
+            onClick={() => setSelectedItems(new Set())}
+            className="flex-shrink-0"
+            aria-label="Clear selection"
+          >
             <X size={13} />
           </button>
-          <span className="font-medium">{selectedItems.size} selected</span>
-          <div className="w-px h-3.5 bg-neutral-600" />
-          <button className="flex items-center gap-1.5 hover:text-blue-300 transition-colors">
+          <span className="font-medium flex-shrink-0">{selectedItems.size} selected</span>
+          <div className="w-px h-3.5 bg-neutral-600 flex-shrink-0" />
+          <button className="flex items-center gap-1.5 hover:text-blue-300 transition-colors flex-shrink-0">
             <Tag size={12} /> Change category
           </button>
-          <button className="flex items-center gap-1.5 hover:text-blue-300 transition-colors">
+          <button className="flex items-center gap-1.5 hover:text-blue-300 transition-colors flex-shrink-0">
             <Download size={12} /> Export
           </button>
-          <button className="flex items-center gap-1.5 text-red-300 hover:text-red-200 transition-colors">
+          <button className="flex items-center gap-1.5 text-red-300 hover:text-red-200 transition-colors flex-shrink-0">
             <Trash2 size={12} /> Delete
           </button>
         </div>

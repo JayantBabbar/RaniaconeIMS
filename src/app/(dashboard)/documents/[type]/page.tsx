@@ -131,7 +131,7 @@ export default function DocumentsListPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title={typeInfo.label}
           description="Documents of this type, filterable by status, date range, and party. Click any row to view/edit its lines."
@@ -174,7 +174,7 @@ export default function DocumentsListPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -199,7 +199,41 @@ export default function DocumentsListPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-hairline-light">
+                {rows.map((d) => {
+                  const t = typeMap.get(d.document_type_id);
+                  const p = d.party_id ? partyMap.get(d.party_id) : null;
+                  return (
+                    <Link
+                      key={d.id}
+                      href={`/documents/detail/${d.id}`}
+                      className="block px-4 py-3 hover:bg-surface/50 active:bg-surface transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="font-mono text-xs font-bold text-brand">
+                          {d.document_number}
+                        </span>
+                        {d.posting_date
+                          ? <Badge tone="green">Posted</Badge>
+                          : <Badge tone="amber">Draft</Badge>}
+                      </div>
+                      {p && (
+                        <div className="text-sm font-medium truncate">{p.name}</div>
+                      )}
+                      <div className="flex items-center gap-2 text-[11px] text-foreground-muted mt-0.5 flex-wrap">
+                        <Badge tone="blue">{t?.code || "—"}</Badge>
+                        <span className="font-mono">{formatDate(d.document_date)}</span>
+                        {p && <span className="font-mono">· {p.code}</span>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <table className="hidden md:table w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -257,6 +291,7 @@ export default function DocumentsListPage() {
                 })}
               </tbody>
             </table>
+            </>
           )}
         </div>
       </div>

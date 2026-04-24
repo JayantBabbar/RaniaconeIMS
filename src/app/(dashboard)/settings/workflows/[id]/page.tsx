@@ -91,7 +91,7 @@ export default function WorkflowDetailPage() {
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Settings", "Workflows", wf.name]} />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <button onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground">
           <ArrowLeft size={14} /> Back
@@ -111,7 +111,7 @@ export default function WorkflowDetailPage() {
         </div>
 
         {/* States */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-5 py-3 flex items-center justify-between border-b border-hairline-light">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">States</h2>
@@ -129,7 +129,7 @@ export default function WorkflowDetailPage() {
               description="Pick statuses from Status Master to act as stages in this workflow. Mark one as 'initial' — that's where new records start."
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-right px-3 py-2 w-12">Order</th>
@@ -168,7 +168,7 @@ export default function WorkflowDetailPage() {
         </div>
 
         {/* Transitions */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-5 py-3 flex items-center justify-between border-b border-hairline-light">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Transitions</h2>
@@ -190,7 +190,7 @@ export default function WorkflowDetailPage() {
               description={states.length < 2 ? "Add at least 2 states before you can define transitions between them." : "Define which state changes are allowed — e.g. 'Draft → Submitted'. Transitions are one-way; add both directions if you need reversibility."}
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">From</th>
@@ -316,7 +316,7 @@ function AddStateModal({
           <select value={form.status_id}
             onChange={(e) => { setForm({ ...form, status_id: e.target.value }); setErrors({}); }}
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
               errors.status_id ? "border-status-red" : "border-hairline"
             )}>
             <option value="">— Select —</option>
@@ -404,7 +404,7 @@ function AddTransitionModal({
           <select value={form.from_state_id}
             onChange={(e) => { setForm({ ...form, from_state_id: e.target.value }); setErrors({ ...errors, from_state_id: "" }); }}
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
               errors.from_state_id ? "border-status-red" : "border-hairline"
             )}>
             <option value="">— Select —</option>
@@ -415,7 +415,7 @@ function AddTransitionModal({
           <select value={form.to_state_id}
             onChange={(e) => { setForm({ ...form, to_state_id: e.target.value }); setErrors({ ...errors, to_state_id: "" }); }}
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
               errors.to_state_id ? "border-status-red" : "border-hairline"
             )}>
             <option value="">— Select —</option>

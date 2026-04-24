@@ -146,7 +146,7 @@ export default function UserDetailPage() {
         }
       />
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 md:p-5 space-y-5">
         <button
           onClick={() => router.push("/admin/users")}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
@@ -169,7 +169,7 @@ export default function UserDetailPage() {
           }
         />
 
-        <div className="grid grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* User info card */}
           <div className="col-span-2 bg-white border border-hairline rounded-md p-5">
             <div className="flex items-start gap-4 mb-6">
@@ -184,7 +184,7 @@ export default function UserDetailPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <DetailRow icon={<Mail size={13} />} label="Email" value={user.email} />
               <DetailRow icon={<UserIcon size={13} />} label="Full Name" value={user.full_name || "—"} />
               <DetailRow icon={<Calendar size={13} />} label="Created" value={formatDate(user.created_at)} />

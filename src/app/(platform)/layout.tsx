@@ -4,11 +4,8 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { PlatformSidebar } from "@/components/layout/platform-sidebar";
+import { SidebarProvider, useSidebar } from "@/components/layout/sidebar-context";
 import { PageLoading } from "@/components/ui/shared";
-
-// ═══════════════════════════════════════════════════════════
-// Platform Layout — Only accessible by super_admin users
-// ═══════════════════════════════════════════════════════════
 
 export default function PlatformLayout({
   children,
@@ -22,7 +19,6 @@ export default function PlatformLayout({
     if (!isLoading && !isAuthenticated) {
       router.replace("/login");
     }
-    // If authenticated but not super admin, redirect to client dashboard
     if (!isLoading && isAuthenticated && !isSuperAdmin) {
       router.replace("/dashboard");
     }
@@ -41,9 +37,28 @@ export default function PlatformLayout({
   }
 
   return (
+    <SidebarProvider>
+      <PlatformShell>{children}</PlatformShell>
+    </SidebarProvider>
+  );
+}
+
+function PlatformShell({ children }: { children: React.ReactNode }) {
+  const { isMobileOpen, closeMobile } = useSidebar();
+
+  return (
     <div className="h-screen flex overflow-hidden">
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-fade-in"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
       <PlatformSidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {children}
+      </main>
     </div>
   );
 }

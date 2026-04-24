@@ -118,7 +118,7 @@ export default function CountDetailPage() {
           )
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <button onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground">
           <ArrowLeft size={14} /> Back
@@ -152,7 +152,7 @@ export default function CountDetailPage() {
         </div>
 
         {/* Lines */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-5 py-3 flex items-center justify-between border-b border-hairline-light">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Count lines</h2>
@@ -179,7 +179,7 @@ export default function CountDetailPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">Item</th>
@@ -360,7 +360,7 @@ function AddLineModal({
               if (errors.item_id) setErrors({ ...errors, item_id: "" });
             }}
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
               errors.item_id ? "border-status-red" : "border-hairline"
             )}>
             <option value="">— Select —</option>

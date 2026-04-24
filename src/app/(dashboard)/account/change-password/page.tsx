@@ -99,7 +99,7 @@ export default function ChangePasswordPage() {
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Account", "Change Password"]} />
 
-      <div className="p-5 space-y-4 max-w-xl">
+      <div className="p-4 md:p-5 space-y-4 max-w-xl">
         <button
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground"

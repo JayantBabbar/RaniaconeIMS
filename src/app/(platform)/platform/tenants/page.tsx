@@ -136,7 +136,7 @@ export default function TenantManagementPage() {
       />
 
       <div className="flex-1 overflow-auto">
-        <div className="p-5 space-y-4">
+        <div className="p-4 md:p-5 space-y-4">
           {/* Header */}
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight">Tenants</h1>
@@ -174,7 +174,7 @@ export default function TenantManagementPage() {
           )}
 
           {/* Table */}
-          <div className="bg-white border border-hairline rounded-md overflow-hidden">
+          <div className="bg-white border border-hairline rounded-md overflow-x-auto">
             {isLoading ? (
               <div className="py-20 flex justify-center">
                 <Spinner size={24} />
@@ -204,7 +204,7 @@ export default function TenantManagementPage() {
               />
             ) : (
               <>
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                       <th className="text-left px-3.5 py-2.5">
@@ -477,7 +477,7 @@ function CreateTenantModal({
       width="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Input
               label="Tenant Name"
@@ -499,11 +499,11 @@ function CreateTenantModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Base Currency" required error={errors.base_currency_id}>
             <select
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded",
                 "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
                 errors.base_currency_id ? "border-status-red" : "border-hairline"
               )}
@@ -527,7 +527,7 @@ function CreateTenantModal({
 
           <FormField label="Timezone">
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.timezone}
               onChange={(e) => updateField("timezone", e.target.value)}
             >
@@ -538,10 +538,10 @@ function CreateTenantModal({
           </FormField>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Plan">
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.plan}
               onChange={(e) => updateField("plan", e.target.value)}
             >
@@ -554,7 +554,7 @@ function CreateTenantModal({
 
           <FormField label="Initial Status">
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.status}
               onChange={(e) => updateField("status", e.target.value)}
             >
@@ -692,10 +692,10 @@ function EditTenantModal({
           required
           maxLength={255}
         />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Status" required>
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value as Tenant["status"] })}
             >
@@ -706,7 +706,7 @@ function EditTenantModal({
           </FormField>
           <FormField label="Plan">
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.plan}
               onChange={(e) => setForm({ ...form, plan: e.target.value })}
             >
@@ -718,11 +718,11 @@ function EditTenantModal({
             </select>
           </FormField>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Base Currency" required error={errors.base_currency_id}>
             <select
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded",
                 "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
                 errors.base_currency_id ? "border-status-red" : "border-hairline"
               )}
@@ -743,7 +743,7 @@ function EditTenantModal({
           <FormField label="Timezone" required error={errors.timezone}>
             <select
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded",
                 "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",
                 errors.timezone ? "border-status-red" : "border-hairline"
               )}

@@ -88,7 +88,7 @@ export default function TenantDetailPage() {
         }
       />
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 md:p-5 space-y-5">
         <button
           onClick={() => router.push("/platform/tenants")}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
@@ -148,7 +148,7 @@ export default function TenantDetailPage() {
         </div>
 
         {/* Details grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white border border-hairline rounded-md p-5 space-y-4">
             <h2 className="text-sm font-semibold">Configuration</h2>
             <DetailRow
@@ -217,7 +217,7 @@ export default function TenantDetailPage() {
         </div>
 
         {/* Users in this tenant */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-5 py-3 flex items-center justify-between border-b border-hairline-light">
             <div className="flex items-center gap-2.5">
               <h2 className="text-sm font-semibold">Users</h2>
@@ -252,7 +252,7 @@ export default function TenantDetailPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">User</th>

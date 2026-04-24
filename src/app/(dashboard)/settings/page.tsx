@@ -70,7 +70,7 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Settings"]} />
-      <div className="p-5 space-y-6">
+      <div className="p-4 md:p-5 space-y-6">
         <PageHeader
           title="Settings"
           description="The control room for your workspace. Set up the reference data every other screen relies on, control who can do what, automate document lifecycles, and connect outside systems."
@@ -83,7 +83,7 @@ export default function SettingsPage() {
               <h2 className="text-sm font-semibold">{s.title}</h2>
               <p className="text-xs text-foreground-muted">{s.description}</p>
             </div>
-            <div className="grid grid-cols-3 gap-2 max-w-4xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-w-4xl">
               {s.items.map((item) => {
                 const Icon = item.icon;
                 return (

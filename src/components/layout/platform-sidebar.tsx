@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useBranding } from "@/providers/branding-provider";
+import { useSidebar } from "@/components/layout/sidebar-context";
 import {
   LayoutDashboard,
   Building2,
@@ -13,6 +14,7 @@ import {
   Activity,
   Users,
   LogOut,
+  X,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -91,14 +93,19 @@ export function PlatformSidebar() {
   const { user, logout } = useAuth();
   const brand = useBranding();
   const Logo = brand.LogoMark;
-  const [collapsed, setCollapsed] = useState(false);
+  const { isMobileOpen, closeMobile } = useSidebar();
+  const [collapsed] = useState(false);
 
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-sidebar-bg text-sidebar-text flex-shrink-0 transition-all duration-200",
-        collapsed ? "w-[52px]" : "w-[220px]"
+        "flex flex-col h-screen bg-sidebar-bg text-sidebar-text transition-all duration-200",
+        "fixed top-0 left-0 z-50 w-[260px] shadow-xl",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full",
+        "lg:static lg:translate-x-0 lg:shadow-none lg:z-auto lg:flex-shrink-0",
+        collapsed ? "lg:w-[52px]" : "lg:w-[220px]"
       )}
+      aria-label="Platform navigation"
     >
       {/* Logo + Platform badge */}
       <div className="flex items-center gap-2.5 px-4 h-12 border-b border-sidebar-border flex-shrink-0">
@@ -115,6 +122,13 @@ export function PlatformSidebar() {
             </span>
           </div>
         )}
+        <button
+          onClick={closeMobile}
+          className="ml-auto lg:hidden text-sidebar-text-muted hover:text-sidebar-text p-1 -mr-1 rounded"
+          aria-label="Close navigation"
+        >
+          <X size={16} />
+        </button>
       </div>
 
       {/* Nav */}

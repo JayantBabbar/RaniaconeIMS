@@ -171,7 +171,7 @@ function DocumentPrintView({ documentId }: { documentId: string }) {
         </div>
 
         {/* Header fields */}
-        <div className="grid grid-cols-2 gap-6 text-sm mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm mb-6">
           <div className="space-y-2">
             {doc.document_date && (
               <Field label="Document date" value={doc.document_date} />
@@ -208,7 +208,7 @@ function DocumentPrintView({ documentId }: { documentId: string }) {
 
         {/* Lines */}
         <div className="border-t border-b border-hairline">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider bg-surface print:bg-white">
                 <th className="text-left px-3 py-2 w-8">#</th>

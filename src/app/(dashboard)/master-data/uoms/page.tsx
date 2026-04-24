@@ -113,7 +113,7 @@ export default function UomsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Units of Measure"
           description="The units you quantify items in — like kilograms, litres, pieces, or boxes. You'll pick one every time you add an item or record stock movements, so keep the list tight and meaningful."
@@ -152,7 +152,7 @@ export default function UomsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center">
               <Spinner size={24} />
@@ -183,7 +183,7 @@ export default function UomsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -393,7 +393,7 @@ function UomFormModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Code"
             placeholder="KG"
@@ -430,7 +430,7 @@ function UomFormModal({
           help="Group units that can be converted between (e.g. Weight contains kg, g, and tonne). You can leave this blank and set it later."
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             disabled={isEdit || submitting}
             {...register("uom_category_id")}
           >

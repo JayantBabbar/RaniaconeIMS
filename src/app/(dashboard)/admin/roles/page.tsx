@@ -68,7 +68,7 @@ export default function RolesPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Roles"
           description="Roles are named bundles of permissions you assign to users. Create roles that match your team's job functions — e.g. 'Warehouse Operator', 'Purchaser', 'Finance Viewer' — then assign them from each user's profile."
@@ -98,7 +98,7 @@ export default function RolesPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {roles.map((role) => (
               <RoleCard key={role.id} role={role} canWrite={canWrite} onDelete={() => setDeleteTarget(role)} />
             ))}

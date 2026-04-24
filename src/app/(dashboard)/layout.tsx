@@ -4,16 +4,8 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/layout/sidebar-context";
 import { PageLoading } from "@/components/ui/shared";
-
-// ═══════════════════════════════════════════════════════════
-// Dashboard Layout — Authenticated shell with sidebar.
-//
-// Guards:
-//   • Unauthenticated → /login
-//   • Super admin → /platform/overview (they belong on the platform
-//     sidebar; any inventory call would 400 without a tenant context).
-// ═══════════════════════════════════════════════════════════
 
 export default function DashboardLayout({
   children,
@@ -47,9 +39,29 @@ export default function DashboardLayout({
   }
 
   return (
+    <SidebarProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </SidebarProvider>
+  );
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const { isMobileOpen, closeMobile } = useSidebar();
+
+  return (
     <div className="h-screen flex overflow-hidden">
+      {/* Mobile backdrop — only when drawer is open */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-fade-in"
+          onClick={closeMobile}
+          aria-hidden="true"
+        />
+      )}
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {children}
+      </main>
     </div>
   );
 }

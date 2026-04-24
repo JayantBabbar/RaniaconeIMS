@@ -202,7 +202,7 @@ function GeneralTab({ item }: { item: Item }) {
   return (
     <div className="bg-white border border-hairline rounded-md p-5 max-w-3xl">
       <h2 className="text-sm font-semibold mb-4">Item Information</h2>
-      <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
         <FieldDisplay label="Item Code" value={item.item_code} mono />
         <FieldDisplay label="Name" value={item.name} />
         <FieldDisplay label="Item Type" value={item.item_type} />
@@ -256,7 +256,7 @@ function IdentifiersTab({ itemId, canWrite }: { itemId: string; canWrite: boolea
   });
 
   return (
-    <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-3xl">
+    <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-3xl">
       <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
         <h2 className="text-sm font-semibold">Identifiers</h2>
         {canWrite && <Button size="sm" icon={<Plus size={12} />} onClick={() => setShowAdd(true)}>Add</Button>}
@@ -265,7 +265,7 @@ function IdentifiersTab({ itemId, canWrite }: { itemId: string; canWrite: boolea
         !identifiers || identifiers.length === 0 ? (
           <EmptyState icon={<Barcode size={20} />} title="No identifiers" description="Add barcodes, SKUs, or GTINs" />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead><tr className="bg-surface text-[10.5px] text-foreground-muted uppercase tracking-wider">
               <th className="text-left px-4 py-2 font-medium">Type</th>
               <th className="text-left px-4 py-2 font-medium">Value</th>
@@ -411,7 +411,7 @@ function LotsTab({ itemId, canWrite }: { itemId: string; canWrite: boolean }) {
   };
 
   return (
-    <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-4xl">
+    <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-4xl">
       <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
         <h2 className="text-sm font-semibold">Lots / Batches</h2>
         {canWrite && <Button size="sm" icon={<Plus size={12} />}>Add Lot</Button>}
@@ -420,7 +420,7 @@ function LotsTab({ itemId, canWrite }: { itemId: string; canWrite: boolean }) {
         !lots || lots.length === 0 ? (
           <EmptyState icon={<Package size={20} />} title="No lots" description="Create lots with manufacturing and expiry dates" />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead><tr className="bg-surface text-[10.5px] text-foreground-muted uppercase tracking-wider">
               <th className="text-left px-4 py-2 font-medium">Lot Number</th>
               <th className="text-left px-4 py-2 font-medium">Mfg Date</th>
@@ -482,7 +482,7 @@ function StockTab({ itemId }: { itemId: string }) {
   });
 
   return (
-    <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-4xl">
+    <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-4xl">
       <div className="px-4 py-3 border-b border-hairline">
         <h2 className="text-sm font-semibold">Stock Balance by Location</h2>
       </div>
@@ -490,7 +490,7 @@ function StockTab({ itemId }: { itemId: string }) {
         !balances || balances.length === 0 ? (
           <EmptyState icon={<BarChart3 size={20} />} title="No stock" description="This item has no inventory in any location" />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead><tr className="bg-surface text-[10.5px] text-foreground-muted uppercase tracking-wider">
               <th className="text-left px-4 py-2 font-medium">Location</th>
               <th className="text-right px-4 py-2 font-medium">On Hand</th>
@@ -601,7 +601,7 @@ function SubResourceTable({
   canWrite?: boolean;
 }) {
   return (
-    <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-4xl">
+    <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-4xl">
       <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
         <h2 className="text-sm font-semibold">{title}</h2>
         {canWrite && <Button size="sm" icon={<Plus size={12} />}>Add</Button>}
@@ -610,7 +610,7 @@ function SubResourceTable({
         rows.length === 0 ? (
           <EmptyState icon={icon} title={emptyText} description={emptyDesc} />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead><tr className="bg-surface text-[10.5px] text-foreground-muted uppercase tracking-wider">
               {headers.map((h, i) => (
                 <th key={i} className={cn("px-4 py-2 font-medium", i >= headers.length - 1 ? "text-right" : "text-left")}>{h}</th>

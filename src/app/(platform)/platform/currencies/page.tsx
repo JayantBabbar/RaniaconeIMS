@@ -56,7 +56,7 @@ export default function CurrencyCatalogPage() {
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Platform", "Currencies"]} />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight">Currencies</h1>
           <Badge tone="neutral">
@@ -98,7 +98,7 @@ export default function CurrencyCatalogPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-3xl">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-3xl">
           {isLoading ? (
             <div className="py-16 flex justify-center">
               <Spinner size={24} />
@@ -119,7 +119,7 @@ export default function CurrencyCatalogPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">

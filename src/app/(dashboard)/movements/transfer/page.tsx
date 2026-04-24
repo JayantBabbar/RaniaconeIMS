@@ -206,7 +206,7 @@ export default function StockTransferWizardPage() {
         }
       />
 
-      <div className="p-5 space-y-5 max-w-5xl">
+      <div className="p-4 md:p-5 space-y-5 max-w-5xl">
         <PageHeader
           title="Stock Transfer"
           description="Move stock between locations. The wizard posts paired OUT and IN movements atomically — either both succeed or neither happens."
@@ -381,10 +381,10 @@ function Step1({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold">Pick source and destination</h2>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <FormField label="From (Source)" required>
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
             value={sourceId}
             onChange={(e) => onSource(e.target.value)}
           >
@@ -398,7 +398,7 @@ function Step1({
         </FormField>
         <FormField label="To (Destination)" required>
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
             value={destId}
             onChange={(e) => onDest(e.target.value)}
           >
@@ -445,7 +445,7 @@ function Step2({
         <ArrowRight size={14} className="text-foreground-muted" />
         <Badge tone="blue">{dest?.name}</Badge>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           type="date"
           label="Posting Date"
@@ -649,7 +649,7 @@ function Step4({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
         <div>
           <div className="text-[10.5px] text-foreground-muted uppercase tracking-wider font-medium">
             Posting Date

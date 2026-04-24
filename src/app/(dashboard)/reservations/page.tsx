@@ -151,7 +151,7 @@ export default function ReservationsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Reservations"
           description="Soft-hold stock for open orders without physically moving it. Prevents you from committing the same stock to two customers."
@@ -190,7 +190,7 @@ export default function ReservationsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -213,7 +213,7 @@ export default function ReservationsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -396,7 +396,7 @@ function ReservationFormModal({
         <FormField label="Item" required error={errors.item_id?.message} help="The item to hold stock of.">
           <select
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
               errors.item_id ? "border-status-red" : "border-hairline"
             )}
             disabled={submitting}
@@ -409,7 +409,7 @@ function ReservationFormModal({
         <FormField label="Location" required error={errors.location_id?.message} help="Where the stock is physically held.">
           <select
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
               errors.location_id ? "border-status-red" : "border-hairline"
             )}
             disabled={submitting}

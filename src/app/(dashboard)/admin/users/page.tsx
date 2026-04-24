@@ -152,7 +152,7 @@ export default function UsersPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Users"
           description="People who can sign in to this workspace. Inviting someone creates their account and sets their initial password; you can then assign them roles to control what they can do."
@@ -193,7 +193,7 @@ export default function UsersPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -224,7 +224,7 @@ export default function UsersPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5">

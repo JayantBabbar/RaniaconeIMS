@@ -163,7 +163,7 @@ export default function NewItemPage() {
           {/* Basic info */}
           <div className="bg-white border border-hairline rounded-md p-5">
             <h2 className="text-sm font-semibold mb-4">Basic Information</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Item Code"
                 placeholder="SKU-001"
@@ -195,10 +195,10 @@ export default function NewItemPage() {
           {/* Classification */}
           <div className="bg-white border border-hairline rounded-md p-5">
             <h2 className="text-sm font-semibold mb-4">Classification</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField label="Item Type" help="Stock items carry inventory balances; services and consumables do not.">
                 <select
-                  className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                   disabled={loading}
                   {...register("item_type")}
                 >
@@ -209,7 +209,7 @@ export default function NewItemPage() {
               </FormField>
               <FormField label="Category" help="Optional grouping used for filters and reports.">
                 <select
-                  className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                   disabled={loading}
                   {...register("category_id")}
                 >
@@ -221,7 +221,7 @@ export default function NewItemPage() {
               </FormField>
               <FormField label="Brand" help="Optional. Useful when you stock multiple brands of the same kind of item.">
                 <select
-                  className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                   disabled={loading}
                   {...register("brand_id")}
                 >

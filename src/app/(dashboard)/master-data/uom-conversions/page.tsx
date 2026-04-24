@@ -106,7 +106,7 @@ export default function UomConversionsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="UoM Conversions"
           description="How one unit equals another inside the same category — '1 kg = 1000 g', '1 box = 24 each'. The system uses these to convert automatically when you buy in one unit but track stock in another."
@@ -145,7 +145,7 @@ export default function UomConversionsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-3xl">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-3xl">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -166,7 +166,7 @@ export default function UomConversionsPage() {
                 ) : undefined
               } />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -354,7 +354,7 @@ function ConvFormModal({ open, onClose, target, uoms }: {
           error={errors.from_uom_id?.message}
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             disabled={isEdit || submitting}
             {...register("from_uom_id")}
           >
@@ -369,7 +369,7 @@ function ConvFormModal({ open, onClose, target, uoms }: {
           error={errors.to_uom_id?.message}
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             disabled={isEdit || submitting}
             {...register("to_uom_id")}
           >

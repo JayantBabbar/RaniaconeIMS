@@ -87,7 +87,7 @@ export default function TenantConfigPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight">
@@ -101,7 +101,7 @@ export default function TenantConfigPage() {
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-[30px] w-[320px]">
+        <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-9 md:h-[30px] w-full sm:w-[320px]">
           <Search size={13} className="text-foreground-muted" />
           <input
             type="text"
@@ -118,7 +118,7 @@ export default function TenantConfigPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -147,7 +147,7 @@ export default function TenantConfigPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5 w-64">Key</th>

@@ -117,7 +117,7 @@ export default function ItemCategoriesPage() {
           </>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Item Categories"
           description="A hierarchy your team uses to organise items. Think folders — 'Tablets' can sit under 'Medicines'. Useful for navigating a large catalogue and for reports."
@@ -138,7 +138,7 @@ export default function ItemCategoriesPage() {
           />
         </div>
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-4xl">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-4xl">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -430,7 +430,7 @@ function CategoryFormModal({
           help="Pick a parent to nest this category under, or leave as root for a top-level group."
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             value={form.parent_id || ""}
             disabled={loading}
             onChange={(e) => setForm({ ...form, parent_id: e.target.value })}

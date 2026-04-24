@@ -68,7 +68,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-required={required || undefined}
             aria-invalid={error ? true : undefined}
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm font-medium",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm font-medium",
               "bg-white border border-hairline rounded",
               "placeholder:text-foreground-muted placeholder:font-normal",
               "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand",

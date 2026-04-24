@@ -42,17 +42,17 @@ export function GlobalSearch({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-[30px] w-[280px]",
+        "flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-[34px] md:h-[30px] w-full sm:w-[280px]",
         className,
       )}
     >
-      <Search size={13} className="text-foreground-muted" />
+      <Search size={13} className="text-foreground-muted flex-shrink-0" />
       <input
         type="text"
         placeholder={placeholder}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="flex-1 text-sm bg-transparent outline-none placeholder:text-foreground-muted"
+        className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder:text-foreground-muted"
       />
       {search && (
         <button

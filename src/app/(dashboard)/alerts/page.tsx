@@ -207,7 +207,7 @@ export default function LowStockAlertsPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Low Stock Alerts"
           description="Items at or below their reorder threshold, per location. Click 'Reorder' to open a pre-filled Purchase Order."
@@ -220,7 +220,7 @@ export default function LowStockAlertsPage() {
         />
 
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <KPICard
             label="Total Alerts"
             value={String(counts.all)}
@@ -269,7 +269,7 @@ export default function LowStockAlertsPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {loading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -296,7 +296,7 @@ export default function LowStockAlertsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5">

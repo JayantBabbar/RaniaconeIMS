@@ -66,7 +66,7 @@ export default function WebhooksPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Webhooks"
           description="Outbound HTTP notifications. When something interesting happens in the system (e.g. a document is posted), we POST a JSON payload to your configured URL."
@@ -80,7 +80,7 @@ export default function WebhooksPage() {
           </div>
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -94,7 +94,7 @@ export default function WebhooksPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">Integration</th>
@@ -261,7 +261,7 @@ function WebhookFormModal({
         <FormField label="Integration" required error={errors.integration_id?.message} help="The saved integration that owns this webhook — its delivery log groups events.">
           <select
             className={cn(
-              "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+              "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
               errors.integration_id ? "border-status-red" : "border-hairline"
             )}
             disabled={isEdit || submitting}

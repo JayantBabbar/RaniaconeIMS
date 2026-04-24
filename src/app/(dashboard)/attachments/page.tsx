@@ -137,7 +137,7 @@ export default function AttachmentsPage() {
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Attachments"]} />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Attachments"
           description="Every file uploaded anywhere in this workspace — invoices attached to documents, photos on items, policy PDFs on parties. Search by filename, filter by entity type, or click through to the record it's attached to."
@@ -170,7 +170,7 @@ export default function AttachmentsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center">
               <Spinner size={24} />
@@ -195,7 +195,7 @@ export default function AttachmentsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   {columns.map((col) => (

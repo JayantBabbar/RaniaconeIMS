@@ -109,7 +109,7 @@ export default function PermissionsReferencePage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Permissions reference"
           description="Every permission your workspace can grant, grouped by the feature it unlocks. This page is read-only — you assign permissions to roles from the Roles screen, then assign roles to users."
@@ -127,7 +127,7 @@ export default function PermissionsReferencePage() {
 
         {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-[30px] w-[280px]">
+          <div className="flex items-center gap-2 bg-white border border-hairline rounded px-2.5 h-9 md:h-[30px] w-full sm:w-[280px]">
             <Search size={13} className="text-foreground-muted" />
             <input
               type="text"
@@ -198,7 +198,7 @@ export default function PermissionsReferencePage() {
             {Array.from(filtered.entries()).map(([module, perms]) => (
               <div
                 key={module}
-                className="bg-white border border-hairline rounded-md overflow-hidden"
+                className="bg-white border border-hairline rounded-md overflow-x-auto"
               >
                 <div className="flex items-center gap-2.5 px-4 py-3 border-b border-hairline bg-surface">
                   <div className="w-6 h-6 rounded bg-brand-light flex items-center justify-center">
@@ -207,7 +207,7 @@ export default function PermissionsReferencePage() {
                   <h2 className="text-sm font-semibold capitalize">{module}</h2>
                   <Badge tone="neutral">{perms.length}</Badge>
                 </div>
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                       <th className="text-left px-4 py-2 w-64">Code</th>

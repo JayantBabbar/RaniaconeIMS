@@ -120,7 +120,7 @@ export default function StockBalancesPage() {
     <RequireRead perm="inventory.balances.read" crumbs={["Inventory", "Stock Balances"]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Inventory", "Stock Balances"]} />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Stock Balances"
           description="How much of each item is physically present in each location, right now. The ledger of truth for inventory on hand."
@@ -134,7 +134,7 @@ export default function StockBalancesPage() {
         />
 
         {/* KPI row */}
-        <div className="grid grid-cols-3 gap-3 max-w-3xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl">
           <KpiCard label="Distinct items" value={totals.items.toLocaleString()} />
           <KpiCard label="Locations in use" value={totals.locations.toLocaleString()} />
           <KpiCard label="Inventory value" value={totals.totalValue.toFixed(2)} />
@@ -175,7 +175,7 @@ export default function StockBalancesPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -194,7 +194,47 @@ export default function StockBalancesPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-hairline-light">
+                {rows.map((b: Balance) => {
+                  const item = itemMap.get(b.item_id);
+                  const loc = locMap.get(b.location_id);
+                  return (
+                    <div key={b.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm truncate">{item?.name || "—"}</div>
+                          <div className="text-[11px] text-foreground-muted font-mono truncate">
+                            {item?.item_code} · {loc?.code}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-semibold tabular-nums">{b.qty_on_hand}</div>
+                          <div className="text-[10px] text-foreground-muted uppercase tracking-wider">on hand</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[11px] pt-1.5 border-t border-hairline-light/60">
+                        <div>
+                          <div className="text-foreground-muted">Reserved</div>
+                          <div className="tabular-nums font-medium text-status-amber-text">{b.qty_reserved}</div>
+                        </div>
+                        <div>
+                          <div className="text-foreground-muted">Available</div>
+                          <div className="tabular-nums font-medium text-status-green-text">{b.qty_available}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-foreground-muted">Value</div>
+                          <div className="tabular-nums font-medium">{parseFloat(b.value).toFixed(2)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <table className="hidden md:table w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -254,6 +294,7 @@ export default function StockBalancesPage() {
                 })}
               </tbody>
             </table>
+            </>
           )}
         </div>
       </div>

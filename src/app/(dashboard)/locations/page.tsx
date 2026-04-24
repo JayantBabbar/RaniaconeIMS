@@ -109,7 +109,7 @@ export default function LocationsPage() {
           </>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Locations & Bins"
           description="Where your stock physically lives. Build a tree: warehouses at the top, zones inside them, aisles and bins further in. Every stock movement and balance points at a location."
@@ -117,7 +117,7 @@ export default function LocationsPage() {
           badge={<Badge tone="neutral">{rows.length}</Badge>}
         />
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-4xl">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-4xl">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -351,7 +351,7 @@ function LocationFormModal({
       width="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Code"
             placeholder="WH-01"
@@ -367,7 +367,7 @@ function LocationFormModal({
             help="Broad category of the location. Use 'warehouse' for the top of each tree; 'zone', 'aisle', 'shelf', 'bin' for inner levels; 'yard', 'staging', 'transit' for special areas."
           >
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
               value={form.location_type}
               onChange={(e) => setForm({ ...form, location_type: e.target.value })}
               disabled={isEdit}
@@ -391,7 +391,7 @@ function LocationFormModal({
           help="Where this location sits in the tree. Leave blank for a top-level warehouse."
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
             value={form.parent_id || ""}
             onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
           >
@@ -450,7 +450,7 @@ function BinsModal({ location, onClose, canWrite }: { location: InventoryLocatio
             </div>
           ) : (
             <div className="border border-hairline rounded-md overflow-hidden">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                     <th className="text-left px-3 py-2">Code</th>

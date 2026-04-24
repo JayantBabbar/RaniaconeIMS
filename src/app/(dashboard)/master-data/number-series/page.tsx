@@ -106,7 +106,7 @@ export default function NumberSeriesPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Number Series"
           description="Auto-generate document numbers like PO-00001, SO-00042. Each series belongs to one entity (PO, SO, Transfer, Stock Count) and hands out sequential numbers on demand."
@@ -145,7 +145,7 @@ export default function NumberSeriesPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -170,7 +170,7 @@ export default function NumberSeriesPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -426,7 +426,7 @@ function NumberSeriesFormModal({
           error={errors.entity?.message}
         >
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
             disabled={isEdit || submitting}
             {...register("entity")}
           >
@@ -436,7 +436,7 @@ function NumberSeriesFormModal({
             <option value="lot">Lot</option>
           </select>
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Prefix"
             placeholder="PO-"
@@ -454,7 +454,7 @@ function NumberSeriesFormModal({
             {...register("suffix")}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Padding"
             type="number"

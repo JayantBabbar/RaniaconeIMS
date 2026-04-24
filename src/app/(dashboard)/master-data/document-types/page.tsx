@@ -116,7 +116,7 @@ export default function DocumentTypesPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Document Types"
           description="The kinds of documents your business creates — Purchase Order, Sales Order, Transfer, Goods Receipt. Each type decides whether the document affects stock and in which direction."
@@ -155,7 +155,7 @@ export default function DocumentTypesPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -176,7 +176,7 @@ export default function DocumentTypesPage() {
                 ) : undefined
               } />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -363,7 +363,7 @@ function DocTypeFormModal({ open, onClose, target }: { open: boolean; onClose: (
             {serverError}
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Code"
             placeholder="PO"
@@ -385,14 +385,14 @@ function DocTypeFormModal({ open, onClose, target }: { open: boolean; onClose: (
             {...register("name")}
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField
             label="Module"
             help="Which part of the app this document lives under."
             error={errors.module?.message}
           >
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
               disabled={isEdit || submitting}
               {...register("module")}
             >
@@ -406,7 +406,7 @@ function DocTypeFormModal({ open, onClose, target }: { open: boolean; onClose: (
             error={errors.direction?.message}
           >
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
               disabled={isEdit || submitting}
               {...register("direction")}
             >

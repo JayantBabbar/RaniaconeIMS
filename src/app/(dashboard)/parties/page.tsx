@@ -128,7 +128,7 @@ export default function PartiesPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Parties"
           description="The businesses you buy from and sell to. Suppliers and customers both live here — one entry per company, with their addresses, contacts, tax ID, and default currency."
@@ -167,7 +167,7 @@ export default function PartiesPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -196,7 +196,7 @@ export default function PartiesPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   {columns.slice(0, 4).map((col) => (
@@ -372,7 +372,7 @@ function PartyFormModal({ open, onClose, target }: { open: boolean; onClose: () 
       width="md"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Code"
             placeholder="ACME-CO"
@@ -388,7 +388,7 @@ function PartyFormModal({ open, onClose, target }: { open: boolean; onClose: () 
             help={`"Customer" = you sell to them. "Supplier" = you buy from them. "Both" = you do both.`}
           >
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.party_type}
               onChange={(e) => setForm({ ...form, party_type: e.target.value })}
             >
@@ -413,7 +413,7 @@ function PartyFormModal({ open, onClose, target }: { open: boolean; onClose: () 
           value={form.legal_name}
           onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Tax ID / GSTIN"
             placeholder="29AAAAA0000A1Z5"
@@ -426,7 +426,7 @@ function PartyFormModal({ open, onClose, target }: { open: boolean; onClose: () 
             help="If this party always trades in a specific currency, set it here. Leave blank to use your workspace's default on each document."
           >
             <select
-              className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.currency_id}
               onChange={(e) => setForm({ ...form, currency_id: e.target.value })}
             >

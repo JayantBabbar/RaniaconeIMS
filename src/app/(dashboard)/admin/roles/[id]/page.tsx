@@ -133,7 +133,7 @@ export default function RoleDetailPage() {
         crumbs={["Admin", "Roles", role.name]}
       />
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 md:p-5 space-y-5">
         {/* Back + header */}
         <button
           onClick={() => router.push("/admin/roles")}
@@ -185,7 +185,7 @@ export default function RoleDetailPage() {
             return (
               <div
                 key={module}
-                className="bg-white border border-hairline rounded-md overflow-hidden"
+                className="bg-white border border-hairline rounded-md overflow-x-auto"
               >
                 {/* Module header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-surface border-b border-hairline">
@@ -216,7 +216,7 @@ export default function RoleDetailPage() {
                 </div>
 
                 {/* Permission checkboxes */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0">
                   {perms.map((perm) => {
                     const isGranted = grantedPermIds.has(perm.id);
                     const isLoading =

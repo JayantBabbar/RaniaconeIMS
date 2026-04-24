@@ -33,10 +33,12 @@ const kindStyles: Record<ButtonKind, string> = {
     "bg-foreground text-white border-foreground shadow-btn-dark hover:bg-neutral-800 active:bg-neutral-900",
 };
 
+// Mobile uses a taller hit area (min ~32–40px) then collapses to design-system
+// density on md+. Text + padding stay the same across breakpoints.
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: "h-[26px] px-2.5 text-xs gap-1.5",
-  md: "h-[30px] px-3 text-sm gap-1.5",
-  lg: "h-9 px-3.5 text-sm gap-2",
+  sm: "h-8 md:h-[26px] px-2.5 text-xs gap-1.5",
+  md: "h-9 md:h-[30px] px-3 text-sm gap-1.5",
+  lg: "h-10 md:h-9 px-3.5 text-sm gap-2",
 };
 
 const iconSizes: Record<ButtonSize, number> = {

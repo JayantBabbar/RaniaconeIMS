@@ -81,7 +81,7 @@ export default function ItemBrandsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Item Brands"
           description="Manufacturers or product brands you stock — GSK, Dell, Ariel. Optional, but handy for filtering items and running brand-specific reports."
@@ -120,7 +120,7 @@ export default function ItemBrandsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden max-w-3xl">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto max-w-3xl">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -143,7 +143,7 @@ export default function ItemBrandsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">

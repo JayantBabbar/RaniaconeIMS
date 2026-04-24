@@ -214,7 +214,7 @@ function NewMovementForm() {
         }
       />
 
-      <div className="p-5 max-w-3xl space-y-5">
+      <div className="p-4 md:p-5 max-w-3xl space-y-5">
         <PageHeader
           title="Post a direct stock movement"
           description="For adjustments, write-offs, or one-off moves that don't flow through a Purchase Order / Sales Order / Transfer. Balances update immediately."
@@ -231,7 +231,7 @@ function NewMovementForm() {
             <div className="text-[10.5px] font-medium uppercase tracking-wider text-foreground-muted mb-1.5">
               Direction <span className="text-status-red">*</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -290,7 +290,7 @@ function NewMovementForm() {
           </div>
 
           {/* Item + location */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormField
               label="Item"
               required
@@ -298,7 +298,7 @@ function NewMovementForm() {
               error={errors.item_id?.message}
             >
               <select
-                className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                 {...register("item_id")}
               >
                 <option value="">Pick an item…</option>
@@ -317,7 +317,7 @@ function NewMovementForm() {
               error={errors.location_id?.message}
             >
               <select
-                className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                 {...register("location_id")}
               >
                 <option value="">Pick a location…</option>
@@ -331,7 +331,7 @@ function NewMovementForm() {
           </div>
 
           {/* Quantity + UoM */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Input
               label="Quantity"
               type="number"
@@ -350,7 +350,7 @@ function NewMovementForm() {
               error={errors.uom_id?.message}
             >
               <select
-                className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
                 {...register("uom_id")}
               >
                 <option value="">Pick a unit…</option>
@@ -408,7 +408,7 @@ function NewMovementForm() {
               </div>
             )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Posting date"
               type="date"

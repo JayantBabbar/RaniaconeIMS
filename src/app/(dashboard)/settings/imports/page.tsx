@@ -35,7 +35,7 @@ export default function ImportsPage() {
     <RequireRead perm="inventory.integrations.read" crumbs={["Settings", "Imports"]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Settings", "Imports"]} />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Imports"
           description="Bulk data uploads — CSV or Excel files for items, parties, stock, and more. Every import runs as a background job with a progress indicator and a per-row error report."
@@ -43,7 +43,7 @@ export default function ImportsPage() {
           badge={<Badge tone="neutral">{rows.length}</Badge>}
         />
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -53,7 +53,7 @@ export default function ImportsPage() {
               description="Start an import from any entity's list page (Items, Parties, Stock…). Each upload appears here with live progress and a per-row error report."
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">Created</th>

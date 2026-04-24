@@ -101,7 +101,7 @@ export default function SystemHealthPage() {
         }
       />
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 md:p-5 space-y-5">
         {/* Header banner */}
         <div className="bg-white border border-hairline rounded-md p-5 flex items-center gap-4">
           <div
@@ -161,7 +161,7 @@ export default function SystemHealthPage() {
         </div>
 
         {/* Per-check breakdown */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <CheckCard
             title="Auth Service"
             status={authOk ? "ok" : "down"}
@@ -201,12 +201,12 @@ export default function SystemHealthPage() {
         </div>
 
         {/* Recent checks table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           <div className="px-4 py-3 border-b border-hairline flex items-center justify-between">
             <h2 className="text-sm font-semibold">Check log</h2>
             <span className="text-xs text-foreground-muted">Most recent first</span>
           </div>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-surface text-[10.5px] text-foreground-muted uppercase tracking-wider">
                 <th className="text-left px-4 py-2 font-medium">Time</th>

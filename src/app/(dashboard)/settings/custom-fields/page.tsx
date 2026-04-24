@@ -114,7 +114,7 @@ export default function CustomFieldsPage() {
           </Can>
         }
       />
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Custom Fields"
           description="Extend items, parties, documents, and more with fields specific to your business — e.g. shelf-life days on items, customer tier on parties."
@@ -153,7 +153,7 @@ export default function CustomFieldsPage() {
           />
         )}
 
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {isLoading ? (
             <div className="py-16 flex justify-center"><Spinner size={24} /></div>
           ) : rows.length === 0 ? (
@@ -176,7 +176,7 @@ export default function CustomFieldsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-4 py-2.5">
@@ -351,13 +351,13 @@ function FieldFormModal({ target, onClose }: { target?: CustomFieldDefinition; o
       width="md"
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Entity" required error={errors.entity} help="Which kind of record this field attaches to. Cannot be changed later.">
             <select value={form.entity}
               onChange={(e) => setField("entity", e.target.value)}
               disabled={isEdit}
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                 errors.entity ? "border-status-red" : "border-hairline"
               )}>
               {CUSTOM_FIELD_ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -368,7 +368,7 @@ function FieldFormModal({ target, onClose }: { target?: CustomFieldDefinition; o
               onChange={(e) => setField("field_type", e.target.value as typeof form.field_type)}
               disabled={isEdit}
               className={cn(
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
                 errors.field_type ? "border-status-red" : "border-hairline"
               )}>
               {CUSTOM_FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -401,7 +401,7 @@ function FieldFormModal({ target, onClose }: { target?: CustomFieldDefinition; o
             value={form.select_choices}
             onChange={(e) => setField("select_choices", e.target.value)} />
         )}
-        <div className="grid grid-cols-2 gap-3 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
           <Input label="Sort order" type="number" value={form.sort_order}
             onChange={(e) => setField("sort_order", parseInt(e.target.value) || 0)} />
           <Checkbox label="Required" checked={form.is_required}

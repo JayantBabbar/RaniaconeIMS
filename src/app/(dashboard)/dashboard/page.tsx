@@ -72,7 +72,7 @@ export default function DashboardPage() {
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Dashboard"]} />
-      <div className="p-5 space-y-5">
+      <div className="p-4 md:p-5 space-y-5">
         {/* Greeting */}
         <div className="flex items-center justify-between">
           <div>
@@ -118,9 +118,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Two column: recent movements + recent documents */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Recent movements */}
-          <div className="bg-white border border-hairline rounded-md overflow-hidden">
+          <div className="bg-white border border-hairline rounded-md overflow-x-auto">
             <div className="px-5 py-3 border-b border-hairline-light flex items-center justify-between">
               <h2 className="text-sm font-semibold">Recent movements</h2>
               <Link href="/movements" className="text-xs text-brand font-medium hover:underline flex items-center gap-1">
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 {balancesLoading ? <Spinner size={18} /> : "No movements yet"}
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <tbody>
                   {movements.slice(0, 8).map((m) => {
                     const item = itemMap.get(m.item_id);
@@ -159,7 +159,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent documents */}
-          <div className="bg-white border border-hairline rounded-md overflow-hidden">
+          <div className="bg-white border border-hairline rounded-md overflow-x-auto">
             <div className="px-5 py-3 border-b border-hairline-light flex items-center justify-between">
               <h2 className="text-sm font-semibold">Recent documents</h2>
               <Link href="/documents/all" className="text-xs text-brand font-medium hover:underline flex items-center gap-1">
@@ -169,7 +169,7 @@ export default function DashboardPage() {
             {docs.length === 0 ? (
               <div className="py-10 text-center text-sm text-foreground-muted">No documents yet</div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <tbody>
                   {docs.slice(0, 8).map((d) => (
                     <tr key={d.id} className="border-t border-hairline-light">

@@ -156,7 +156,7 @@ export default function PlatformUsersPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold tracking-tight">Platform Users</h1>
@@ -218,7 +218,7 @@ export default function PlatformUsersPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {loading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -247,7 +247,7 @@ export default function PlatformUsersPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5">
@@ -480,7 +480,7 @@ function InviteUserModal({
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Mode switcher */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setForm({ ...form, mode: "super" })}
@@ -524,7 +524,7 @@ function InviteUserModal({
             </label>
             <select
               className={
-                "w-full h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 " +
+                "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 " +
                 (errors.tenant_id ? "border-status-red" : "border-hairline")
               }
               value={form.tenant_id}

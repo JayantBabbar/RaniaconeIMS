@@ -141,7 +141,7 @@ export default function SerialsPage() {
         }
       />
 
-      <div className="p-5 space-y-4">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Serials"
           description="Unique serial records for every serial-tracked item. Each serial has a lifecycle: in stock → reserved → issued, with optional returned/scrapped."
@@ -203,7 +203,7 @@ export default function SerialsPage() {
         )}
 
         {/* Table */}
-        <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <div className="bg-white border border-hairline rounded-md overflow-x-auto">
           {itemsLoading || serialsQuery.isLoading ? (
             <div className="py-20 flex justify-center">
               <Spinner size={24} />
@@ -240,7 +240,7 @@ export default function SerialsPage() {
               }
             />
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3.5 py-2.5">
@@ -411,7 +411,7 @@ function AddSerialModal({
         )}
         <FormField label="Item" required error={errors.item_id?.message} help="Only items you've flagged as serial-tracked appear here.">
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
             disabled={submitting}
             {...register("item_id")}
           >
@@ -434,7 +434,7 @@ function AddSerialModal({
         />
         <FormField label="Initial Status" help="Usually 'in stock'. Use 'reserved' only if you're logging a serial already committed to an open order.">
           <select
-            className="w-full h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
             disabled={submitting}
             {...register("status")}
           >
