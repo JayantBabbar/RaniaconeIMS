@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import { PARTIES } from "@/lib/api-constants";
 import type { Party, PaginatedResponse } from "@/types";
 
@@ -70,8 +71,12 @@ export const partyService = {
 
   delete: (id: string) => api.delete<void>(PARTIES.DETAIL(id)),
 
-  listAddresses: (partyId: string) =>
-    api.get<PaginatedResponse<Address>>(PARTIES.ADDRESSES(partyId)),
+  listAddresses: async (partyId: string): Promise<Address[]> => {
+    const res = await api.get<Address[] | PaginatedResponse<Address>>(
+      PARTIES.ADDRESSES(partyId),
+    );
+    return unwrapList(res);
+  },
   createAddress: (
     partyId: string,
     data: {
@@ -86,8 +91,12 @@ export const partyService = {
     }
   ) => api.post<Address>(PARTIES.ADDRESSES(partyId), data),
 
-  listContacts: (partyId: string) =>
-    api.get<PaginatedResponse<Contact>>(PARTIES.CONTACTS(partyId)),
+  listContacts: async (partyId: string): Promise<Contact[]> => {
+    const res = await api.get<Contact[] | PaginatedResponse<Contact>>(
+      PARTIES.CONTACTS(partyId),
+    );
+    return unwrapList(res);
+  },
   createContact: (
     partyId: string,
     data: {

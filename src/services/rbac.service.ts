@@ -131,7 +131,10 @@ export const roleService = {
     return api.auth.post<Role>(ROLES.LIST, data);
   },
 
-  async update(id: string, data: { name?: string }): Promise<Role> {
+  async update(
+    id: string,
+    data: { name?: string; description?: string },
+  ): Promise<Role> {
     return api.auth.patch<Role>(ROLES.DETAIL(id), data);
   },
 

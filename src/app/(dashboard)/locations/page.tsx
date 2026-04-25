@@ -67,6 +67,9 @@ export default function LocationsPage() {
     queryKey: ["locations"],
     queryFn: () => locationService.list({ limit: 200 }),
   });
+  // locationService.list still returns the PaginatedResponse envelope
+  // (this endpoint is one of the few that uses it). listBins() is the
+  // unwrapped one further down.
   const rows = data?.data || [];
   const tree = useMemo(() => buildTree(rows), [rows]);
 
@@ -427,7 +430,7 @@ function BinsModal({ location, onClose, canWrite }: { location: InventoryLocatio
     queryKey: ["bins", location.id],
     queryFn: () => locationService.listBins(location.id),
   });
-  const bins = data?.data || [];
+  const bins = data || [];
 
   return (
     <>

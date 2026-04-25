@@ -1,18 +1,29 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import { COUNTS } from "@/lib/api-constants";
 import type { StockCount, CountLine, PaginatedResponse } from "@/types";
 
 // ═══════════════════════════════════════════════════════════
 // Stock Counts Service
+//
+// GET /counts returns a plain JSON array (not the PaginatedResponse
+// envelope used by /items). unwrapList() handles both shapes so this
+// service stays robust if the backend later switches to envelopes.
 // ═══════════════════════════════════════════════════════════
 
 export const countService = {
-  list: (params?: {
+  list: async (params?: {
     limit?: number;
     cursor?: string;
     location_id?: string;
     status?: string;
-  }) => api.get<PaginatedResponse<StockCount>>(COUNTS.LIST, params),
+  }): Promise<StockCount[]> => {
+    const res = await api.get<StockCount[] | PaginatedResponse<StockCount>>(
+      COUNTS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
 
   getById: (id: string) => api.get<StockCount>(COUNTS.DETAIL(id)),
 
@@ -32,8 +43,12 @@ export const countService = {
 
   apply: (id: string) => api.post<StockCount>(COUNTS.APPLY(id)),
 
-  listLines: (countId: string) =>
-    api.get<PaginatedResponse<CountLine>>(COUNTS.LINES(countId)),
+  listLines: async (countId: string): Promise<CountLine[]> => {
+    const res = await api.get<CountLine[] | PaginatedResponse<CountLine>>(
+      COUNTS.LINES(countId),
+    );
+    return unwrapList(res);
+  },
 
   createLine: (
     countId: string,

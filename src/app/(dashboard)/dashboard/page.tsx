@@ -49,8 +49,8 @@ export default function DashboardPage() {
 
   const balances = balancesRaw ?? [];
   const movements = movementsRaw ?? [];
-  const docs = docsRaw?.data || [];
-  const counts = countsRaw?.data || [];
+  const docs = docsRaw || [];
+  const counts = countsRaw || [];
   const items = itemsRaw?.data || [];
   const locations = locsRaw?.data || [];
 

@@ -80,7 +80,7 @@ export default function NewDocumentPage() {
     queryKey: ["locations"], queryFn: () => locationService.list({ limit: 200 }),
   });
 
-  const allTypes = typesRaw?.data || [];
+  const allTypes = typesRaw || [];
   const candidateTypes = useMemo(
     () => (typeInfo.codes.length === 0 ? allTypes : allTypes.filter((t) => typeInfo.codes.includes(t.code))),
     [allTypes, typeInfo]

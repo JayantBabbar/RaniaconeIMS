@@ -34,7 +34,7 @@ export default function CountsPage() {
   const canWrite = can("inventory.counts.write");
   const [showCreate, setShowCreate] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data: allRows = [], isLoading } = useQuery({
     queryKey: ["counts"],
     queryFn: () => countService.list({ limit: 200 }),
   });
@@ -42,8 +42,6 @@ export default function CountsPage() {
     queryKey: ["locations"],
     queryFn: () => locationService.list({ limit: 200 }),
   });
-
-  const allRows = data?.data || [];
   const locations = locsRaw?.data || [];
   const locMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
 
@@ -206,11 +204,28 @@ export default function CountsPage() {
 }
 
 const countSchema = z.object({
-  count_number: z.string().max(50, "Max 50 characters").optional().or(z.literal("")),
+  count_number: z
+    .string()
+    .min(1, "Count number is required (must be unique within your tenant)")
+    .max(50, "Max 50 characters"),
   count_date: z.string().min(1, "Count date is required"),
   location_id: z.string().min(1, "Location is required"),
   remarks: z.string().max(2000, "Too long").optional().or(z.literal("")),
 });
+
+// Suggest a sensible default like CT-2026-04-25-001 — user can keep, edit,
+// or replace. Reduces 409 collisions vs asking the user to invent one.
+function defaultCountNumber(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  // Two-digit hour-minute suffix so two new counts in the same day don't
+  // collide unless the user creates them within the same minute.
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mi = String(now.getMinutes()).padStart(2, "0");
+  return `CT-${yyyy}-${mm}${dd}-${hh}${mi}`;
+}
 
 type CountFormValues = z.infer<typeof countSchema>;
 
@@ -229,7 +244,7 @@ function CountFormModal({
   } = useForm<CountFormValues>({
     resolver: zodResolver(countSchema),
     defaultValues: {
-      count_number: "",
+      count_number: defaultCountNumber(),
       count_date: new Date().toISOString().slice(0, 10),
       location_id: "",
       remarks: "",
@@ -241,7 +256,7 @@ function CountFormModal({
     setSubmitting(true);
     try {
       await countService.create({
-        count_number: data.count_number || undefined,
+        count_number: data.count_number,
         count_date: data.count_date,
         location_id: data.location_id,
         remarks: data.remarks || undefined,
@@ -251,7 +266,12 @@ function CountFormModal({
       onClose();
     } catch (err) {
       if (isApiError(err)) {
-        if (Object.keys(err.fieldErrors).length > 0) {
+        // Friendly message for the most common 409 — duplicate count number.
+        if (err.status === 409 && err.code === "COUNT_NUMBER_EXISTS") {
+          setServerError(
+            `A count with number "${data.count_number}" already exists. Pick a different number — e.g. add a suffix or use today's date.`,
+          );
+        } else if (Object.keys(err.fieldErrors).length > 0) {
           setServerError(Object.values(err.fieldErrors).join(", "));
         } else {
           setServerError(err.message);

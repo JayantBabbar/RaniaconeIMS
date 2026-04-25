@@ -45,7 +45,7 @@ export default function TenantConfigPage() {
     queryFn: () => tenantConfigService.list({ limit: 200 }),
   });
 
-  const entries = data?.data || [];
+  const entries = data || [];
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

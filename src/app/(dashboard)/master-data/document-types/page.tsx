@@ -44,7 +44,7 @@ export default function DocumentTypesPage() {
     queryKey: ["documentTypes"],
     queryFn: () => documentTypeService.list({ limit: 200 }),
   });
-  const allRows = data?.data || [];
+  const allRows = data || [];
 
   const moduleOptions = Array.from(new Set(allRows.map((r) => r.module).filter(Boolean))).map(
     (v) => ({ value: v, label: v }),

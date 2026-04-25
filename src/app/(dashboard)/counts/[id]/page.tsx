@@ -55,7 +55,7 @@ export default function CountDetailPage() {
     queryFn: () => locationService.list({ limit: 200 }),
   });
 
-  const lines = linesRaw?.data || [];
+  const lines = linesRaw || [];
   const items = itemsRaw?.data || [];
   const locations = locsRaw?.data || [];
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);

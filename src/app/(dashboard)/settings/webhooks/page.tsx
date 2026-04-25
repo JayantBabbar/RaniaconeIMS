@@ -39,8 +39,8 @@ export default function WebhooksPage() {
     queryFn: () => integrationService.list({ limit: 200 }),
   });
 
-  const rows = data?.data || [];
-  const integrations = integrationsRaw?.data || [];
+  const rows = data || [];
+  const integrations = integrationsRaw || [];
   const integMap = useMemo(() => new Map(integrations.map((i) => [i.id, i])), [integrations]);
 
   const deleteMut = useMutation({

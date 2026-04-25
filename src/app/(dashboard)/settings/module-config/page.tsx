@@ -58,7 +58,7 @@ export default function ModuleConfigPage() {
     queryFn: () => moduleConfigService.list({ limit: 200 }),
   });
 
-  const entries = data?.data || [];
+  const entries = data || [];
 
   const modules = useMemo(() => {
     const fromData = new Set(entries.map((e) => e.module));

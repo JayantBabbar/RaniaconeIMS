@@ -46,7 +46,7 @@ export default function WorkflowsPage() {
     queryKey: ["workflows"],
     queryFn: () => workflowService.list({ limit: 200 }),
   });
-  const allRows = data?.data || [];
+  const allRows = data || [];
 
   const entityOptions = Array.from(new Set(allRows.map((r) => r.entity).filter(Boolean))).map(
     (v) => ({ value: v, label: v }),

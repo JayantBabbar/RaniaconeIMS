@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import {
   CUSTOM_FIELDS,
   INTEGRATIONS,
@@ -56,8 +57,13 @@ export const CUSTOM_FIELD_TYPES = [
 ] as const;
 
 export const customFieldService = {
-  listDefinitions: (params?: { limit?: number; cursor?: string; entity?: string }) =>
-    api.get<PaginatedResponse<CustomFieldDefinition>>(CUSTOM_FIELDS.DEFINITIONS, params),
+  listDefinitions: async (params?: { limit?: number; cursor?: string; entity?: string }): Promise<CustomFieldDefinition[]> => {
+    const res = await api.get<CustomFieldDefinition[] | PaginatedResponse<CustomFieldDefinition>>(
+      CUSTOM_FIELDS.DEFINITIONS,
+      params,
+    );
+    return unwrapList(res);
+  },
 
   createDefinition: (data: {
     entity: string;
@@ -106,8 +112,13 @@ export interface Integration {
 }
 
 export const integrationService = {
-  list: (params?: { limit?: number; cursor?: string }) =>
-    api.get<PaginatedResponse<Integration>>(INTEGRATIONS.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string }): Promise<Integration[]> => {
+    const res = await api.get<Integration[] | PaginatedResponse<Integration>>(
+      INTEGRATIONS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
   getById: (id: string) => api.get<Integration>(INTEGRATIONS.DETAIL(id)),
   create: (data: {
     name: string;
@@ -136,8 +147,13 @@ export interface Webhook {
 }
 
 export const webhookService = {
-  list: (params?: { limit?: number; cursor?: string }) =>
-    api.get<PaginatedResponse<Webhook>>(WEBHOOKS.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string }): Promise<Webhook[]> => {
+    const res = await api.get<Webhook[] | PaginatedResponse<Webhook>>(
+      WEBHOOKS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
   create: (data: {
     integration_id: string;
     event_type: string;
@@ -168,8 +184,13 @@ export interface ImportBatch {
 }
 
 export const importService = {
-  list: (params?: { limit?: number; cursor?: string }) =>
-    api.get<PaginatedResponse<ImportBatch>>(IMPORTS.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string }): Promise<ImportBatch[]> => {
+    const res = await api.get<ImportBatch[] | PaginatedResponse<ImportBatch>>(
+      IMPORTS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
   getById: (id: string) => api.get<ImportBatch>(IMPORTS.DETAIL(id)),
 };
 
@@ -195,8 +216,13 @@ export interface ModuleConfigEntry {
 
 // Backend treats PUT as upsert by key (no POST / no PATCH for these endpoints).
 export const tenantConfigService = {
-  list: (params?: { limit?: number; cursor?: string }) =>
-    api.get<PaginatedResponse<TenantConfigEntry>>(CONFIG.TENANT, params),
+  list: async (params?: { limit?: number; cursor?: string }): Promise<TenantConfigEntry[]> => {
+    const res = await api.get<TenantConfigEntry[] | PaginatedResponse<TenantConfigEntry>>(
+      CONFIG.TENANT,
+      params,
+    );
+    return unwrapList(res);
+  },
   getByKey: (key: string) => api.get<TenantConfigEntry>(CONFIG.TENANT_KEY(key)),
   set: (data: { key: string; value: unknown }) =>
     api.getInstance()
@@ -210,8 +236,13 @@ export const tenantConfigService = {
 };
 
 export const moduleConfigService = {
-  list: (params?: { limit?: number; cursor?: string; module?: string }) =>
-    api.get<PaginatedResponse<ModuleConfigEntry>>(CONFIG.MODULE, params),
+  list: async (params?: { limit?: number; cursor?: string; module?: string }): Promise<ModuleConfigEntry[]> => {
+    const res = await api.get<ModuleConfigEntry[] | PaginatedResponse<ModuleConfigEntry>>(
+      CONFIG.MODULE,
+      params,
+    );
+    return unwrapList(res);
+  },
   set: (data: { module: string; key: string; value: unknown }) =>
     api.getInstance()
       .put<ModuleConfigEntry>(CONFIG.MODULE_KEY(data.module, data.key), {
@@ -241,7 +272,12 @@ export interface Attachment {
 }
 
 export const attachmentService = {
-  list: (params?: { limit?: number; cursor?: string; entity?: string; entity_id?: string }) =>
-    api.get<PaginatedResponse<Attachment>>(ATTACHMENTS.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string; entity?: string; entity_id?: string }): Promise<Attachment[]> => {
+    const res = await api.get<Attachment[] | PaginatedResponse<Attachment>>(
+      ATTACHMENTS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
   delete: (id: string) => api.delete<void>(ATTACHMENTS.DETAIL(id)),
 };

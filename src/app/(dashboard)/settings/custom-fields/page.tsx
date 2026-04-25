@@ -44,7 +44,7 @@ export default function CustomFieldsPage() {
         limit: 200,
       }),
   });
-  const allRows = data?.data || [];
+  const allRows = data || [];
 
   const columns: ColumnDef<CustomFieldDefinition>[] = [
     {

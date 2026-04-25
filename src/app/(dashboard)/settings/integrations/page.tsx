@@ -34,7 +34,7 @@ export default function IntegrationsPage() {
     queryKey: ["integrations"],
     queryFn: () => integrationService.list({ limit: 200 }),
   });
-  const rows = data?.data || [];
+  const rows = data || [];
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => integrationService.delete(id),

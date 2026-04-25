@@ -54,8 +54,8 @@ export default function WorkflowDetailPage() {
     queryFn: () => statusMasterService.list({ limit: 200 }),
   });
 
-  const states = statesRaw?.data || [];
-  const transitions = transRaw?.data || [];
+  const states = statesRaw || [];
+  const transitions = transRaw || [];
   const statuses = statusMasterRaw?.data || [];
   const statusMap = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
   const stateMap = useMemo(() => new Map(states.map((s) => [s.id, s])), [states]);

@@ -135,7 +135,7 @@ function AddressesTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
     queryKey: ["partyAddresses", partyId],
     queryFn: () => partyService.listAddresses(partyId),
   });
-  const rows = data?.data || [];
+  const rows = data || [];
 
   return (
     <div className="space-y-3">
@@ -320,7 +320,7 @@ function ContactsTab({ partyId, canWrite }: { partyId: string; canWrite: boolean
     queryKey: ["partyContacts", partyId],
     queryFn: () => partyService.listContacts(partyId),
   });
-  const rows = data?.data || [];
+  const rows = data || [];
 
   return (
     <div className="space-y-3">

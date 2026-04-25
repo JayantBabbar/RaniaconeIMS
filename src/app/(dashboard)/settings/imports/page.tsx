@@ -16,7 +16,7 @@ export default function ImportsPage() {
     queryKey: ["imports"],
     queryFn: () => importService.list({ limit: 200 }),
   });
-  const rows = data?.data || [];
+  const rows = data || [];
 
   const statusTone = (s: string): "green" | "blue" | "amber" | "red" | "neutral" => {
     if (s === "completed") return "green";

@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import { LOCATIONS } from "@/lib/api-constants";
 import type { InventoryLocation, PaginatedResponse } from "@/types";
 
@@ -38,8 +39,13 @@ export const locationService = {
   ) => api.patch<InventoryLocation>(LOCATIONS.DETAIL(id), data),
   delete: (id: string) => api.delete<void>(LOCATIONS.DETAIL(id)),
 
-  listBins: (locationId: string) =>
-    api.get<PaginatedResponse<WarehouseBin>>(LOCATIONS.BINS(locationId)),
+  // Bins endpoint returns a plain JSON array (not enveloped).
+  listBins: async (locationId: string): Promise<WarehouseBin[]> => {
+    const res = await api.get<WarehouseBin[] | PaginatedResponse<WarehouseBin>>(
+      LOCATIONS.BINS(locationId),
+    );
+    return unwrapList(res);
+  },
   createBin: (
     locationId: string,
     data: { code: string; name: string; is_active?: boolean }

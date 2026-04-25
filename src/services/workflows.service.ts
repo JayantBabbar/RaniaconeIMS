@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import { WORKFLOWS } from "@/lib/api-constants";
 import type { PaginatedResponse } from "@/types";
 
@@ -36,8 +37,13 @@ export interface WorkflowTransition {
 }
 
 export const workflowService = {
-  list: (params?: { limit?: number; cursor?: string; entity?: string }) =>
-    api.get<PaginatedResponse<Workflow>>(WORKFLOWS.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string; entity?: string }): Promise<Workflow[]> => {
+    const res = await api.get<Workflow[] | PaginatedResponse<Workflow>>(
+      WORKFLOWS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
 
   getById: (id: string) => api.get<Workflow>(WORKFLOWS.DETAIL(id)),
 
@@ -50,8 +56,12 @@ export const workflowService = {
   delete: (id: string) => api.delete<void>(WORKFLOWS.DETAIL(id)),
 
   // States
-  listStates: (workflowId: string) =>
-    api.get<PaginatedResponse<WorkflowState>>(WORKFLOWS.STATES(workflowId)),
+  listStates: async (workflowId: string): Promise<WorkflowState[]> => {
+    const res = await api.get<WorkflowState[] | PaginatedResponse<WorkflowState>>(
+      WORKFLOWS.STATES(workflowId),
+    );
+    return unwrapList(res);
+  },
 
   createState: (
     workflowId: string,
@@ -68,8 +78,12 @@ export const workflowService = {
     api.delete<void>(WORKFLOWS.STATE(workflowId, stateId)),
 
   // Transitions
-  listTransitions: (workflowId: string) =>
-    api.get<PaginatedResponse<WorkflowTransition>>(WORKFLOWS.TRANSITIONS(workflowId)),
+  listTransitions: async (workflowId: string): Promise<WorkflowTransition[]> => {
+    const res = await api.get<WorkflowTransition[] | PaginatedResponse<WorkflowTransition>>(
+      WORKFLOWS.TRANSITIONS(workflowId),
+    );
+    return unwrapList(res);
+  },
 
   createTransition: (
     workflowId: string,

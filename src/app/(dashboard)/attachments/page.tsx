@@ -66,7 +66,7 @@ export default function AttachmentsPage() {
     queryKey: ["attachments"],
     queryFn: () => attachmentService.list({ limit: 200 }),
   });
-  const rows = data?.data || [];
+  const rows = data || [];
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => attachmentService.delete(id),

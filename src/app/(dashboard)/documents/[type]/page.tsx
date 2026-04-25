@@ -47,7 +47,7 @@ export default function DocumentsListPage() {
     queryKey: ["documentTypes"],
     queryFn: () => documentTypeService.list({ limit: 200 }),
   });
-  const allDocTypes = docTypesRaw?.data || [];
+  const allDocTypes = docTypesRaw || [];
   const relevantTypes = useMemo(
     () =>
       typeInfo.codes.length === 0
@@ -70,7 +70,7 @@ export default function DocumentsListPage() {
     queryFn: () => partyService.list({ limit: 200 }),
   });
 
-  const allRowsRaw = data?.data || [];
+  const allRowsRaw = data || [];
   const parties = partiesRaw?.data || [];
   const typeMap = useMemo(() => new Map(allDocTypes.map((t) => [t.id, t])), [allDocTypes]);
   const partyMap = useMemo(() => new Map(parties.map((p) => [p.id, p])), [parties]);

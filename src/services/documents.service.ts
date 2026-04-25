@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import { DOCUMENTS } from "@/lib/api-constants";
 import type {
   DocumentHeader,
@@ -7,11 +8,14 @@ import type {
 } from "@/types";
 
 // ═══════════════════════════════════════════════════════════
-// Documents Service — headers, lines, post, cancel
+// Documents Service — headers, lines, post, cancel.
+// Backend returns plain JSON arrays for /documents and
+// /documents/{id}/lines (not the PaginatedResponse envelope).
+// unwrapList() handles both shapes for forward compatibility.
 // ═══════════════════════════════════════════════════════════
 
 export const documentService = {
-  list: (params?: {
+  list: async (params?: {
     limit?: number;
     cursor?: string;
     document_type_id?: string;
@@ -19,7 +23,13 @@ export const documentService = {
     posted?: boolean;
     start_date?: string;
     end_date?: string;
-  }) => api.get<PaginatedResponse<DocumentHeader>>(DOCUMENTS.LIST, params),
+  }): Promise<DocumentHeader[]> => {
+    const res = await api.get<DocumentHeader[] | PaginatedResponse<DocumentHeader>>(
+      DOCUMENTS.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
 
   getById: (id: string) => api.get<DocumentHeader>(DOCUMENTS.DETAIL(id)),
 
@@ -53,8 +63,12 @@ export const documentService = {
   cancel: (id: string) => api.post<DocumentHeader>(DOCUMENTS.CANCEL(id)),
 
   // Lines
-  listLines: (documentId: string) =>
-    api.get<PaginatedResponse<DocumentLine>>(DOCUMENTS.LINES(documentId)),
+  listLines: async (documentId: string): Promise<DocumentLine[]> => {
+    const res = await api.get<DocumentLine[] | PaginatedResponse<DocumentLine>>(
+      DOCUMENTS.LINES(documentId),
+    );
+    return unwrapList(res);
+  },
 
   createLine: (
     documentId: string,

@@ -77,7 +77,7 @@ export default function DocumentDetailPage() {
     queryFn: () => uomService.list({ limit: 200 }),
   });
 
-  const lines = linesRaw?.data || [];
+  const lines = linesRaw || [];
   const items = itemsRaw?.data || [];
   const uoms = uomsRaw?.data || [];
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -123,7 +123,7 @@ export default function DocumentDetailPage() {
   }
   if (isLoading || !doc) return <PageLoading />;
 
-  const docType = typesRaw?.data.find((t) => t.id === doc.document_type_id);
+  const docType = typesRaw?.find((t) => t.id === doc.document_type_id);
   const party = partiesRaw?.data.find((p) => p.id === doc.party_id);
   const sourceLoc = locsRaw?.data.find((l) => l.id === doc.source_location_id);
   const destLoc = locsRaw?.data.find((l) => l.id === doc.destination_location_id);

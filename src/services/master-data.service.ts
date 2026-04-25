@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { unwrapList } from "@/lib/utils";
 import {
   STATUS_MASTER,
   NUMBER_SERIES,
@@ -150,9 +151,15 @@ export const itemCategoryService = {
 };
 
 // ── Document Types ────────────────────────────────────────
+// Backend returns a plain JSON array (not the PaginatedResponse envelope).
 export const documentTypeService = {
-  list: (params?: { limit?: number; cursor?: string; module?: string }) =>
-    api.get<PaginatedResponse<DocumentType>>(DOCUMENT_TYPES.LIST, params),
+  list: async (params?: { limit?: number; cursor?: string; module?: string }): Promise<DocumentType[]> => {
+    const res = await api.get<DocumentType[] | PaginatedResponse<DocumentType>>(
+      DOCUMENT_TYPES.LIST,
+      params,
+    );
+    return unwrapList(res);
+  },
   create: (data: {
     code: string;
     name: string;
