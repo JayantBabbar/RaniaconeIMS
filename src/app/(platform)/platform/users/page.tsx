@@ -428,24 +428,17 @@ function InviteUserModal({
 
     setLoading(true);
     try {
-      if (form.mode === "super") {
-        // Service-provider super admin — created without a tenant header
-        await authService.register({
-          email: form.email.trim(),
-          full_name: form.full_name.trim(),
-          password: form.password,
-        });
-      } else {
-        await api.post(
-          "/auth/register",
-          {
-            email: form.email.trim(),
-            full_name: form.full_name.trim(),
-            password: form.password,
-          },
-          { "X-Tenant-Id": form.tenant_id },
-        );
-      }
+      // /auth/register reads tenant_id from the BODY. Earlier versions of
+      // this code sent X-Tenant-Id as a header, but the endpoint never
+      // consulted the header — users were silently being orphaned with
+      // tenant_id = null. Pass tenant_id in the body and we get a real,
+      // tenant-scoped user back.
+      await authService.register({
+        email: form.email.trim(),
+        full_name: form.full_name.trim(),
+        password: form.password,
+        ...(form.mode === "tenant" ? { tenant_id: form.tenant_id } : {}),
+      });
 
       toast.success(
         "User registered",
