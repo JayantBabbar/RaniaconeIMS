@@ -1,0 +1,514 @@
+═══════════════════════════════════════════════════════════════════════
+24-APR BACKEND CHANGES — AUDIT REPORT
+─────────────────────────────────────────────────────────────────────
+Authored by: Frontend team
+Date: 2026-04-25
+Subject of audit: documentation/24aprChanges/CHANGES_APPLIED.md
+Method: line-by-line verification of every claim against actual code,
+        plus live-backend smoke testing (49/51 checks passing).
+═══════════════════════════════════════════════════════════════════════
+
+This report verifies whether the changes described in the 24-apr backend
+handover document (CHANGES_APPLIED.md) are actually present in the code
+on `main`. Two new gaps surfaced during the audit are also documented
+with full proposed patches for the backend team to apply.
+
+─────────────────────────────────────────────────────────────────────
+TL;DR
+─────────────────────────────────────────────────────────────────────
+
+The 24-apr doc is ~98% honestly delivered. Every artefact it lists
+(helpers, audit module, endpoint rewires, tests) exists in the code.
+
+Two gaps:
+
+1. REQ-2 — `POST /users/{id}/reset-password` skipped two §2-spec items
+   (strict tenant scope, audit log call). 3-line fix.
+
+2. REQ-3 — `PATCH /roles/{id}` and `DELETE /roles/{id}` not implemented.
+   Frontend has been depending on them. Larger fix (5 files).
+
+Both are documented at the bottom of this file with drop-in patches.
+
+─────────────────────────────────────────────────────────────────────
+SECTION-BY-SECTION VERIFICATION
+─────────────────────────────────────────────────────────────────────
+
+§1 — Password reset (DEFERRED)
+══════════════════════════════════════════════════════════════════════
+Doc claim:  "Self-service forgot/reset deferred. No code changes."
+Actual:     Confirmed no code added.
+Verdict:    ✓ Honest deferral.
+
+§2 — Admin-initiated password reset (DONE)
+══════════════════════════════════════════════════════════════════════
+
+Doc claim                                            | Actual    | Status
+─────────────────────────────────────────────────────|-----------|-------
+AdminResetPasswordRequest in schemas/auth.py         | Present   | ✓
+admin_reset_password() in services/user_service.py   | Present   | ✓
+POST /users/{id}/reset-password route in api/v1/     | Present   | ✓
+204 on success                                       | Present   | ✓
+Refresh tokens revoked on success                    | Present   | ✓
+test_admin_reset_password.py with 7 tests            | 7 tests   | ✓
+
+Spec subtleties (not perfectly delivered):
+
+  Doc said: "Super admin — can reset anyone. **Must pass
+            X-Acting-Tenant-Id**."
+  Actual:    Uses `get_optional_acting_tenant_id`, so SPA can call
+             without the header. No 400 raised.
+
+  Doc said: Audit row written with `tenant_id = <target's tenant>`
+            on every cross-tenant override.
+  Actual:    No `audit_super_admin_override()` call in this handler.
+             SPA action goes unaudited if header is missing; even
+             with header, the cross-tenant override audit row that
+             every other §4 endpoint writes is absent here.
+
+→ Captured as REQ-2 below.
+
+§3 — List-endpoint shape inconsistency (DOC FIX)
+══════════════════════════════════════════════════════════════════════
+Doc claim:  "Documentation only. No code changes. unwrapList() shim
+             stays useful."
+Actual:     The doc fix is in place. Bonus: the `?tenant_id=` query
+            hack on /users that the doc claimed was removed actually
+            was removed too.
+Verdict:    ✓ Delivered. (Frontend ran a sweep ensuring every list
+            service uses unwrapList — verified in
+            src/services/list-shape.integration.test.ts, 86 tests.)
+
+§4 — Super-admin cross-tenant reads + writes (DONE)
+══════════════════════════════════════════════════════════════════════
+
+Doc claim                                            | Actual    | Status
+─────────────────────────────────────────────────────|-----------|-------
+get_acting_tenant_id helper                          | Present   | ✓
+get_optional_acting_tenant_id helper                 | Present   | ✓
+core/audit_helpers.py file                           | Present   | ✓
+audit_super_admin_override() function                | Present   | ✓
+GET /users uses get_optional + returns []            | Verified  | ✓
+GET /users/{id} ensures same tenant                  | Verified  | ✓
+PATCH /users/{id} ensures same tenant                | Verified  | ✓
+DELETE /users/{id} ensures same tenant               | Verified  | ✓
+POST /users restricts tenant admins to own tenant    | Verified  | ✓
+?tenant_id= query parameter removed from GET /users  | Removed   | ✓
+POST /roles uses get_acting_tenant_id + audit        | Verified  | ✓
+GET /roles uses get_optional + returns []            | Verified  | ✓
+GET /roles/{id} uses get_acting                      | Verified  | ✓
+POST /roles/{id}/permissions + audit                 | Verified  | ✓
+DELETE /roles/{id}/permissions/{pid} + audit         | Verified  | ✓
+POST /users/{id}/roles + audit                       | Verified  | ✓
+GET /users/{id}/roles uses get_optional              | Verified  | ✓
+DELETE /users/{id}/roles/{rid} + audit               | Verified  | ✓
+DELETE /subscriptions/{id} + audit                   | Verified  | ✓
+test_super_admin_cross_tenant.py with 10 tests       | 11 tests  | ✓
+
+Verdict: All 14 endpoint rewires verified. All 6 cross-tenant write
+endpoints in rbac.py call audit_super_admin_override.
+
+The ONE gap in §4 audit logging:
+  users.py::admin_reset_password does NOT call
+  audit_super_admin_override (also REQ-2).
+
+─────────────────────────────────────────────────────────────────────
+TEST COUNT VERIFICATION
+─────────────────────────────────────────────────────────────────────
+
+Doc claim:  Auth tests 27 → ~44 (+17)
+Actual:     `find packages/auth/tests/ -name 'test_*.py' -exec
+             grep -c '^async def test_' {} +`
+            Total async test functions: 49.
+
+Slightly higher than promised. No missing tests detected.
+
+─────────────────────────────────────────────────────────────────────
+LIVE-BACKEND SMOKE TEST RESULTS
+─────────────────────────────────────────────────────────────────────
+
+Two scripts run end-to-end against running services:
+
+  scripts/smoke-test-api.sh (tenant admin smoke)
+    → 36/36 pass.
+    → Confirms read path works, original count-creation bug is gone.
+
+  scripts/smoke-test-api-spa.sh (super admin cross-tenant smoke)
+    → 13/15 pass.
+    → 2 failures match REQ-2 and REQ-3 below — known and documented.
+
+Combined: 49/51 live-backend checks pass. Failures are exactly the
+two issues this report flags.
+
+─────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════════════
+GAPS FOUND — DROP-IN PATCHES FOR BACKEND TEAM
+═══════════════════════════════════════════════════════════════════════
+─────────────────────────────────────────────────────────────────────
+
+REQ-2 — admin_reset_password is too permissive for SPA
+═══════════════════════════════════════════════════════════════════════
+
+Severity: MEDIUM (security/audit gap; functional but spec-violating)
+
+Reproduction:
+─────────────────────────────────────────────────────────────────────
+ACCESS=$(login as admin@raniacone.com)  # super admin
+TARGET_UID=<some user id in any tenant>
+
+curl -X POST http://localhost:8000/api/v1/users/$TARGET_UID/reset-password \
+  -H "Authorization: Bearer $ACCESS" \
+  -H "Content-Type: application/json" \
+  -d '{"new_password":"NewPass1234!"}'
+
+Expected per §2 spec: 400 TENANT_REQUIRED.
+Actual:               204 (password reset, audit row attributed to
+                      null tenant_id).
+
+Root cause (packages/auth/app/api/v1/users.py, lines 161-186):
+─────────────────────────────────────────────────────────────────────
+@router.post("/{user_id}/reset-password", status_code=204, ...)
+async def admin_reset_password(
+    user_id: UUID,
+    body: AdminResetPasswordRequest,
+    db: AsyncConnection = Depends(get_db),
+    claims: dict = Depends(get_current_user_required),
+    tid: Optional[UUID] = Depends(get_optional_acting_tenant_id),
+    #                            ↑ should be get_acting_tenant_id
+) -> Response:
+    target = await user_repo.get_by_id(db, user_id)
+    if not target:
+        raise NotFoundError("User not found", code="USER_NOT_FOUND")
+    _ensure_same_tenant(target, tid, bool(claims.get("sa")))
+    # ↑ short-circuits on `is_sa=True` — so SPA with tid=None still passes.
+    # Missing: audit_super_admin_override() call.
+    await user_service.admin_reset_password(...)
+    return Response(status_code=204)
+
+Drop-in patch:
+─────────────────────────────────────────────────────────────────────
+@router.post("/{user_id}/reset-password", status_code=204, response_class=Response,
+             dependencies=[Depends(require_perm("auth.users.write"))])
+async def admin_reset_password(
+    user_id: UUID,
+    body: AdminResetPasswordRequest,
+    db: AsyncConnection = Depends(get_db),
+    claims: dict = Depends(get_current_user_required),
+    tid: UUID = Depends(get_acting_tenant_id),       # ← strict
+) -> Response:
+    target = await user_repo.get_by_id(db, user_id)
+    if not target:
+        raise NotFoundError("User not found", code="USER_NOT_FOUND")
+    _ensure_same_tenant(target, tid, bool(claims.get("sa")))
+    await audit_super_admin_override(                 # ← NEW
+        db,
+        target_tenant_id=tid,
+        endpoint="POST /users/{id}/reset-password",
+    )
+    await user_service.admin_reset_password(
+        db,
+        target_user_id=user_id,
+        new_password=body.new_password,
+        actor_id=UUID(claims["sub"]),
+    )
+    return Response(status_code=204)
+
+Behavioural change:
+─────────────────────────────────────────────────────────────────────
+- Tenant admin: unchanged. JWT.tid resolved by helper. No 400.
+- Super admin WITH header: unchanged + audit row written.
+- Super admin WITHOUT header: now 400 TENANT_REQUIRED. Was 204.
+
+New test to add:
+─────────────────────────────────────────────────────────────────────
+async def test_super_admin_reset_password_without_header_returns_400(
+    client, sa_access_token, target_user_id,
+):
+    resp = await client.post(
+        f"/users/{target_user_id}/reset-password",
+        headers={"Authorization": f"Bearer {sa_access_token}"},
+        json={"new_password": "Anything1!"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["code"] == "TENANT_REQUIRED"
+
+Frontend side: nothing to change. The FE always passes the header
+in super-admin contexts (`/platform/users` and `/platform/tenants/[id]`
+both use userService.adminResetPassword(uid, pwd, actingTenantId)).
+
+─────────────────────────────────────────────────────────────────────
+
+REQ-3 — PATCH /roles/{id} and DELETE /roles/{id} not implemented
+═══════════════════════════════════════════════════════════════════════
+
+Severity: MEDIUM (frontend depends on them; UI silently fails)
+
+Background:
+─────────────────────────────────────────────────────────────────────
+The frontend has had `roleService.update()` and `roleService.delete()`
+wired since Phase 5 (RBAC). Both call /roles/{id} via PATCH/DELETE.
+Backend exposes neither method on this route — both return 405.
+
+Frontend usage today:
+- /admin/roles list page: Delete action — silently 405 (live backend).
+- /admin/roles/[id] detail page: new Rename action just added — also
+  405. Surfaces a friendly "backend update pending" notice rather
+  than confusing the admin.
+
+Backend code change required (5 files):
+─────────────────────────────────────────────────────────────────────
+
+1. packages/auth/app/schemas/rbac.py
+   Add `RoleUpdateRequest` alongside RoleCreateRequest:
+
+   class RoleUpdateRequest(APIRequestModel):
+       """PATCH /roles/{id} body. `code` is intentionally immutable
+       to keep grants and downstream references stable."""
+       name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+       description: Optional[str] = None
+
+2. packages/auth/app/repositories/rbac_repo.py
+   Add three helpers:
+
+   async def update_role(
+       conn: AsyncConnection,
+       role_id: UUID,
+       tenant_id: UUID,
+       *,
+       name: Optional[str] = None,
+       description: Optional[str] = None,
+   ) -> Optional[dict[str, Any]]:
+       sets, args = [], []
+       if name is not None:
+           sets.append("name = %s"); args.append(name)
+       if description is not None:
+           sets.append("description = %s"); args.append(description)
+       if not sets:
+           return await get_role_by_id(conn, role_id, tenant_id)
+       sets.append("updated_at = now()")
+       args.extend([role_id, tenant_id])
+       async with conn.cursor(row_factory=dict_row) as cur:
+           await cur.execute(
+               f"UPDATE roles SET {', '.join(sets)} "
+               f"WHERE id = %s AND tenant_id = %s "
+               f"RETURNING {ROLE_COLS}",
+               tuple(args),
+           )
+           return await cur.fetchone()
+
+
+   async def delete_role(
+       conn: AsyncConnection, role_id: UUID, tenant_id: UUID,
+   ) -> bool:
+       async with conn.cursor() as cur:
+           await cur.execute(
+               "DELETE FROM roles WHERE id = %s AND tenant_id = %s",
+               (role_id, tenant_id),
+           )
+           return cur.rowcount > 0
+
+
+   async def count_users_with_role(
+       conn: AsyncConnection, role_id: UUID,
+   ) -> int:
+       async with conn.cursor() as cur:
+           await cur.execute(
+               "SELECT COUNT(*) FROM user_roles WHERE role_id = %s",
+               (role_id,),
+           )
+           row = await cur.fetchone()
+           return int(row[0]) if row else 0
+
+3. packages/auth/app/services/rbac_service.py
+   Add two service methods:
+
+   async def update_role(
+       conn: AsyncConnection,
+       *,
+       role_id: UUID,
+       tenant_id: UUID,
+       name: Optional[str],
+       description: Optional[str],
+       actor_id: Optional[UUID] = None,
+   ) -> dict[str, Any]:
+       async with conn.transaction():
+           before = await rbac_repo.get_role_by_id(conn, role_id, tenant_id)
+           if not before:
+               raise NotFoundError("Role not found", code="ROLE_NOT_FOUND")
+           if before.get("is_system"):
+               raise ConflictError(
+                   "System roles cannot be modified",
+                   code="SYSTEM_ROLE_IMMUTABLE",
+               )
+           row = await rbac_repo.update_role(
+               conn, role_id, tenant_id,
+               name=name, description=description,
+           )
+           await audit_repo.log_audit(
+               conn, tenant_id=tenant_id, table_name="roles",
+               record_id=role_id, action="UPDATE",
+               old_data=row_to_json(before),
+               new_data=row_to_json(row),
+               changed_by=actor_id,
+               request_id=get_request_id(),
+           )
+           return row
+
+
+   async def delete_role(
+       conn: AsyncConnection,
+       *,
+       role_id: UUID,
+       tenant_id: UUID,
+       actor_id: Optional[UUID] = None,
+   ) -> None:
+       async with conn.transaction():
+           before = await rbac_repo.get_role_by_id(conn, role_id, tenant_id)
+           if not before:
+               raise NotFoundError("Role not found", code="ROLE_NOT_FOUND")
+           if before.get("is_system"):
+               raise ConflictError(
+                   "System roles cannot be deleted",
+                   code="SYSTEM_ROLE_IMMUTABLE",
+               )
+           in_use = await rbac_repo.count_users_with_role(conn, role_id)
+           if in_use > 0:
+               raise ConflictError(
+                   f"Role is assigned to {in_use} user(s) — unassign first",
+                   code="ROLE_IN_USE",
+                   field_errors={"role_id": "in use"},
+               )
+           await rbac_repo.delete_role(conn, role_id, tenant_id)
+           await audit_repo.log_audit(
+               conn, tenant_id=tenant_id, table_name="roles",
+               record_id=role_id, action="DELETE",
+               old_data=row_to_json(before),
+               changed_by=actor_id,
+               request_id=get_request_id(),
+           )
+
+4. packages/auth/app/api/v1/rbac.py
+   Add `RoleUpdateRequest` to the imports list at the top.
+   Add these two handlers right after the existing get_role handler
+   (currently around line 102):
+
+   @roles_router.patch("/{role_id}", response_model=RoleResponse,
+                       dependencies=[Depends(require_perm("auth.roles.write"))])
+   async def update_role(
+       role_id: UUID,
+       body: RoleUpdateRequest,
+       db: AsyncConnection = Depends(get_db),
+       claims: dict = Depends(get_current_user_required),
+       tid: UUID = Depends(get_acting_tenant_id),
+   ) -> RoleResponse:
+       await audit_super_admin_override(
+           db, target_tenant_id=tid, endpoint="PATCH /roles/{id}",
+       )
+       row = await rbac_service.update_role(
+           db, role_id=role_id, tenant_id=tid,
+           name=body.name, description=body.description,
+           actor_id=UUID(claims["sub"]),
+       )
+       return RoleResponse(**row)
+
+
+   @roles_router.delete("/{role_id}", status_code=204, response_class=Response,
+                        dependencies=[Depends(require_perm("auth.roles.write"))])
+   async def delete_role(
+       role_id: UUID,
+       db: AsyncConnection = Depends(get_db),
+       claims: dict = Depends(get_current_user_required),
+       tid: UUID = Depends(get_acting_tenant_id),
+   ) -> Response:
+       await audit_super_admin_override(
+           db, target_tenant_id=tid, endpoint="DELETE /roles/{id}",
+       )
+       await rbac_service.delete_role(
+           db, role_id=role_id, tenant_id=tid,
+           actor_id=UUID(claims["sub"]),
+       )
+       return Response(status_code=204)
+
+5. packages/auth/tests/integration/test_role_crud.py (new file)
+   Add tests covering:
+
+   - test_tenant_admin_can_rename_role_in_own_tenant
+   - test_tenant_admin_cannot_rename_role_in_other_tenant   (404)
+   - test_super_admin_can_rename_role_with_header
+   - test_super_admin_rename_without_header_returns_400     (TENANT_REQUIRED)
+   - test_renaming_system_role_is_rejected                  (409 SYSTEM_ROLE_IMMUTABLE)
+   - test_delete_role_succeeds_when_not_assigned
+   - test_delete_role_in_use_returns_409                    (ROLE_IN_USE)
+   - test_delete_system_role_is_rejected                    (409 SYSTEM_ROLE_IMMUTABLE)
+   - test_delete_role_writes_audit_row
+   - test_delete_role_in_other_tenant_returns_404_for_tenant_admin
+
+Behavioural contract:
+─────────────────────────────────────────────────────────────────────
+- Tenant admin can rename/delete custom roles in their own tenant.
+- Tenant admin cannot rename/delete roles in another tenant — 404
+  (tenant-scoped query returns nothing, leaks no info).
+- Super admin must pass X-Acting-Tenant-Id; otherwise 400 TENANT_REQUIRED.
+- System roles (admin, operator, viewer) — 409 SYSTEM_ROLE_IMMUTABLE
+  on rename or delete attempt.
+- Roles still in use (referenced by user_roles) — 409 ROLE_IN_USE
+  on delete. Must unassign users first.
+- All cross-tenant overrides audited via audit_super_admin_override.
+- All updates and deletes audited via audit_repo.log_audit.
+
+Frontend side:
+─────────────────────────────────────────────────────────────────────
+- /admin/roles list — Delete button already wired; will start working.
+- /admin/roles/[id] detail — Rename button already wired (just added);
+  will start working. Until then, both surface a friendly notice.
+- No further FE deploy required after this lands.
+
+─────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════════════
+PATTERN CONSISTENCY (rationale for the proposed patches)
+═══════════════════════════════════════════════════════════════════════
+─────────────────────────────────────────────────────────────────────
+
+The §4 update established a uniform contract across all cross-tenant
+write endpoints. Adopting REQ-2 + REQ-3 keeps every endpoint speaking
+the same dialect rather than introducing a third behaviour.
+
+Pattern §4 established                  | Endpoints that must follow it
+────────────────────────────────────────|───────────────────────────────
+get_acting_tenant_id (strict) on writes | All POST/PATCH/DELETE on
+                                        | tenant-scoped resources
+_ensure_same_tenant on target lookups   | All /users/{id} write paths
+audit_super_admin_override              | All POST/PATCH/DELETE on
+                                        | tenant-scoped resources
+400 TENANT_REQUIRED on missing header   | All write endpoints
+422 VALIDATION_ERROR on bad UUID        | All write endpoints
+is_system check on system roles         | New PATCH/DELETE /roles/{id}
+in_use check on destructive deletes     | New DELETE /roles/{id}
+
+After REQ-2 + REQ-3 land, every cross-tenant-capable write endpoint
+behaves identically. No special cases to remember.
+
+─────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════════════
+ACTION ITEMS — PRIORITY ORDER
+═══════════════════════════════════════════════════════════════════════
+─────────────────────────────────────────────────────────────────────
+
+  PRIORITY 1 — REQ-2  (3 lines changed)
+    File: packages/auth/app/api/v1/users.py
+    Effort: ~10 minutes
+    Impact: closes a §2 spec hole and an audit-attribution gap.
+
+  PRIORITY 2 — REQ-3  (5 files changed, ~140 lines added)
+    Files: rbac.py, schemas/rbac.py, services/rbac_service.py,
+           repositories/rbac_repo.py, tests/integration/test_role_crud.py
+    Effort: ~1 hour
+    Impact: unblocks Roles management UI on the frontend
+            (rename + delete buttons that currently 405).
+
+After both: every endpoint matches both the 24-apr spec and the
+frontend's expectations. No further pending items.
+
+═══════════════════════════════════════════════════════════════════════
+END OF AUDIT REPORT
+═══════════════════════════════════════════════════════════════════════
