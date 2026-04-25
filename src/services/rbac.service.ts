@@ -72,6 +72,28 @@ export const userService = {
     });
   },
 
+  /**
+   * Admin-initiated password reset (auth service §2 — 2026-04-24 changes).
+   * On 204, the target user's refresh tokens are revoked server-side.
+   * Pass `actingTenantId` when called from a super-admin context — the
+   * backend requires X-Acting-Tenant-Id for SPAs and ignores it for
+   * tenant admins (they're scoped to their JWT's tid).
+   */
+  async adminResetPassword(
+    userId: string,
+    newPassword: string,
+    actingTenantId?: string,
+  ): Promise<void> {
+    const headers = actingTenantId
+      ? { "X-Acting-Tenant-Id": actingTenantId }
+      : undefined;
+    await api.auth.post<void>(
+      USERS.RESET_PASSWORD(userId),
+      { new_password: newPassword },
+      headers,
+    );
+  },
+
   // ── User Roles ──
   async listRoles(userId: string): Promise<UserRole[]> {
     const res = await api.auth.get<UserRole[] | PaginatedResponse<UserRole>>(

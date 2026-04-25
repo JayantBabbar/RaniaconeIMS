@@ -44,6 +44,7 @@ export const USERS = {
   DETAIL: (id: string) => `/users/${id}`,
   ROLES: (id: string) => `/users/${id}/roles`,
   ROLE: (userId: string, roleId: string) => `/users/${userId}/roles/${roleId}`,
+  RESET_PASSWORD: (id: string) => `/users/${id}/reset-password`,
 } as const;
 
 export const PERMISSIONS = {

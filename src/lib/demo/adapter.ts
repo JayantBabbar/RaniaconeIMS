@@ -248,6 +248,24 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     return u ? delay(ok(u)) : (() => { throw fail(404, "NOT_FOUND", "User not found"); })();
   }
 
+  // Admin-initiated password reset (auth service §2 — 2026-04-24).
+  // Real backend: 204 + revokes all refresh tokens. We don't actually
+  // mutate anything in the fixtures — the demo just lets the click succeed.
+  const rpwm = match(path, "/users/:id/reset-password");
+  if (method === "POST" && rpwm) {
+    const u = F.USERS.find((x) => x.id === rpwm.id);
+    if (!u) throw fail(404, "USER_NOT_FOUND", "User not found");
+    const np = (typeof body === "object" && body && "new_password" in body)
+      ? String((body as { new_password?: unknown }).new_password ?? "")
+      : "";
+    if (np.length < 8 || np.length > 128) {
+      throw fail(422, "VALIDATION_ERROR", "Password must be 8–128 characters", {
+        new_password: "Must be between 8 and 128 characters",
+      });
+    }
+    return delay(ok({}, 204));
+  }
+
   // ─── Roles ────────────────────────────
   if (method === "GET" && path === "/roles") return delay(ok(listFor(F.ROLES)));
   const rm = match(path, "/roles/:id");

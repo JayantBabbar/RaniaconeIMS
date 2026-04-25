@@ -18,7 +18,6 @@ import { useCan } from "@/components/ui/can";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
 import { userService, roleService } from "@/services/rbac.service";
-import { useBranding } from "@/providers/branding-provider";
 import { isApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import {
@@ -352,9 +351,9 @@ function DetailRow({
 }
 
 // ── Reset password modal (admin-initiated) ───────────────────────
-// The endpoint is pending backend confirmation (see changes_required.txt).
-// Current behaviour tries PATCH /users/{id} with a password field; if the
-// server rejects that, falls back to showing the pending notice.
+// Calls POST /users/{id}/reset-password (auth service §2, 2026-04-24).
+// On success, the target user's refresh tokens are revoked server-side
+// — they're signed out of every device immediately.
 
 const resetSchema = z
   .object({
@@ -380,7 +379,6 @@ function ResetPasswordModal({
   userEmail: string;
 }) {
   const toast = useToast();
-  const brand = useBranding();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -404,27 +402,22 @@ function ResetPasswordModal({
     setServerError(null);
     setSubmitting(true);
     try {
-      // Attempt PATCH /users/{id} with a password field. If the backend
-      // accepts this, great. If not, we surface a clear error and the
-      // admin knows to fall back to the email flow (once available).
-      await userService.update(userId, {
-        // `password` isn't in the declared update shape but the server
-        // may accept it as an extra field. Cast narrowly.
-        ...({ password: data.new_password } as unknown as { is_active: boolean }),
-      });
+      await userService.adminResetPassword(userId, data.new_password);
       toast.success(
         "Password reset",
-        `${userEmail} can sign in with the new password. Share it securely and ask them to change it.`,
+        `${userEmail} has been signed out of every device. Share the new password securely and ask them to change it after signing in.`,
       );
       close();
     } catch (err) {
       if (isApiError(err)) {
-        if (err.status === 422 && err.fieldErrors?.password) {
-          setServerError(err.fieldErrors.password);
-        } else if (err.status === 405 || err.status === 422) {
+        if (err.status === 422 && err.fieldErrors?.new_password) {
+          setServerError(err.fieldErrors.new_password);
+        } else if (err.status === 403) {
           setServerError(
-            `This workspace doesn't support admin-initiated password reset yet. We've filed a request with the backend team — until it's ready, contact ${brand.supportEmail}.`,
+            "You don't have permission to reset this user's password. Required: auth.users.write.",
           );
+        } else if (err.status === 404) {
+          setServerError("That user no longer exists.");
         } else {
           setServerError(err.message);
         }
