@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/shared";
 import { Input } from "@/components/ui/form-elements";
 import { Dialog, ConfirmDialog } from "@/components/ui/dialog";
+import { ResetPasswordDialog } from "@/components/ui/reset-password-dialog";
 import { ActionMenu } from "@/components/ui/action-menu";
 import {
   GlobalSearch,
@@ -26,7 +27,7 @@ import { useToast } from "@/components/ui/toast";
 import { userService } from "@/services/rbac.service";
 import { authService } from "@/services/auth.service";
 import { tenantService } from "@/services/platform.service";
-import { api, isApiError } from "@/lib/api-client";
+import { isApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import type { User, Tenant } from "@/types";
 import {
@@ -35,6 +36,7 @@ import {
   Users as UsersIcon,
   Building2,
   Trash2,
+  KeyRound,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -53,11 +55,12 @@ export default function PlatformUsersPage() {
 
   const [showInvite, setShowInvite] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DirectoryRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<DirectoryRow | null>(null);
 
   // All tenants for scoping
   const { data: tenantsRaw } = useQuery({
     queryKey: ["platformTenants"],
-    queryFn: () => tenantService.list({ limit: 200 }),
+    queryFn: () => tenantService.list({ limit: 500 }),
   });
   const tenants = tenantsRaw ?? [];
 
@@ -128,8 +131,11 @@ export default function PlatformUsersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (u: DirectoryRow) => {
-      const headers = u._tenant ? { "X-Tenant-Id": u._tenant.id } : undefined;
-      return api.getInstance().delete(`/users/${u.id}`, { headers });
+      // SPA deleting a tenant user must send X-Acting-Tenant-Id per the
+      // 25-apr backend update. For users with a tenant, use the helper;
+      // for super admins (no _tenant), use the plain endpoint.
+      if (u._tenant) return userService.deleteInTenant(u.id, u._tenant.id);
+      return userService.delete(u.id);
     },
     onSuccess: () => {
       toast.success("User removed");
@@ -343,9 +349,14 @@ export default function PlatformUsersPage() {
                                   icon: <Building2 size={12} />,
                                   href: `/platform/tenants/${u._tenant.id}`,
                                 },
-                                { divider: true, label: "" },
                               ]
                             : []),
+                          {
+                            label: "Reset password",
+                            icon: <KeyRound size={12} />,
+                            onClick: () => setResetTarget(u),
+                          },
+                          { divider: true, label: "" },
                           {
                             label: "Remove",
                             icon: <Trash2 size={12} />,
@@ -368,6 +379,18 @@ export default function PlatformUsersPage() {
         onClose={() => setShowInvite(false)}
         tenants={tenants}
       />
+
+      {/* Super admin cross-tenant password reset — passes actingTenantId so
+          the backend's X-Acting-Tenant-Id check lets us reach the user. */}
+      {resetTarget && (
+        <ResetPasswordDialog
+          open={!!resetTarget}
+          onClose={() => setResetTarget(null)}
+          userId={resetTarget.id}
+          userEmail={resetTarget.email}
+          actingTenantId={resetTarget._tenant?.id}
+        />
+      )}
 
       <ConfirmDialog
         open={!!deleteTarget}

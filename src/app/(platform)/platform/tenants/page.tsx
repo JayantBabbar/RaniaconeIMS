@@ -49,7 +49,7 @@ export default function TenantManagementPage() {
     queryKey: ["platformTenants"],
     queryFn: () =>
       tenantService.list({
-        limit: 200,
+        limit: 500,
       }),
   });
 

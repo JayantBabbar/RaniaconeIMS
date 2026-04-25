@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 // import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/ui/shared";
 import { Dialog } from "@/components/ui/dialog";
+import { ResetPasswordDialog } from "@/components/ui/reset-password-dialog";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { Input } from "@/components/ui/form-elements";
 import { useToast } from "@/components/ui/toast";
 import { tenantService, currencyService } from "@/services/platform.service";
@@ -28,6 +30,7 @@ import {
   UserPlus,
   Copy,
   Users as UsersIcon,
+  KeyRound,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -41,6 +44,7 @@ export default function TenantDetailPage() {
   const toast = useToast();
   const [showRegisterUser, setShowRegisterUser] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [resetTarget, setResetTarget] = useState<{ id: string; email: string } | null>(null);
 
   const { data: tenant, isLoading } = useQuery({
     queryKey: ["platformTenant", id],
@@ -260,6 +264,7 @@ export default function TenantDetailPage() {
                   <th className="text-center px-4 py-2.5">Status</th>
                   <th className="text-center px-4 py-2.5">Admin</th>
                   <th className="text-left px-4 py-2.5">Created</th>
+                  <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
@@ -297,6 +302,18 @@ export default function TenantDetailPage() {
                     <td className="px-4 py-2.5 text-foreground-secondary text-xs">
                       {formatDate(u.created_at)}
                     </td>
+                    <td className="px-2 py-2.5 text-center">
+                      <ActionMenu
+                        items={[
+                          {
+                            label: "Reset password",
+                            icon: <KeyRound size={12} />,
+                            onClick: () =>
+                              setResetTarget({ id: u.id, email: u.email }),
+                          },
+                        ]}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -311,6 +328,17 @@ export default function TenantDetailPage() {
         onClose={() => setShowRegisterUser(false)}
         tenant={tenant}
       />
+
+      {/* Super-admin password reset — sends X-Acting-Tenant-Id for this tenant. */}
+      {resetTarget && (
+        <ResetPasswordDialog
+          open={!!resetTarget}
+          onClose={() => setResetTarget(null)}
+          userId={resetTarget.id}
+          userEmail={resetTarget.email}
+          actingTenantId={tenant.id}
+        />
+      )}
     </div>
   );
 }

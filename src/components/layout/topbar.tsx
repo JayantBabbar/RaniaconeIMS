@@ -14,6 +14,65 @@ interface TopBarProps {
   className?: string;
 }
 
+// Standard crumb labels → routes. Lets plain string[] breadcrumbs become
+// clickable without every caller having to pass hrefs. Labels not in the
+// map (e.g. a document number, a tenant name) render as plain text.
+const CRUMB_ROUTES: Record<string, string> = {
+  // Top-level sections
+  "Platform": "/platform/overview",
+  "Dashboard": "/dashboard",
+  "Admin": "/admin/users",
+  "Settings": "/settings",
+  "Account": "/account/change-password",
+  // Platform subsections
+  "Overview": "/platform/overview",
+  "Tenants": "/platform/tenants",
+  "Currencies": "/platform/currencies",
+  "System Health": "/platform/health",
+  // Tenant-admin subsections
+  "Users": "/admin/users",
+  "Roles": "/admin/roles",
+  "Permissions": "/admin/permissions",
+  // Inventory
+  "Inventory": "/items",
+  "Items": "/items",
+  "Lots": "/items/lots",
+  "Serials": "/items/serials",
+  "Locations": "/locations",
+  "Stock Balances": "/balances",
+  "Movements": "/movements",
+  "Reservations": "/reservations",
+  "Valuation Layers": "/valuation",
+  "Low Stock Alerts": "/alerts",
+  "Attachments": "/attachments",
+  // Documents
+  "Documents": "/documents/all",
+  "Purchase Orders": "/documents/purchase-orders",
+  "Sales Orders": "/documents/sales-orders",
+  "Transfers": "/documents/transfers",
+  // Operations
+  "Stock Counts": "/counts",
+  "Parties": "/parties",
+  // Master data
+  "Master Data": "/master-data/status-master",
+  "Status Master": "/master-data/status-master",
+  "Number Series": "/master-data/number-series",
+  "UoM Categories": "/master-data/uom-categories",
+  "UoMs": "/master-data/uoms",
+  "UoM Conversions": "/master-data/uom-conversions",
+  "Brands": "/master-data/brands",
+  "Categories": "/master-data/categories",
+  "Document Types": "/master-data/document-types",
+  // Settings subsections
+  "Custom Fields": "/settings/custom-fields",
+  "Imports": "/settings/imports",
+  "Integrations": "/settings/integrations",
+  "Module Configuration": "/settings/module-config",
+  "Tenant Configuration": "/settings/tenant-config",
+  "Webhooks": "/settings/webhooks",
+  "Workflows": "/settings/workflows",
+};
+
 export function TopBar({ crumbs, right, className }: TopBarProps) {
   const { user, tenantName, logout } = useAuth();
   const { openMobile } = useSidebar();
@@ -48,26 +107,39 @@ export function TopBar({ crumbs, right, className }: TopBarProps) {
           </div>
           {/* Desktop */}
           <div className="hidden md:flex items-center gap-1.5 text-sm min-w-0">
-            {crumbs.map((crumb, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && (
-                  <ChevronRight
-                    size={11}
-                    className="text-foreground-muted flex-shrink-0"
-                  />
-                )}
-                <span
-                  className={cn(
-                    "truncate",
-                    i === crumbs.length - 1
-                      ? "text-foreground font-medium"
-                      : "text-foreground-secondary"
+            {crumbs.map((crumb, i) => {
+              const isLast = i === crumbs.length - 1;
+              const href = !isLast ? CRUMB_ROUTES[crumb] : undefined;
+              return (
+                <React.Fragment key={i}>
+                  {i > 0 && (
+                    <ChevronRight
+                      size={11}
+                      className="text-foreground-muted flex-shrink-0"
+                    />
                   )}
-                >
-                  {crumb}
-                </span>
-              </React.Fragment>
-            ))}
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="truncate text-foreground-secondary hover:text-foreground hover:underline transition-colors"
+                    >
+                      {crumb}
+                    </Link>
+                  ) : (
+                    <span
+                      className={cn(
+                        "truncate",
+                        isLast
+                          ? "text-foreground font-medium"
+                          : "text-foreground-secondary"
+                      )}
+                    >
+                      {crumb}
+                    </span>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </>
       )}

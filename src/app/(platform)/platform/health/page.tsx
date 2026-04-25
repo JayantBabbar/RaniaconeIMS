@@ -66,7 +66,7 @@ export default function SystemHealthPage() {
 
   const { data: tenantsRaw } = useQuery({
     queryKey: ["platformTenants"],
-    queryFn: () => tenantService.list({ limit: 200 }),
+    queryFn: () => tenantService.list({ limit: 500 }),
   });
   const tenants = tenantsRaw ?? [];
 

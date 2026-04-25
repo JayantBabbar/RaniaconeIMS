@@ -31,7 +31,7 @@ export default function PlatformOverviewPage() {
 
   const { data: tenantsRaw } = useQuery({
     queryKey: ["platformTenants"],
-    queryFn: () => tenantService.list({ limit: 200 }),
+    queryFn: () => tenantService.list({ limit: 500 }),
   });
 
   const { data: currenciesRaw } = useQuery({
