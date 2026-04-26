@@ -1646,7 +1646,7 @@ export default function LandingPage() {
       // ScrollTriggers don't fire, content stays fully visible. Belt
       // and braces vs. the kind of timing race a static HTML page
       // doesn't have to worry about.
-      gsap.utils.toArray<HTMLElement>("[data-tile]").forEach((tile) => {
+      (gsap.utils.toArray("[data-tile]") as HTMLElement[]).forEach((tile) => {
         gsap.from(tile, {
           y: 32,
           duration: 0.85,
