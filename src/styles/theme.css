@@ -18,15 +18,15 @@
  * ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Brand ────────────────────────────────────────────────────────── */
-  --color-brand:          #2563eb;
-  --color-brand-light:    #eff6ff;
-  --color-brand-dark:     #1d4ed8;
-  --color-brand-50:       #eff6ff;
-  --color-brand-100:      #dbeafe;
-  --color-brand-500:      #2563eb;
-  --color-brand-600:      #1d4ed8;
-  --color-brand-700:      #1e40af;
+  /* ── Brand — saffron-amber, matched to the marketing landing ─────── */
+  --color-brand:          #d97c2f;   /* deep saffron-amber, the primary */
+  --color-brand-light:    #fef3e7;   /* pale tint, hover surfaces */
+  --color-brand-dark:     #b15a1d;   /* deeper, hover/active */
+  --color-brand-50:       #fdf6ec;
+  --color-brand-100:      #fde2c0;
+  --color-brand-500:      #d97c2f;
+  --color-brand-600:      #b15a1d;
+  --color-brand-700:      #8a4515;
 
   /* ── Surfaces ─────────────────────────────────────────────────────── */
   --color-background:           #ffffff;
@@ -75,9 +75,9 @@
   --shadow-card:    0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-raised:  0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-btn-primary: 0 1px 2px rgba(37, 99, 235, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --shadow-btn-success: 0 1px 2px rgba(22, 163, 74, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --shadow-btn-dark:    0 1px 2px rgba(0, 0, 0, 0.12),    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-btn-primary: 0 1px 2px rgba(217, 124, 47, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow-btn-success: 0 1px 2px rgba(22, 163, 74, 0.25),  inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-btn-dark:    0 1px 2px rgba(0, 0, 0, 0.12),      inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
   /* ── Radius ──────────────────────────────────────────────────────── */
   --radius-sm:      4px;
@@ -90,7 +90,7 @@
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
   /* ── Focus ring ──────────────────────────────────────────────────── */
-  --ring-color: rgba(37, 99, 235, 0.3);
+  --ring-color: rgba(217, 124, 47, 0.30);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RaniacOne — horizontal lockup (mark + wordmark).
+  Mark on the left, "RaniacOne" set in Switzer Bold to the right.
+  Wordmark fill uses currentColor so the lockup adapts to dark/light
+  contexts without needing two files.
+-->
+<svg width="320" height="80" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RaniacOne">
+  <title>RaniacOne</title>
+  <style>
+    .plate { fill: #d67837; fill: oklch(0.620 0.180 50); }
+    .mark  { fill: #ffffff; }
+    .word  {
+      font-family: 'Switzer', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
+      font-weight: 700;
+      font-size: 38px;
+      letter-spacing: -0.025em;
+      fill: currentColor;
+    }
+  </style>
+  <g transform="translate(0, 8)">
+    <rect class="plate" width="64" height="64" rx="14"/>
+    <g transform="translate(14, 16)" class="mark">
+      <path fill-rule="evenodd" d="M 0 0 L 14 0 Q 24 0 24 11 Q 24 18 18 21 L 24 32 L 16 32 L 11 22 L 6 22 L 6 32 L 0 32 Z M 6 6 L 13 6 Q 18 6 18 11 Q 18 16 13 16 L 6 16 Z"/>
+      <path d="M 28 5 L 32 0 L 36 0 L 36 32 L 32 32 L 32 4 Z"/>
+    </g>
+  </g>
+  <text x="80" y="55" class="word">RaniacOne</text>
+</svg>

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Pallet+Boxes+Forklift  .::RAWscan::.
+* source:	https://sketchfab.com/3d-models/palletboxesforklift-rawscan-c2cf485ab7ca42c78807e72d8952cc5a
+* author:	Andrea Spognetta (Spogna) (https://sketchfab.com/spogna)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Pallet+Boxes+Forklift  .::RAWscan::." (https://sketchfab.com/3d-models/palletboxesforklift-rawscan-c2cf485ab7ca42c78807e72d8952cc5a) by Andrea Spognetta (Spogna) (https://sketchfab.com/spogna) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

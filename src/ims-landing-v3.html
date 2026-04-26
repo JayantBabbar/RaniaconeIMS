@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockFlow IMS — Intelligent Inventory Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#080a0f;--bg2:#0d1117;--bg3:#161b22;--bg4:#1c2129;
+  --amber:#f0a500;--amber-g:#f0a50040;--orange:#ff6b35;
+  --green:#2ea043;--green-g:#2ea04330;
+  --red:#f85149;--red-g:#f8514930;
+  --blue:#58a6ff;
+  --txt:#e6edf3;--txt2:#8b949e;--txt3:#484f58;
+  --brd:#21262d;--road:#1a1e25;
+  --fd:'Outfit',sans-serif;--fb:'DM Sans',sans-serif;--fm:'JetBrains Mono',monospace;
+}
+html{background:var(--bg);overflow-x:hidden;scroll-behavior:smooth}
+body{font-family:var(--fb);color:var(--txt);background:var(--bg);overflow-x:hidden}
+
+/* ═══ LOADER ═══ */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s,visibility .5s}
+#loader.done{opacity:0;visibility:hidden;pointer-events:none}
+#loader h2{font-family:var(--fd);font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,var(--amber),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1.2rem}
+.lbar{width:160px;height:3px;background:var(--brd);border-radius:4px;overflow:hidden}
+.lbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--orange));animation:lfill 1.3s ease-out forwards}
+@keyframes lfill{to{width:100%}}
+
+/* ═══ NAV ═══ */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:.9rem 2rem;display:flex;align-items:center;justify-content:space-between;background:rgba(8,10,15,.6);backdrop-filter:blur(18px);border-bottom:1px solid transparent;transition:all .3s}
+nav.scrolled{border-color:var(--brd);background:rgba(8,10,15,.92)}
+.logo{font-family:var(--fd);font-weight:800;font-size:1.2rem;display:flex;align-items:center;gap:.45rem}
+.logo b{width:26px;height:26px;background:linear-gradient(135deg,var(--amber),var(--orange));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#000}
+.nr{display:flex;gap:2rem;align-items:center}
+.nr a{color:var(--txt2);text-decoration:none;font-size:.82rem;font-weight:500;transition:color .3s}
+.nr a:hover{color:var(--txt)}
+.nr .cta{background:linear-gradient(135deg,var(--amber),var(--orange));color:#000!important;padding:.45rem 1.1rem;border-radius:7px;font-weight:700!important}
+
+/* ═══ PROGRESS ═══ */
+#prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:201;background:linear-gradient(90deg,var(--amber),var(--orange),var(--red))}
+
+/* ═══ HERO ═══ */
+#hero{height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;position:relative}
+#hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 80%,#1a130a,transparent)}
+.hi{position:relative;z-index:2;max-width:650px;padding:0 1.5rem}
+.badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .8rem;border-radius:99px;background:rgba(240,165,0,.07);border:1px solid rgba(240,165,0,.18);font-size:.75rem;font-weight:500;color:var(--amber);margin-bottom:1.2rem;opacity:0;animation:fu .6s 1.5s forwards}
+.badge .dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.4}}
+.hi h1{font-family:var(--fd);font-size:clamp(2.4rem,6vw,4.5rem);font-weight:900;line-height:1.08;margin-bottom:1.1rem;opacity:0;animation:fu .6s 1.7s forwards}
+.hi h1 em{font-style:normal;background:linear-gradient(135deg,var(--amber),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hi p{font-size:1.05rem;color:var(--txt2);line-height:1.7;max-width:480px;margin:0 auto 2rem;opacity:0;animation:fu .6s 1.9s forwards}
+.hb{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;opacity:0;animation:fu .6s 2.1s forwards}
+.bp{display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.6rem;border-radius:9px;background:linear-gradient(135deg,var(--amber),#e09000);color:#000;font-weight:700;font-size:.88rem;text-decoration:none;border:none;cursor:pointer;font-family:var(--fb);transition:transform .2s,box-shadow .3s}
+.bp:hover{transform:translateY(-2px);box-shadow:0 6px 25px var(--amber-g)}
+.bs{display:inline-flex;align-items:center;gap:.4rem;padding:.75rem 1.6rem;border-radius:9px;background:transparent;border:1px solid var(--brd);color:var(--txt);font-weight:600;font-size:.88rem;text-decoration:none;cursor:pointer;font-family:var(--fb);transition:border-color .3s}
+.bs:hover{border-color:var(--txt3)}
+.sc{position:absolute;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.4rem;opacity:0;animation:fu .6s 2.5s forwards}
+.sc span{font-size:.68rem;color:var(--txt3);text-transform:uppercase;letter-spacing:2px}
+.sc .ar{width:1px;height:30px;background:linear-gradient(to bottom,var(--amber),transparent);animation:scp 2s infinite}
+@keyframes scp{0%,100%{opacity:.3;transform:scaleY(.5)}50%{opacity:1;transform:scaleY(1)}}
+@keyframes fu{to{opacity:1;transform:translateY(0)}}
+.badge,.hi h1,.hi p,.hb,.sc{transform:translateY(18px)}
+
+/* ══════════════════════════════════════════
+   THE ROAD JOURNEY
+   ══════════════════════════════════════════ */
+#journey{position:relative}
+
+/* Road */
+.road{
+  position:absolute;left:50%;top:0;bottom:0;width:80px;
+  transform:translateX(-50%);
+  background:#13161c;
+  border-left:3px solid #252a33;
+  border-right:3px solid #252a33;
+  z-index:1;
+}
+.road::after{
+  content:'';position:absolute;left:50%;top:0;bottom:0;width:3px;
+  transform:translateX(-50%);
+  background:repeating-linear-gradient(to bottom,rgba(240,165,0,.35) 0,rgba(240,165,0,.35) 28px,transparent 28px,transparent 56px);
+  animation:roadScroll 1s linear infinite;
+  animation-play-state:paused;
+}
+@keyframes roadScroll{to{background-position:0 56px}}
+
+/* ═══ THE TRUCK — always on screen in road zone ═══ */
+#truck-wrap{
+  position:fixed;
+  left:50%;top:0;
+  transform:translateX(-50%);
+  z-index:100;
+  pointer-events:none;
+  /* start hidden, JS controls opacity */
+  opacity:0;
+  transition:opacity .4s;
+}
+#truck-wrap.on{opacity:1}
+
+.truck-glow{
+  position:absolute;left:50%;top:10px;
+  transform:translateX(-50%);
+  width:50px;height:90px;
+  background:radial-gradient(ellipse,rgba(240,165,0,.12),transparent 70%);
+  filter:blur(10px);
+  pointer-events:none;
+}
+
+/* Headlight beams */
+.headlight-beam{
+  position:absolute;
+  top:-60px;left:50%;
+  transform:translateX(-50%);
+  width:0;height:0;
+  border-left:18px solid transparent;
+  border-right:18px solid transparent;
+  border-bottom:60px solid rgba(240,165,0,.04);
+  pointer-events:none;
+}
+
+/* Tire smoke */
+.tire-smoke{
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  display:flex;gap:24px;
+}
+.tire-smoke i{
+  display:block;width:4px;height:4px;
+  background:rgba(255,255,255,.08);border-radius:50%;
+  animation:smoke 1s infinite ease-out;
+}
+.tire-smoke i:nth-child(2){animation-delay:.3s}
+.tire-smoke i:nth-child(3){animation-delay:.6s}
+@keyframes smoke{
+  0%{opacity:.15;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(20px) scale(2.5)}
+}
+
+/* ═══ STOPS ═══ */
+.stop{position:relative;min-height:100vh;display:flex;align-items:center;z-index:5;padding:5rem 0}
+.si{max-width:1200px;width:100%;margin:0 auto;display:grid;grid-template-columns:1fr 80px 1fr;align-items:center;padding:0 2rem}
+.sl{grid-column:1;padding-right:2.5rem}
+.sr{grid-column:3;padding-left:2.5rem}
+.sm{grid-column:2}
+
+/* Milestone dots on road */
+.mile{
+  position:absolute;left:50%;transform:translateX(-50%);
+  width:16px;height:16px;background:var(--bg);
+  border:2px solid var(--txt3);border-radius:50%;z-index:6;
+  transition:all .4s;top:50%;
+}
+.mile.lit{border-color:var(--amber);background:var(--amber);box-shadow:0 0 14px var(--amber-g)}
+
+/* Cards */
+.card{
+  background:var(--bg2);border:1px solid var(--brd);border-radius:14px;
+  padding:2.2rem;opacity:0;transform:translateY(35px);
+  transition:all .7s cubic-bezier(.16,1,.3,1);
+}
+.stop.vis .card{opacity:1;transform:translateY(0)}
+.sn{font-family:var(--fm);font-size:.7rem;color:var(--amber);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:.5rem;opacity:.7}
+.card h2{font-family:var(--fd);font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;line-height:1.15;margin-bottom:.7rem}
+.card p{font-size:.9rem;color:var(--txt2);line-height:1.7;margin-bottom:1rem}
+
+/* Visual panels */
+.vpanel{
+  background:var(--bg2);border:1px solid var(--brd);border-radius:14px;overflow:hidden;
+  opacity:0;transform:translateY(35px);
+  transition:all .7s cubic-bezier(.16,1,.3,1) .15s;
+}
+.stop.vis .vpanel{opacity:1;transform:translateY(0)}
+
+/* ═══ SCAN LIST ═══ */
+.scanl{padding:1.3rem;position:relative}
+.sr-item{
+  display:flex;align-items:center;gap:.7rem;
+  padding:.7rem .9rem;background:var(--bg3);border:1px solid var(--brd);
+  border-radius:9px;margin-bottom:.5rem;
+  opacity:0;transform:translateX(-20px);transition:all .45s cubic-bezier(.16,1,.3,1);
+}
+.sr-item.on{opacity:1;transform:translateX(0)}
+.sr-item .ic{width:34px;height:34px;background:rgba(240,165,0,.1);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
+.sr-item .inf{flex:1}
+.sr-item .inf b{font-size:.82rem;display:block}
+.sr-item .inf small{font-family:var(--fm);font-size:.68rem;color:var(--txt3)}
+.sr-item .tg{padding:.18rem .5rem;border-radius:99px;font-size:.65rem;font-weight:600;background:var(--green-g);color:var(--green)}
+.sbeam{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);top:0;animation:sbm 2.8s infinite}
+@keyframes sbm{0%{top:0;opacity:0}8%{opacity:1}92%{opacity:1}100%{top:100%;opacity:0}}
+
+/* ═══ DASHBOARD ═══ */
+.dash{border-radius:14px;overflow:hidden;background:var(--bg2);border:1px solid var(--brd)}
+.dt{display:flex;align-items:center;justify-content:space-between;padding:.55rem .9rem;background:var(--bg3);border-bottom:1px solid var(--brd)}
+.dd{display:flex;gap:4px}.dd i{width:8px;height:8px;border-radius:50%;display:block}
+.dd i:nth-child(1){background:#f85149}.dd i:nth-child(2){background:#f0a500}.dd i:nth-child(3){background:#2ea043}
+.du{font-family:var(--fm);font-size:.6rem;color:var(--txt3);background:var(--bg);padding:.2rem .7rem;border-radius:4px}
+.db{padding:1rem}
+.ds{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.6rem}
+.dst{background:var(--bg3);border:1px solid var(--brd);border-radius:7px;padding:.65rem}
+.dst small{font-size:.6rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.8px}
+.dst .v{font-family:var(--fd);font-size:1.2rem;font-weight:800;color:var(--amber)}
+.dst .c{font-size:.6rem;margin-top:.1rem}
+.c.up{color:var(--green)}.c.dn{color:var(--red)}
+.dchart{background:var(--bg3);border:1px solid var(--brd);border-radius:7px;padding:.7rem;height:100px;display:flex;flex-direction:column}
+.dchart span{font-size:.6rem;color:var(--txt3);font-weight:600;margin-bottom:.3rem}
+.bars{display:flex;align-items:flex-end;gap:2px;flex:1}
+.bars div{flex:1;background:linear-gradient(to top,var(--amber),rgba(240,165,0,.25));border-radius:2px 2px 0 0;min-height:2px;transition:height 1s cubic-bezier(.16,1,.3,1)}
+
+/* ═══ CONVEYOR ═══ */
+.convs{aspect-ratio:16/10;position:relative;background:var(--bg2)}
+.convs svg{width:100%;height:100%;display:block}
+.sf{position:absolute;top:.8rem;right:.8rem;display:flex;flex-direction:column;gap:.3rem}
+.sf span{padding:.18rem .5rem;background:var(--green-g);border:1px solid rgba(46,160,67,.2);border-radius:4px;font-family:var(--fm);font-size:.6rem;color:var(--green);opacity:0;transform:translateX(12px);transition:all .45s}
+.sf span.on{opacity:1;transform:translateX(0)}
+
+/* ═══ ALERT ═══ */
+.als{aspect-ratio:16/10;position:relative;background:var(--bg2)}
+.als svg{width:100%;height:100%;display:block}
+.apop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,10,15,.55);opacity:0;transition:opacity .5s;pointer-events:none}
+.apop.on{opacity:1;pointer-events:auto}
+.am{background:var(--bg3);border:1px solid var(--red);border-radius:12px;padding:1.5rem;max-width:290px;width:85%;text-align:center;box-shadow:0 0 40px var(--red-g);transform:scale(.85);opacity:0;transition:all .45s cubic-bezier(.16,1,.3,1) .15s}
+.apop.on .am{transform:scale(1);opacity:1}
+.ai{width:44px;height:44px;background:rgba(248,81,73,.1);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto .6rem;font-size:1.3rem;animation:ap 1.4s infinite}
+@keyframes ap{0%,100%{box-shadow:0 0 0 0 var(--red-g)}50%{box-shadow:0 0 0 10px transparent}}
+.am h3{font-family:var(--fd);font-size:1rem;font-weight:700;color:var(--red);margin-bottom:.3rem}
+.am>p{font-size:.75rem;color:var(--txt2);margin-bottom:.8rem}
+.ait{text-align:left;margin-bottom:.8rem}
+.ait div{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--brd);font-size:.72rem}
+.ait .q{color:var(--red);font-family:var(--fm);font-weight:600}
+.br{width:100%;padding:.5rem;background:var(--red);border:none;border-radius:7px;color:#fff;font-weight:700;font-size:.8rem;cursor:pointer;font-family:var(--fb)}
+
+/* ═══ CYCLE ═══ */
+.cc{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin-top:1.2rem}
+.ci{background:var(--bg3);border:1px solid var(--brd);border-radius:10px;padding:1.1rem;text-align:center;opacity:0;transform:translateY(15px);transition:all .45s}
+.ci.on{opacity:1;transform:translateY(0)}
+.ci .ii{font-size:1.5rem;margin-bottom:.5rem}
+.ci h4{font-size:.85rem;font-weight:700;margin-bottom:.2rem}
+.ci p{font-size:.72rem;color:var(--txt2);line-height:1.5}
+
+/* ═══ FEATURES ═══ */
+#feat{padding:6rem 2rem;max-width:1050px;margin:0 auto}
+.sh{text-align:center;margin-bottom:3rem}
+.sh .lb{font-family:var(--fm);font-size:.68rem;color:var(--amber);letter-spacing:3px;text-transform:uppercase;margin-bottom:.5rem}
+.sh h2{font-family:var(--fd);font-size:clamp(1.7rem,3.5vw,2.5rem);font-weight:800}
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.fc{background:var(--bg2);border:1px solid var(--brd);border-radius:12px;padding:1.5rem;opacity:0;transform:translateY(15px);transition:all .45s,border-color .3s,box-shadow .3s}
+.fc.on{opacity:1;transform:translateY(0)}
+.fc:hover{border-color:var(--amber);transform:translateY(-3px)!important;box-shadow:0 6px 30px rgba(0,0,0,.25)}
+.fc .fi{width:38px;height:38px;background:rgba(240,165,0,.08);border:1px solid rgba(240,165,0,.12);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:.8rem}
+.fc h3{font-family:var(--fd);font-weight:700;font-size:.92rem;margin-bottom:.3rem}
+.fc p{font-size:.78rem;color:var(--txt2);line-height:1.6}
+
+/* ═══ CTA ═══ */
+#cta{padding:6rem 2rem;text-align:center;position:relative}
+#cta::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 40% at 50% 50%,rgba(240,165,0,.04),transparent);pointer-events:none}
+.ctai{max-width:540px;margin:0 auto;position:relative;z-index:1}
+.ctai h2{font-family:var(--fd);font-size:clamp(1.8rem,4.5vw,3rem);font-weight:900;margin-bottom:.7rem}
+.ctai h2 em{font-style:normal;background:linear-gradient(135deg,var(--amber),var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ctai p{color:var(--txt2);font-size:1rem;margin-bottom:1.8rem;line-height:1.7}
+.cb{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+
+/* ═══ FOOTER ═══ */
+footer{padding:2rem;border-top:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;max-width:1050px;margin:0 auto;font-size:.72rem;color:var(--txt3)}
+footer a{color:var(--txt2);text-decoration:none}footer a:hover{color:var(--txt)}
+footer .fl{display:flex;gap:1.5rem}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:900px){
+  .si{grid-template-columns:1fr!important;gap:1.5rem}
+  .sl,.sr{padding:0!important;grid-column:1!important}
+  .sm{display:none}
+  .road{display:none}
+  #truck-wrap{display:none}
+  .mile{display:none}
+  .nr{display:none}
+  .fg,.cc{grid-template-columns:1fr}
+  .ds{grid-template-columns:1fr}
+  .stop{padding:3rem 1.2rem}
+  footer{flex-direction:column;gap:.8rem;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<div id="loader"><h2>StockFlow</h2><div class="lbar"><i></i></div></div>
+<div id="prog"></div>
+
+<nav id="nav">
+  <div class="logo"><b>SF</b> StockFlow</div>
+  <div class="nr">
+    <a href="#stop1">How It Works</a>
+    <a href="#feat">Features</a>
+    <a href="#cta">Pricing</a>
+    <a href="#cta" class="cta">Get Started</a>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section id="hero">
+  <div class="hi">
+    <div class="badge"><span class="dot"></span> v2.0 — Smarter than ever</div>
+    <h1>Inventory that<br><em>moves</em> with you.</h1>
+    <p>From dock to doorstep — track every unit, automate reorders, and never lose sight of your stock.</p>
+    <div class="hb">
+      <a href="#cta" class="bp">Start Free Trial →</a>
+      <a href="#stop1" class="bs">See the Journey ↓</a>
+    </div>
+  </div>
+  <div class="sc"><span>Scroll to drive</span><div class="ar"></div></div>
+</section>
+
+<!-- ═══ ROAD JOURNEY ═══ -->
+<div id="journey">
+  <div class="road" id="road"></div>
+
+  <!-- ████ THE TRUCK ████ -->
+  <div id="truck-wrap">
+    <div class="headlight-beam"></div>
+    <div class="truck-glow"></div>
+    <svg width="70" height="120" viewBox="0 0 70 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Shadow -->
+      <ellipse cx="35" cy="115" rx="28" ry="5" fill="rgba(0,0,0,.4)"/>
+      <!-- Trailer -->
+      <rect x="9" y="32" width="52" height="60" rx="5" fill="#2d333b" stroke="#505860" stroke-width="2"/>
+      <!-- Trailer face -->
+      <rect x="14" y="37" width="42" height="24" rx="3" fill="#21262d"/>
+      <!-- Logo -->
+      <text x="35" y="53" text-anchor="middle" fill="#f0a500" font-family="Outfit" font-weight="800" font-size="9">STOCK</text>
+      <text x="35" y="62" text-anchor="middle" fill="#f0a50099" font-family="Outfit" font-weight="700" font-size="6">FLOW</text>
+      <!-- Cargo stripes -->
+      <line x1="16" y1="68" x2="54" y2="68" stroke="#3a424d" stroke-width="1"/>
+      <line x1="16" y1="74" x2="54" y2="74" stroke="#3a424d" stroke-width="1"/>
+      <line x1="16" y1="80" x2="54" y2="80" stroke="#3a424d" stroke-width="1"/>
+      <!-- Cab -->
+      <rect x="13" y="5" width="44" height="29" rx="6" fill="#3d4550" stroke="#505860" stroke-width="2"/>
+      <!-- Windshield -->
+      <rect x="18" y="9" width="34" height="15" rx="4" fill="#0d1117" stroke="#505860" stroke-width="1"/>
+      <!-- Windshield reflection -->
+      <rect x="20" y="11" width="10" height="4" rx="2" fill="rgba(88,166,255,.08)"/>
+      <!-- Headlights -->
+      <rect x="18" y="1" width="10" height="5" rx="2.5" fill="#f0a500">
+        <animate attributeName="opacity" values="1;.7;1" dur="2s" repeatCount="indefinite"/>
+      </rect>
+      <rect x="42" y="1" width="10" height="5" rx="2.5" fill="#f0a500">
+        <animate attributeName="opacity" values="1;.7;1" dur="2s" repeatCount="indefinite" begin=".5s"/>
+      </rect>
+      <!-- Taillights -->
+      <rect x="16" y="90" width="7" height="3" rx="1.5" fill="#f85149" opacity=".8"/>
+      <rect x="47" y="90" width="7" height="3" rx="1.5" fill="#f85149" opacity=".8"/>
+      <!-- Wheels (side view ovals) -->
+      <ellipse cx="15" cy="17" rx="6" ry="5" fill="#111318" stroke="#3a424d" stroke-width="1.5"/>
+      <ellipse cx="55" cy="17" rx="6" ry="5" fill="#111318" stroke="#3a424d" stroke-width="1.5"/>
+      <ellipse cx="15" cy="87" rx="6" ry="5" fill="#111318" stroke="#3a424d" stroke-width="1.5"/>
+      <ellipse cx="55" cy="87" rx="6" ry="5" fill="#111318" stroke="#3a424d" stroke-width="1.5"/>
+      <!-- Wheel rims -->
+      <ellipse cx="15" cy="17" rx="2.5" ry="2" fill="#2d333b"/>
+      <ellipse cx="55" cy="17" rx="2.5" ry="2" fill="#2d333b"/>
+      <ellipse cx="15" cy="87" rx="2.5" ry="2" fill="#2d333b"/>
+      <ellipse cx="55" cy="87" rx="2.5" ry="2" fill="#2d333b"/>
+      <!-- Mirrors -->
+      <rect x="3" y="12" width="7" height="4" rx="1.5" fill="#505860"/>
+      <rect x="60" y="12" width="7" height="4" rx="1.5" fill="#505860"/>
+      <!-- Roof light bar -->
+      <rect x="22" y="3" width="26" height="2" rx="1" fill="#f0a500" opacity=".3"/>
+    </svg>
+    <div class="tire-smoke"><i></i><i></i><i></i></div>
+  </div>
+
+  <!-- ═══ STOP 1 ═══ -->
+  <section class="stop" id="stop1">
+    <div class="mile"></div>
+    <div class="si">
+      <div class="sl">
+        <div class="card">
+          <div class="sn">01 — Arrival</div>
+          <h2>Truck pulls in.<br>Dock is ready.</h2>
+          <p>A shipment arrives. StockFlow's dock management is already expecting it — PO matched, bay assigned, team notified.</p>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+            <div style="padding:.35rem .7rem;background:var(--bg3);border:1px solid var(--brd);border-radius:6px"><small style="font-family:var(--fm);font-size:.6rem;color:var(--txt3)">PO STATUS</small><br><b style="color:var(--green);font-size:.8rem">✓ Matched</b></div>
+            <div style="padding:.35rem .7rem;background:var(--bg3);border:1px solid var(--brd);border-radius:6px"><small style="font-family:var(--fm);font-size:.6rem;color:var(--txt3)">DOCK BAY</small><br><b style="color:var(--amber);font-size:.8rem">Bay 04</b></div>
+            <div style="padding:.35rem .7rem;background:var(--bg3);border:1px solid var(--brd);border-radius:6px"><small style="font-family:var(--fm);font-size:.6rem;color:var(--txt3)">ETA</small><br><b style="color:var(--blue);font-size:.8rem">On Time</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="sm"></div>
+      <div class="sr">
+        <div class="vpanel warehouse-scene" style="padding:0;aspect-ratio:4/3">
+          <svg viewBox="0 0 500 375" xmlns="http://www.w3.org/2000/svg">
+            <rect width="500" height="375" fill="#0d1117"/>
+            <circle cx="60" cy="25" r="1" fill="#fff" opacity=".3"/><circle cx="180" cy="40" r="1.3" fill="#fff" opacity=".2"/><circle cx="350" cy="18" r="1" fill="#fff" opacity=".4"/>
+            <rect x="40" y="90" width="420" height="210" rx="3" fill="#1a1e25" stroke="#2a2f38" stroke-width="1.5"/>
+            <polygon points="30,90 250,25 470,90" fill="#21262d" stroke="#2a2f38" stroke-width="1.5"/>
+            <rect x="160" y="40" width="180" height="24" rx="3" fill="#161b22" stroke="#f0a500" stroke-width=".8"/>
+            <text x="250" y="57" text-anchor="middle" fill="#f0a500" font-family="Outfit" font-weight="700" font-size="10.5">STOCKFLOW WAREHOUSE</text>
+            <rect x="180" y="170" width="140" height="130" rx="2" fill="#161b22" stroke="#3a424d" stroke-width="1.5"/>
+            <rect x="195" y="190" width="22" height="38" rx="1" fill="#2d333b"/><rect x="222" y="198" width="22" height="30" rx="1" fill="#2d333b"/><rect x="249" y="185" width="22" height="43" rx="1" fill="#2d333b"/><rect x="276" y="195" width="22" height="33" rx="1" fill="#2d333b"/>
+            <rect x="183" y="175" width="134" height="3" fill="#f0a500" opacity=".5"/>
+            <rect x="55" y="205" width="85" height="95" rx="2" fill="#21262d" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="360" y="205" width="85" height="95" rx="2" fill="#21262d" stroke="#2a2f38" stroke-width="1"/>
+            <circle cx="173" cy="165" r="4.5" fill="#f0a500" opacity=".7"/>
+            <circle cx="173" cy="165" r="12" fill="#f0a500" opacity=".06"><animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/></circle>
+            <circle cx="327" cy="165" r="4.5" fill="#f0a500" opacity=".7"/>
+            <rect x="0" y="300" width="500" height="75" fill="#161b22"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STOP 2 ═══ -->
+  <section class="stop" id="stop2">
+    <div class="mile"></div>
+    <div class="si">
+      <div class="sl">
+        <div class="vpanel scanl" id="scanp">
+          <div class="sbeam"></div>
+          <div class="sr-item" data-d="0"><div class="ic">📦</div><div class="inf"><b>Industrial Widget A</b><small>SKU-7842-A · Qty: 240</small></div><div class="tg">✓ Added</div></div>
+          <div class="sr-item" data-d="300"><div class="ic">🔧</div><div class="inf"><b>Precision Bearing Set</b><small>SKU-3391-B · Qty: 480</small></div><div class="tg">✓ Added</div></div>
+          <div class="sr-item" data-d="600"><div class="ic">⚙️</div><div class="inf"><b>Motor Assembly Unit</b><small>SKU-1205-C · Qty: 60</small></div><div class="tg">✓ Added</div></div>
+          <div class="sr-item" data-d="900"><div class="ic">🏷️</div><div class="inf"><b>Copper Wire Spool 12ga</b><small>SKU-5578-D · Qty: 150</small></div><div class="tg">✓ Added</div></div>
+          <div class="sr-item" data-d="1200"><div class="ic">📋</div><div class="inf"><b>Hydraulic Pump H200</b><small>SKU-9012-E · Qty: 35</small></div><div class="tg">✓ Added</div></div>
+        </div>
+      </div>
+      <div class="sm"></div>
+      <div class="sr">
+        <div class="card">
+          <div class="sn">02 — Intake</div>
+          <h2>Scan. Verify.<br>Into the system.</h2>
+          <p>Each crate scanned at the dock. Barcodes flash, quantities verified. StockFlow auto-populates your inventory in one sweep.</p>
+          <div style="display:flex;flex-direction:column;gap:.3rem">
+            <div style="display:flex;align-items:center;gap:.35rem"><span style="width:6px;height:6px;background:var(--green);border-radius:50%;display:inline-block"></span><span style="font-size:.78rem;color:var(--txt2)">Auto SKU recognition</span></div>
+            <div style="display:flex;align-items:center;gap:.35rem"><span style="width:6px;height:6px;background:var(--green);border-radius:50%;display:inline-block"></span><span style="font-size:.78rem;color:var(--txt2)">PO quantity matching</span></div>
+            <div style="display:flex;align-items:center;gap:.35rem"><span style="width:6px;height:6px;background:var(--green);border-radius:50%;display:inline-block"></span><span style="font-size:.78rem;color:var(--txt2)">Batch & expiry tracking</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STOP 3 ═══ -->
+  <section class="stop" id="stop3">
+    <div class="mile"></div>
+    <div class="si">
+      <div class="sl">
+        <div class="card">
+          <div class="sn">03 — Control</div>
+          <h2>Everything.<br>Real-time.</h2>
+          <p>Your dashboard lights up. Every unit accounted for, every shelf mapped, every trend tracked.</p>
+          <div style="margin-top:.6rem;padding:.6rem;background:var(--bg3);border:1px solid var(--brd);border-radius:7px">
+            <div style="font-family:var(--fm);font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">TOP MOVERS</div>
+            <div style="font-size:.75rem;color:var(--txt2);line-height:1.8">
+              <span style="color:var(--green)">↑</span> Widget A <span style="color:var(--green);font-family:var(--fm)">+240</span><br>
+              <span style="color:var(--green)">↑</span> Bearings <span style="color:var(--green);font-family:var(--fm)">+480</span><br>
+              <span style="color:var(--red)">↓</span> Motor <span style="color:var(--red);font-family:var(--fm)">-18</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sm"></div>
+      <div class="sr">
+        <div class="vpanel dash" id="dashp">
+          <div class="dt"><div class="dd"><i></i><i></i><i></i></div><div class="du">app.stockflow.io/dashboard</div><div style="width:40px"></div></div>
+          <div class="db">
+            <div class="ds">
+              <div class="dst"><small>Total Items</small><div class="v" data-to="12847">0</div><div class="c up">↑ 965 today</div></div>
+              <div class="dst"><small>Categories</small><div class="v" data-to="284">0</div><div class="c up">↑ 12 new</div></div>
+              <div class="dst"><small>Capacity</small><div class="v" style="color:var(--green)">78%</div><div class="c up">Healthy</div></div>
+              <div class="dst"><small>Pending</small><div class="v" data-to="43">0</div><div class="c dn">↓ 7 from yday</div></div>
+            </div>
+            <div class="dchart"><span>INVENTORY · 30 DAYS</span><div class="bars" id="bars"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STOP 4 ═══ -->
+  <section class="stop" id="stop4">
+    <div class="mile"></div>
+    <div class="si">
+      <div class="sl">
+        <div class="vpanel convs" id="convp">
+          <svg viewBox="0 0 500 310" xmlns="http://www.w3.org/2000/svg">
+            <rect width="500" height="310" fill="#0d1117"/>
+            <rect x="15" y="15" width="65" height="150" rx="2" fill="#1a1e25" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="19" y="22" width="57" height="14" rx="1" fill="#21262d"/><rect x="19" y="40" width="57" height="14" rx="1" fill="#21262d"/><rect x="19" y="58" width="57" height="14" rx="1" fill="#21262d"/><rect x="19" y="76" width="57" height="14" rx="1" fill="#21262d"/>
+            <rect x="420" y="15" width="65" height="150" rx="2" fill="#1a1e25" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="424" y="22" width="57" height="14" rx="1" fill="#21262d"/><rect x="424" y="40" width="57" height="14" rx="1" fill="#21262d"/><rect x="424" y="58" width="57" height="14" rx="1" fill="#21262d"/>
+            <rect x="0" y="210" width="500" height="18" fill="#2d333b" stroke="#3a424d" stroke-width="1" rx="1"/>
+            <rect x="38" y="228" width="5" height="40" fill="#3a424d"/><rect x="238" y="228" width="5" height="40" fill="#3a424d"/><rect x="438" y="228" width="5" height="40" fill="#3a424d"/>
+            <rect x="80" y="182" width="32" height="28" rx="2" fill="#8b5e28" stroke="#a06830" stroke-width="1"/><rect x="88" y="185" width="11" height="4" rx="1" fill="#f0a500" opacity=".6"/>
+            <rect x="200" y="187" width="28" height="23" rx="2" fill="#6e4a20" stroke="#8b5e28" stroke-width="1"/><rect x="206" y="190" width="9" height="4" rx="1" fill="#2ea043" opacity=".6"/>
+            <rect x="340" y="180" width="35" height="30" rx="2" fill="#7a5225" stroke="#946330" stroke-width="1"/><rect x="348" y="183" width="14" height="4" rx="1" fill="#58a6ff" opacity=".5"/>
+            <rect x="430" y="248" width="48" height="22" rx="2" fill="#2d333b" stroke="#484f58" stroke-width="1"/>
+            <rect x="442" y="253" width="16" height="12" rx="1" fill="#3a424d"/>
+            <circle cx="437" cy="272" r="4.5" fill="#111318" stroke="#484f58" stroke-width="1"/><circle cx="465" cy="272" r="4.5" fill="#111318" stroke="#484f58" stroke-width="1"/>
+          </svg>
+          <div class="sf">
+            <span data-sd="0">SOLD · Widget A × 24</span>
+            <span data-sd="400">SOLD · Bearing × 12</span>
+            <span data-sd="800">SOLD · Motor × 3</span>
+          </div>
+        </div>
+      </div>
+      <div class="sm"></div>
+      <div class="sr">
+        <div class="card">
+          <div class="sn">04 — Outbound</div>
+          <h2>Sold! Off<br>it goes.</h2>
+          <p>Orders flow in, the conveyor rolls. Each item picked, packed, shipped — inventory auto-decremented.</p>
+          <div style="margin-top:.6rem;padding:.6rem;background:var(--bg3);border:1px solid var(--brd);border-radius:7px">
+            <div style="font-family:var(--fm);font-size:.6rem;color:var(--txt3);margin-bottom:.3rem">LIVE DISPATCH</div>
+            <div style="font-size:.72rem;color:var(--txt2);line-height:1.9">
+              <span style="color:var(--amber)">14:32</span> ORD-8841 → Mumbai<br>
+              <span style="color:var(--amber)">14:28</span> ORD-8840 → Delhi<br>
+              <span style="color:var(--amber)">14:15</span> ORD-8839 → Pune
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STOP 5 ═══ -->
+  <section class="stop" id="stop5">
+    <div class="mile"></div>
+    <div class="si">
+      <div class="sl">
+        <div class="card">
+          <div class="sn">05 — Alert</div>
+          <h2>Stock runs low.<br><span style="color:var(--red)">StockFlow sees it.</span></h2>
+          <p>Before shelves go bare, intelligent alerts fire. Low-stock thresholds, predictive reorder points, auto-generated POs.</p>
+        </div>
+      </div>
+      <div class="sm"></div>
+      <div class="sr">
+        <div class="vpanel als" id="alertp">
+          <svg viewBox="0 0 500 310" xmlns="http://www.w3.org/2000/svg">
+            <rect width="500" height="310" fill="#0d1117"/>
+            <rect x="0" y="250" width="500" height="60" fill="#161b22"/>
+            <rect x="30" y="40" width="72" height="200" rx="2" fill="none" stroke="#2a2f38" stroke-width="1.5"/><line x1="30" y1="90" x2="102" y2="90" stroke="#2a2f38" stroke-width="1"/><line x1="30" y1="140" x2="102" y2="140" stroke="#2a2f38" stroke-width="1"/><line x1="30" y1="190" x2="102" y2="190" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="120" y="40" width="72" height="200" rx="2" fill="none" stroke="#2a2f38" stroke-width="1.5"/><line x1="120" y1="90" x2="192" y2="90" stroke="#2a2f38" stroke-width="1"/><line x1="120" y1="140" x2="192" y2="140" stroke="#2a2f38" stroke-width="1"/><line x1="120" y1="190" x2="192" y2="190" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="210" y="40" width="72" height="200" rx="2" fill="none" stroke="#2a2f38" stroke-width="1.5"/><line x1="210" y1="90" x2="282" y2="90" stroke="#2a2f38" stroke-width="1"/><line x1="210" y1="140" x2="282" y2="140" stroke="#2a2f38" stroke-width="1"/><line x1="210" y1="190" x2="282" y2="190" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="300" y="40" width="72" height="200" rx="2" fill="none" stroke="#2a2f38" stroke-width="1.5"/><line x1="300" y1="90" x2="372" y2="90" stroke="#2a2f38" stroke-width="1"/><line x1="300" y1="140" x2="372" y2="140" stroke="#2a2f38" stroke-width="1"/><line x1="300" y1="190" x2="372" y2="190" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="390" y="40" width="72" height="200" rx="2" fill="none" stroke="#2a2f38" stroke-width="1.5"/><line x1="390" y1="90" x2="462" y2="90" stroke="#2a2f38" stroke-width="1"/><line x1="390" y1="140" x2="462" y2="140" stroke="#2a2f38" stroke-width="1"/><line x1="390" y1="190" x2="462" y2="190" stroke="#2a2f38" stroke-width="1"/>
+            <rect x="40" y="195" width="15" height="10" rx="1" fill="#3a424d" opacity=".4"/>
+            <circle cx="100" cy="20" r="5" fill="#f85149" opacity=".5"><animate attributeName="opacity" values=".5;.12;.5" dur="1.2s" repeatCount="indefinite"/></circle>
+            <circle cx="260" cy="20" r="5" fill="#f85149" opacity=".5"><animate attributeName="opacity" values=".5;.12;.5" dur="1.2s" repeatCount="indefinite" begin=".6s"/></circle>
+            <circle cx="420" cy="20" r="5" fill="#f85149" opacity=".5"><animate attributeName="opacity" values=".5;.12;.5" dur="1.2s" repeatCount="indefinite" begin=".3s"/></circle>
+            <text x="250" y="283" text-anchor="middle" fill="#2a2f38" font-family="Outfit" font-weight="900" font-size="42" opacity=".2">EMPTY</text>
+          </svg>
+          <div class="apop" id="apop">
+            <div class="am">
+              <div class="ai">⚠️</div>
+              <h3>Low Stock Alert</h3>
+              <p>5 items below reorder threshold.</p>
+              <div class="ait">
+                <div><span>Widget A</span><span class="q">12 left</span></div>
+                <div><span>Bearing Set</span><span class="q">8 left</span></div>
+                <div><span>Motor Unit</span><span class="q">3 left</span></div>
+                <div><span>Copper Wire</span><span class="q">0 left</span></div>
+              </div>
+              <button class="br">⚡ Auto-Reorder Now</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ STOP 6 ═══ -->
+  <section class="stop" id="stop6">
+    <div class="mile"></div>
+    <div class="si" style="grid-template-columns:1fr">
+      <div style="grid-column:1;text-align:center;max-width:680px;margin:0 auto">
+        <div class="card" style="text-align:center">
+          <div class="sn" style="text-align:center">06 — Restock</div>
+          <h2 style="text-align:center">The cycle <span style="color:var(--green)">never breaks</span>.</h2>
+          <p style="text-align:center;max-width:440px;margin:0 auto .5rem">StockFlow auto-generates POs, notifies suppliers, and the next truck is already en route.</p>
+          <div class="cc" id="ccards">
+            <div class="ci" data-cd="0"><div class="ii">📋</div><h4>Auto PO Generated</h4><p>Smart reorder + demand forecasting</p></div>
+            <div class="ci" data-cd="250"><div class="ii">📡</div><h4>Supplier Notified</h4><p>Instant orders, tracked ETAs</p></div>
+            <div class="ci" data-cd="500"><div class="ii">🚛</div><h4>Truck Dispatched</h4><p>New shipment on its way</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="feat">
+  <div class="sh"><div class="lb">Capabilities</div><h2>Everything you need.<br>Nothing you don't.</h2></div>
+  <div class="fg">
+    <div class="fc"><div class="fi">📡</div><h3>Real-Time Tracking</h3><p>Every unit, shelf, warehouse — sub-second accuracy.</p></div>
+    <div class="fc"><div class="fi">🔄</div><h3>Auto Reorder</h3><p>AI demand forecasting. Never run out or overstock.</p></div>
+    <div class="fc"><div class="fi">📊</div><h3>Analytics & Reports</h3><p>Movement, velocity, dead stock. Export anywhere.</p></div>
+    <div class="fc"><div class="fi">🏗️</div><h3>Multi-Warehouse</h3><p>Unlimited locations with transfer tracking.</p></div>
+    <div class="fc"><div class="fi">⚡</div><h3>Conveyor Integration</h3><p>Belt system integration for automated dispatch.</p></div>
+    <div class="fc"><div class="fi">🔐</div><h3>Role-Based Access</h3><p>Dock workers to C-suite — granular permissions.</p></div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section id="cta">
+  <div class="ctai">
+    <h2>Ready to take<br><em>control?</em></h2>
+    <p>Join 2,000+ warehouses on StockFlow. 14-day free trial — no card required.</p>
+    <div class="cb">
+      <a href="#" class="bp" style="padding:.85rem 2rem;font-size:.95rem">Start Free Trial →</a>
+      <a href="#" class="bs" style="padding:.85rem 2rem;font-size:.95rem">Book a Demo</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>© 2026 StockFlow IMS</div>
+  <div class="fl"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Docs</a><a href="#">Support</a></div>
+</footer>
+
+<script>
+// Loader
+window.addEventListener('load',()=>setTimeout(()=>document.getElementById('loader').classList.add('done'),1500));
+
+// Scroll progress + nav
+const prog=document.getElementById('prog'),nav=document.getElementById('nav');
+let lastScroll=0;
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY,h=document.documentElement.scrollHeight-innerHeight;
+  prog.style.width=(s/h*100)+'%';
+  nav.classList.toggle('scrolled',s>40);
+  lastScroll=s;
+},{passive:true});
+
+// ████ TRUCK CONTROLLER ████
+const truckWrap=document.getElementById('truck-wrap');
+const journey=document.getElementById('journey');
+const roadEl=document.getElementById('road');
+
+function truckLoop(){
+  const jRect=journey.getBoundingClientRect();
+  const jTop=jRect.top;
+  const jBot=jRect.bottom;
+  const wh=window.innerHeight;
+
+  // Show truck when journey section is in view
+  const visible=jTop<wh*0.6 && jBot>wh*0.2;
+  truckWrap.classList.toggle('on',visible);
+
+  if(visible){
+    // Truck stays vertically centered-ish but we can add subtle sway
+    const scrollProgress=window.scrollY;
+    const sway=Math.sin(scrollProgress*0.006)*5;
+    const bounce=Math.sin(scrollProgress*0.018)*2;
+    truckWrap.style.left=`calc(50% + ${sway}px)`;
+    truckWrap.style.top=`calc(38vh + ${bounce}px)`;
+    truckWrap.style.transform='translateX(-50%)';
+
+    // Animate road dashes
+    roadEl.style.setProperty('--road-offset',(scrollProgress%56)+'px');
+  }
+
+  requestAnimationFrame(truckLoop);
+}
+requestAnimationFrame(truckLoop);
+
+// Road line animation via scroll
+const roadAfterStyle=document.createElement('style');
+document.head.appendChild(roadAfterStyle);
+window.addEventListener('scroll',()=>{
+  const offset=window.scrollY%56;
+  roadAfterStyle.textContent=`.road::after{background-position:0 ${offset}px!important}`;
+},{passive:true});
+
+// ████ STOP REVEALS ████
+const sObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')});
+},{threshold:.12,rootMargin:'0px 0px -30px 0px'});
+document.querySelectorAll('.stop').forEach(s=>sObs.observe(s));
+
+// Milestones
+const mObs=new IntersectionObserver(es=>{
+  es.forEach(e=>e.target.classList.toggle('lit',e.isIntersecting));
+},{threshold:.5});
+document.querySelectorAll('.mile').forEach(m=>mObs.observe(m));
+
+// Scan rows
+const scObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.sr-item').forEach(r=>{
+        setTimeout(()=>r.classList.add('on'),+r.dataset.d||0);
+      });scObs.unobserve(e.target);
+    }
+  });
+},{threshold:.25});
+const scanp=document.getElementById('scanp');if(scanp)scObs.observe(scanp);
+
+// Dashboard
+const dObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.v[data-to]').forEach(v=>{
+        const t=+v.dataset.to;let c=0;const inc=t/50;
+        const iv=setInterval(()=>{c+=inc;if(c>=t){c=t;clearInterval(iv)}v.textContent=Math.floor(c).toLocaleString()},28);
+      });
+      const bars=document.getElementById('bars');
+      if(bars&&!bars.children.length){
+        [38,52,33,62,48,72,36,58,68,43,78,52,82,45,60,40,70,56,88,44,65,50,75,60,48,80,42,71,58,92].forEach((h,i)=>{
+          const d=document.createElement('div');d.style.height='2px';bars.appendChild(d);
+          setTimeout(()=>d.style.height=h+'%',i*30);
+        });
+      }
+      dObs.unobserve(e.target);
+    }
+  });
+},{threshold:.2});
+const dashp=document.getElementById('dashp');if(dashp)dObs.observe(dashp);
+
+// Sold tags
+const soObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.sf span').forEach(s=>{
+        setTimeout(()=>s.classList.add('on'),+s.dataset.sd||0);
+      });soObs.unobserve(e.target);
+    }
+  });
+},{threshold:.25});
+const convp=document.getElementById('convp');if(convp)soObs.observe(convp);
+
+// Alert popup
+const aObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      setTimeout(()=>document.getElementById('apop').classList.add('on'),600);
+      aObs.unobserve(e.target);
+    }
+  });
+},{threshold:.25});
+const alertp=document.getElementById('alertp');if(alertp)aObs.observe(alertp);
+
+// Cycle cards
+const cObs=new IntersectionObserver(es=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.ci').forEach(c=>{
+        setTimeout(()=>c.classList.add('on'),+c.dataset.cd||0);
+      });cObs.unobserve(e.target);
+    }
+  });
+},{threshold:.25});
+const ccards=document.getElementById('ccards');if(ccards)cObs.observe(ccards);
+
+// Feature cards
+const fObs=new IntersectionObserver(es=>{
+  es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('on'),i*80)}});
+},{threshold:.12});
+document.querySelectorAll('.fc').forEach(f=>fObs.observe(f));
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+</script>
+</body>
+</html>
