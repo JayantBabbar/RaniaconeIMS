@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/topbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, Spinner, KPICard } from "@/components/ui/shared";
+import { Dialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/form-elements";
 import { Can, useCan } from "@/components/ui/can";
 import { RequireRead } from "@/components/ui/forbidden-state";
+import { useToast } from "@/components/ui/toast";
+import { isApiError } from "@/lib/api-client";
 import {
   GlobalSearch,
   SortHeader,
@@ -25,6 +29,7 @@ import {
   ShoppingCart,
   ExternalLink,
   Package,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Item, Balance } from "@/types";
 import type { ReorderPolicy } from "@/services/items.service";
@@ -49,6 +54,10 @@ interface AlertRow {
 export default function LowStockAlertsPage() {
   const { can } = useCan();
   const canReorder = can("inventory.documents.write");
+  const canEditThreshold = can("inventory.reorder_policies.write") || can("inventory.items.write");
+  const [editTarget, setEditTarget] = useState<AlertRow | null>(null);
+  const qc = useQueryClient();
+  const toast = useToast();
 
   // Load all active items
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
@@ -380,7 +389,17 @@ export default function LowStockAlertsPage() {
                       )}
                     </td>
                     <td className="px-3.5 py-2.5 text-right">
-                      <div className="inline-flex gap-1">
+                      <div className="inline-flex gap-1 flex-wrap justify-end">
+                        {canEditThreshold && (
+                          <Button
+                            size="sm"
+                            icon={<SlidersHorizontal size={11} />}
+                            onClick={() => setEditTarget(a)}
+                            title="Edit threshold for this item × location"
+                          >
+                            Threshold
+                          </Button>
+                        )}
                         <Link href={`/items/${a.item.id}`}>
                           <Button size="sm" icon={<ExternalLink size={11} />}>
                             Item
@@ -406,7 +425,121 @@ export default function LowStockAlertsPage() {
           )}
         </div>
       </div>
+
+      {editTarget && (
+        <ThresholdQuickEditModal
+          row={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["reorderPoliciesAll"] });
+            toast.success("Threshold updated");
+            setEditTarget(null);
+          }}
+        />
+      )}
     </div>
     </RequireRead>
+  );
+}
+
+// ── Inline threshold editor — opens from the Edit button on each
+// alert row. Pre-fills with the existing policy values; PATCH on save.
+function ThresholdQuickEditModal({
+  row, onClose, onSaved,
+}: {
+  row: AlertRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+
+  const [minQty, setMinQty]             = useState(row.policy.min_qty ?? "");
+  const [reorderPoint, setReorderPoint] = useState(row.policy.reorder_point ?? "");
+  const [reorderQty, setReorderQty]     = useState(row.policy.reorder_qty ?? "");
+  const [maxQty, setMaxQty]             = useState(row.policy.max_qty ?? "");
+
+  const save = useMutation({
+    mutationFn: () => itemService.updateReorderPolicy(row.item.id, row.policy.id, {
+      min_qty:       Number(minQty),
+      ...(reorderPoint ? { reorder_point: Number(reorderPoint) } : {}),
+      ...(reorderQty   ? { reorder_qty:   Number(reorderQty) }   : {}),
+      ...(maxQty       ? { max_qty:       Number(maxQty) }       : {}),
+    }),
+    onSuccess: onSaved,
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not save"),
+  });
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Threshold — ${row.item.name}`}
+      description={`Editing reorder policy for ${row.item.item_code} at ${row.locationName}.`}
+      width="md"
+    >
+      <div className="space-y-3">
+        <div className="rounded bg-surface border border-hairline p-3 text-[12px] grid grid-cols-3 gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-foreground-muted">On hand</div>
+            <div className="font-medium tabular-nums mt-0.5">{row.onHand.toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-foreground-muted">Available</div>
+            <div className="font-medium tabular-nums mt-0.5">{row.available.toLocaleString()}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-foreground-muted">Shortfall</div>
+            <div className="font-medium tabular-nums text-status-red-text mt-0.5">{row.shortfall.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Min qty"
+            type="number"
+            min={0}
+            value={minQty}
+            onChange={(e) => setMinQty(e.target.value)}
+            help="Absolute floor — alerts as 'critical' when available falls below."
+          />
+          <Input
+            label="Reorder point"
+            type="number"
+            min={0}
+            value={reorderPoint}
+            onChange={(e) => setReorderPoint(e.target.value)}
+            help="Soft trigger — alerts as 'low' at or below."
+          />
+          <Input
+            label="Reorder qty"
+            type="number"
+            min={0}
+            value={reorderQty}
+            onChange={(e) => setReorderQty(e.target.value)}
+            help="How many to order when triggered."
+          />
+          <Input
+            label="Max qty"
+            type="number"
+            min={0}
+            value={maxQty}
+            onChange={(e) => setMaxQty(e.target.value)}
+            help="Cap — avoids overstock alerts."
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-hairline">
+          <Button kind="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            kind="primary"
+            loading={save.isPending}
+            disabled={!minQty || Number(minQty) < 0}
+            onClick={() => save.mutate()}
+          >
+            Save changes
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }

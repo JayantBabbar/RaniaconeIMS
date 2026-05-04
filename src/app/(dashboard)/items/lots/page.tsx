@@ -1,19 +1,12 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/topbar";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, Spinner, KPICard } from "@/components/ui/shared";
-import { Input, FormField } from "@/components/ui/form-elements";
-import { Dialog } from "@/components/ui/dialog";
-import { Can, useCan } from "@/components/ui/can";
 import { RequireRead } from "@/components/ui/forbidden-state";
 import {
   GlobalSearch,
@@ -22,13 +15,10 @@ import {
   ActiveFilterBar,
 } from "@/components/ui/table-toolkit";
 import { useTableFilters, type ColumnDef } from "@/hooks";
-import { useToast } from "@/components/ui/toast";
 import { itemService } from "@/services/items.service";
 import type { Lot } from "@/services/items.service";
 import type { Item } from "@/types";
-import { isApiError } from "@/lib/api-client";
 import {
-  Plus,
   Layers,
   CalendarClock,
   AlertTriangle,
@@ -36,9 +26,21 @@ import {
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
-// S-48: Lot Management
-// Tenant-wide list of lots across items, with mfg/expiry dates
-// and a "Add lot" modal scoped to a selected item.
+// S-48: Lot Management — VIEW-ONLY page.
+//
+// Lots are NOT manually created here. They're born from GRN line
+// entries (per Phase 12 design — see /documents/goods-receipts):
+// when an Operator types a batch number on a GRN line for a batch-
+// tracked item, the system creates the Lot record automatically.
+//
+// This page exists to LIST and DRILL-INTO existing lots:
+//   • Filter by item / lot number / expiry window
+//   • Click a row to see remaining qty + source GRN
+//   • Track expiring-soon batches
+//
+// If you need to manually create a Lot (rare — migration scenarios),
+// use the bulk-import wizard at /settings/imports/stock_balances
+// which can seed lot records alongside opening qty.
 // ═══════════════════════════════════════════════════════════
 
 interface LotRow extends Lot {
@@ -48,11 +50,6 @@ interface LotRow extends Lot {
 const EXPIRY_WINDOW_DAYS = 60;
 
 export default function LotsPage() {
-  const queryClient = useQueryClient();
-  const { can } = useCan();
-  const canWrite = can("inventory.lots.write");
-
-  const [showCreate, setShowCreate] = useState(false);
 
   // Load items (batch-tracked only would be ideal; we filter by is_batch_tracked)
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
@@ -140,20 +137,7 @@ export default function LotsPage() {
   return (
     <RequireRead perm="inventory.lots.read" crumbs={["Inventory", "Lots"]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
-      <TopBar
-        crumbs={["Inventory", "Lots"]}
-        right={
-          <Can perm="inventory.lots.write">
-            <Button
-              kind="primary"
-              icon={<Plus size={13} />}
-              onClick={() => setShowCreate(true)}
-            >
-              Add Lot
-            </Button>
-          </Can>
-        }
-      />
+      <TopBar crumbs={["Inventory", "Lots"]} />
 
       <div className="p-4 md:p-5 space-y-4">
         <PageHeader
@@ -231,22 +215,14 @@ export default function LotsPage() {
               }
               description={
                 batchItems.length === 0
-                  ? "Flag an item as batch-tracked on its detail page, then come back here to record lots."
+                  ? "Flag an item as batch-tracked on its detail page first. Once goods of that item arrive via a Goods Receipt, the lot will appear here."
                   : lots.length === 0
-                    ? "Record a lot number for a batch-tracked item so receipts can reference it."
+                    ? "Lots are created automatically when batch-tracked items are received via a Goods Receipt. Post a GRN with a lot/batch number to see it here."
                     : "Try loosening the filters, or clear them all to start over."
               }
               action={
-                canWrite && batchItems.length > 0 && lots.length === 0 ? (
-                  <Button
-                    kind="primary"
-                    icon={<Plus size={13} />}
-                    onClick={() => setShowCreate(true)}
-                  >
-                    Add your first lot
-                  </Button>
-                ) : activeFilterCount > 0 ? (
-                  <Button onClick={clearAll}>Clear all filters</Button>
+                activeFilterCount > 0 ? (
+                  <button onClick={clearAll} className="text-sm text-brand hover:underline">Clear all filters</button>
                 ) : undefined
               }
             />
@@ -352,187 +328,7 @@ export default function LotsPage() {
         </div>
       </div>
 
-      <AddLotModal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        items={batchItems}
-        onCreated={() => {
-          queryClient.invalidateQueries({ queryKey: ["allLots"] });
-        }}
-      />
     </div>
     </RequireRead>
-  );
-}
-
-const lotSchema = z
-  .object({
-    item_id: z.string().min(1, "Pick an item"),
-    lot_number: z.string().trim().min(1, "Lot number is required").max(100, "Too long"),
-    mfg_date: z.string().optional().or(z.literal("")),
-    expiry_date: z.string().optional().or(z.literal("")),
-    received_qty: z
-      .string()
-      .min(1, "Quantity is required")
-      .refine((v) => Number(v) > 0, "Must be greater than zero"),
-  })
-  .refine(
-    (v) =>
-      !v.mfg_date ||
-      !v.expiry_date ||
-      new Date(v.expiry_date) >= new Date(v.mfg_date),
-    { message: "Expiry must be on or after mfg date", path: ["expiry_date"] },
-  );
-
-type LotFormValues = z.infer<typeof lotSchema>;
-
-function AddLotModal({
-  open,
-  onClose,
-  items,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  items: Item[];
-  onCreated: () => void;
-}) {
-  const toast = useToast();
-  const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors },
-  } = useForm<LotFormValues>({
-    resolver: zodResolver(lotSchema),
-    defaultValues: {
-      item_id: "",
-      lot_number: "",
-      mfg_date: "",
-      expiry_date: "",
-      received_qty: "",
-    },
-  });
-
-  const close = () => {
-    reset();
-    setServerError(null);
-    onClose();
-  };
-
-  const onSubmit = async (data: LotFormValues) => {
-    setServerError(null);
-    setSubmitting(true);
-    try {
-      await itemService.addLot(data.item_id, {
-        lot_number: data.lot_number.trim(),
-        mfg_date: data.mfg_date || undefined,
-        expiry_date: data.expiry_date || undefined,
-        received_qty: Number(data.received_qty),
-      });
-      toast.success("Lot created");
-      onCreated();
-      close();
-    } catch (err) {
-      if (isApiError(err)) {
-        if (err.code === "CONFLICT") {
-          setError("lot_number", { message: "A lot with this number already exists for this item." });
-        } else if (Object.keys(err.fieldErrors).length > 0) {
-          setServerError(Object.values(err.fieldErrors).join(", "));
-        } else {
-          setServerError(err.message);
-        }
-      } else {
-        setServerError("Could not create lot. Please try again.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onClose={close}
-      title="Add a lot"
-      description="Record a batch of a batch-tracked item with its manufacturing/expiry dates and received quantity."
-      width="md"
-    >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
-        {serverError && (
-          <div
-            role="alert"
-            className="p-2.5 rounded-md bg-status-red-bg border border-status-red/20 text-[12.5px] text-status-red-text"
-          >
-            {serverError}
-          </div>
-        )}
-        <FormField label="Item" required error={errors.item_id?.message} help="Only items you've flagged as batch-tracked appear here.">
-          <select
-            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary"
-            disabled={submitting}
-            {...register("item_id")}
-          >
-            <option value="">Select item…</option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name} ({i.item_code})
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <Input
-          label="Lot Number"
-          placeholder="LOT-2024-001"
-          required
-          help="The batch identifier printed on the goods. Must be unique per item."
-          error={errors.lot_number?.message}
-          disabled={submitting}
-          {...register("lot_number")}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            type="date"
-            label="Mfg Date"
-            help="Date the batch was manufactured. Optional but useful for shelf-life tracking."
-            error={errors.mfg_date?.message}
-            disabled={submitting}
-            {...register("mfg_date")}
-          />
-          <Input
-            type="date"
-            label="Expiry Date"
-            help="Date the batch expires. Lots are consumed FIFO by expiry when stock moves OUT."
-            error={errors.expiry_date?.message}
-            disabled={submitting}
-            {...register("expiry_date")}
-          />
-        </div>
-        <Input
-          type="number"
-          label="Received Qty"
-          placeholder="100"
-          required
-          min="0"
-          step="any"
-          help="Quantity received for this lot, in the item's base UoM."
-          error={errors.received_qty?.message}
-          disabled={submitting}
-          {...register("received_qty")}
-        />
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" onClick={close}>
-            Cancel
-          </Button>
-          <Button type="submit" kind="primary" loading={submitting}>
-            Create Lot
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   );
 }

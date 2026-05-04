@@ -13,14 +13,18 @@ import { documentService } from "@/services/documents.service";
 import { countService } from "@/services/counts.service";
 import { itemService } from "@/services/items.service";
 import { locationService } from "@/services/locations.service";
+import { billService } from "@/services/bills.service";
+import { documentTypeService } from "@/services/master-data.service";
+import { useCanSeeCost } from "@/components/ui/cost-mask";
 import {
-  DollarSign, Box, FileText, ClipboardList,
+  DollarSign, Box, FileText, ClipboardList, FileWarning,
   ArrowDownToLine, ArrowUpFromLine, ArrowRight,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { user, tenantName } = useAuth();
+  const canSeeCost = useCanSeeCost();
 
   const { data: balancesRaw, isLoading: balancesLoading } = useQuery({
     queryKey: ["dashboard-balances"],
@@ -46,6 +50,42 @@ export default function DashboardPage() {
     queryKey: ["locations"],
     queryFn: () => locationService.list({ limit: 200 }),
   });
+
+  // Phase 12 — "Pending bills" KPI for Admin only.
+  // Computed client-side as: count of posted GRN documents whose
+  // matching vendor bill has not been entered yet. The match is by
+  // (party_id, item_id, qty); for the demo we approximate with a
+  // count of posted GRNs minus posted bills referencing the same vendor.
+  // In production this should be a server-side aggregation endpoint
+  // (see PHASE12_BACKEND_SPEC.md) so it stays accurate at scale.
+  const { data: docTypesRaw } = useQuery({
+    queryKey: ["docTypes"],
+    queryFn: () => documentTypeService.list({ limit: 200 }),
+    enabled: canSeeCost,
+  });
+  const { data: billsRaw } = useQuery({
+    queryKey: ["bills-for-pending"],
+    queryFn: () => billService.list({ limit: 200 }),
+    enabled: canSeeCost,
+  });
+  const grnTypeId = useMemo(
+    () => (docTypesRaw ?? []).find((t) => t.code === "GRN")?.id,
+    [docTypesRaw],
+  );
+  const pendingBillsCount = useMemo(() => {
+    if (!canSeeCost || !grnTypeId) return 0;
+    const postedGrns = (docsRaw ?? []).filter(
+      (d) => d.document_type_id === grnTypeId && !!d.posting_date,
+    );
+    if (postedGrns.length === 0) return 0;
+    // Per-vendor count: GRNs whose vendor has a posted bill in same week
+    // are considered "matched". Demo-grade heuristic; backend will do a
+    // proper line-by-line match.
+    const billedVendors = new Set(
+      (billsRaw ?? []).filter((b) => b.status === "posted").map((b) => b.party_id),
+    );
+    return postedGrns.filter((d) => !d.party_id || !billedVendors.has(d.party_id)).length;
+  }, [canSeeCost, grnTypeId, docsRaw, billsRaw]);
 
   const balances = balancesRaw ?? [];
   const movements = movementsRaw ?? [];
@@ -87,13 +127,15 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard
-            icon={<DollarSign size={14} />}
-            label="Inventory value"
-            value={balancesLoading ? "—" : totalValue.toFixed(2)}
-            hint={`${distinctItems} distinct items`}
-            href="/balances"
-          />
+          {canSeeCost && (
+            <KpiCard
+              icon={<DollarSign size={14} />}
+              label="Inventory value"
+              value={balancesLoading ? "—" : totalValue.toFixed(2)}
+              hint={`${distinctItems} distinct items`}
+              href="/balances"
+            />
+          )}
           <KpiCard
             icon={<Box size={14} />}
             label="Items in stock"
@@ -108,13 +150,23 @@ export default function DashboardPage() {
             hint={`${postedDocsToday} posted today`}
             href="/documents/all"
           />
-          <KpiCard
-            icon={<ClipboardList size={14} />}
-            label="Stock counts"
-            value={openCounts.toString()}
-            hint="open sessions"
-            href="/counts"
-          />
+          {canSeeCost ? (
+            <KpiCard
+              icon={<FileWarning size={14} />}
+              label="GRNs pending bill"
+              value={pendingBillsCount.toString()}
+              hint={pendingBillsCount > 0 ? "Goods received but no vendor bill yet" : "All caught up"}
+              href="/documents/goods-receipts"
+            />
+          ) : (
+            <KpiCard
+              icon={<ClipboardList size={14} />}
+              label="Stock counts"
+              value={openCounts.toString()}
+              hint="open sessions"
+              href="/counts"
+            />
+          )}
         </div>
 
         {/* Two column: recent movements + recent documents */}

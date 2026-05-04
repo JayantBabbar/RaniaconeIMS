@@ -92,7 +92,7 @@ export default function ValuationLayersPage() {
   } = useTableFilters({ data: allRows, columns });
 
   return (
-    <RequireRead perm="inventory.balances.read" crumbs={["Inventory", "Valuation Layers"]}>
+    <RequireRead perm="inventory.cost.read" crumbs={["Inventory", "Valuation Layers"]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar crumbs={["Inventory", "Valuation Layers"]} />
       <div className="p-4 md:p-5 space-y-4">

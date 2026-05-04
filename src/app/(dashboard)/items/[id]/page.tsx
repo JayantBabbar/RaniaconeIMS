@@ -13,11 +13,13 @@ import { Input, Textarea, Checkbox } from "@/components/ui/form-elements";
 import { Can, useCan } from "@/components/ui/can";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
+import Link from "next/link";
 import {
   itemService,
   brandService,
   categoryService,
 } from "@/services/items.service";
+import { pricingService } from "@/services/pricing.service";
 import type {
   ItemIdentifier,
   ItemVariant,
@@ -49,6 +51,8 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  DollarSign,
+  ExternalLink,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -57,6 +61,7 @@ import {
 
 const TABS = [
   { id: "general", label: "General", icon: Box },
+  { id: "pricing", label: "Pricing", icon: DollarSign },
   { id: "identifiers", label: "Identifiers", icon: Barcode },
   { id: "variants", label: "Variants", icon: Layers },
   { id: "uoms", label: "UoMs", icon: Ruler },
@@ -176,6 +181,7 @@ export default function ItemDetailPage() {
       {/* Tab content */}
       <div className="flex-1 overflow-auto p-5">
         {activeTab === "general" && <GeneralTab item={item} />}
+        {activeTab === "pricing" && <PricingTab itemId={id} />}
         {activeTab === "identifiers" && <IdentifiersTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "variants" && <VariantsTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "uoms" && <UoMsTab itemId={id} canWrite={canItemsWrite} />}
@@ -338,6 +344,116 @@ function AddIdentifierDialog({ open, onClose, itemId }: { open: boolean; onClose
         </div>
       </form>
     </Dialog>
+  );
+}
+
+// ── Pricing Tab ───────────────────────────────────────────
+//
+// Shows the active sale-price grid for this item, indexed by
+// thickness × size. Read-only here; clicking any cell takes
+// the user to the master pricing config page pre-filtered to
+// this item where they can update prices and see history.
+//
+// Empty cell = no rule yet for that combination. Filled cell
+// shows the current price + the date it became effective.
+
+const PRICING_THICKNESSES = [2, 3, 4, 5];
+const PRICING_SIZES = [
+  { code: "1220x2440", short: "4×8 ft",  label: "1220 × 2440 mm" },
+  { code: "1220x3050", short: "4×10 ft", label: "1220 × 3050 mm" },
+  { code: "1220x3660", short: "4×12 ft", label: "1220 × 3660 mm" },
+];
+
+function PricingTab({ itemId }: { itemId: string }) {
+  const { data: rules, isLoading } = useQuery({
+    queryKey: ["pricing-rules", itemId],
+    queryFn: () => pricingService.list({ item_id: itemId, active_only: true, limit: 200 }),
+  });
+
+  // Build a quick (thickness|size) → rule lookup so the grid renders fast.
+  const ruleMap = new Map(
+    (rules ?? []).map((r) => [`${r.thickness_mm}|${r.size_code}`, r] as const),
+  );
+
+  const filledCount = rules?.length ?? 0;
+  const totalCells = PRICING_THICKNESSES.length * PRICING_SIZES.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Pricing</h2>
+          <p className="text-[12.5px] text-foreground-secondary mt-0.5 max-w-2xl">
+            Sale price per sheet, by thickness × size. Mr. Arpit can update any cell — the previous price stays in history; old invoices keep their original snapshotted price.
+          </p>
+        </div>
+        <Link
+          href={`/master-data/item-pricing?item_id=${encodeURIComponent(itemId)}`}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
+        >
+          Manage prices <ExternalLink size={13} />
+        </Link>
+      </div>
+
+      <div className="text-[11px] text-foreground-muted">
+        {filledCount} of {totalCells} dimension combinations have a price set.
+        {filledCount < totalCells && (
+          <span className="ml-1 text-amber-700">
+            Empty cells need a price before invoices/challans can auto-fill for that combination.
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Spinner /></div>
+      ) : (
+        <div className="rounded-md border border-hairline bg-white overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-3 py-2.5 border-b border-hairline">Thickness ↓ &nbsp; Size →</th>
+                {PRICING_SIZES.map((s) => (
+                  <th key={s.code} className="text-right px-3 py-2.5 border-b border-hairline">
+                    <div>{s.short}</div>
+                    <div className="text-[9.5px] font-mono opacity-60">{s.label}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PRICING_THICKNESSES.map((t) => (
+                <tr key={t} className="border-b border-hairline-light hover:bg-surface/50">
+                  <td className="px-3 py-3 font-medium">{t} mm</td>
+                  {PRICING_SIZES.map((s) => {
+                    const rule = ruleMap.get(`${t}|${s.code}`);
+                    return (
+                      <td key={s.code} className="px-3 py-3 text-right">
+                        {rule ? (
+                          <div>
+                            <div className="tabular-nums font-semibold text-foreground">
+                              {formatCurrency(rule.sale_price, "INR", "en-IN")}
+                            </div>
+                            <div className="text-[10.5px] text-foreground-muted">
+                              since {formatDate(rule.valid_from, "short")}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-foreground-muted italic">— not set —</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-[11px] text-foreground-muted">
+        Use this view as a quick price reference. To update a price, click <span className="font-medium">Manage prices</span> above — the master pricing page handles version-history and effective dates.
+      </p>
+    </div>
   );
 }
 
@@ -521,29 +637,278 @@ function StockTab({ itemId }: { itemId: string }) {
 
 // ── Reorder Tab ───────────────────────────────────────────
 
+// ── Reorder Policies — interactive CRUD per item × location ─
+//
+// Mr. Arpit needs to set the low-stock threshold per item per
+// location and update it as stock-velocity changes. This tab
+// provides the full create/edit/delete cycle.
+//
+// Fields per policy:
+//   min_qty       — absolute minimum (alarm if available falls below)
+//   reorder_point — soft trigger (alert when available <= this)
+//   reorder_qty   — how much to reorder when triggered
+//   max_qty       — cap (avoids overstock alerts)
+
 function ReorderTab({ itemId, canWrite }: { itemId: string; canWrite: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [editTarget, setEditTarget] = useState<ReorderPolicy | "new" | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReorderPolicy | null>(null);
+
   const { data: policies, isLoading } = useQuery({
     queryKey: ["itemReorderPolicies", itemId],
     queryFn: () => itemService.listReorderPolicies(itemId),
   });
 
+  const { data: locsRaw } = useQuery({
+    queryKey: ["locations"],
+    queryFn: () => itemService.getBalances("__noop").catch(() => [] as never[]).then(() => null),
+    enabled: false,
+  });
+  void locsRaw;
+
+  const deleteMut = useMutation({
+    mutationFn: (policyId: string) => itemService.deleteReorderPolicy(itemId, policyId),
+    onSuccess: () => {
+      toast.success("Threshold deleted");
+      qc.invalidateQueries({ queryKey: ["itemReorderPolicies", itemId] });
+      setDeleteTarget(null);
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not delete"),
+  });
+
   return (
-    <SubResourceTable
-      title="Reorder Policies"
-      icon={<AlertTriangle size={20} />}
-      emptyText="No reorder policies"
-      emptyDesc="Set min/max stock levels per location"
-      isLoading={isLoading}
-      headers={["Location", "Min Qty", "Max Qty", "Reorder Point", "Reorder Qty"]}
-      canWrite={canWrite}
-      rows={(policies || []).map((p) => [
-        <span key="l" className="font-mono text-xs">{p.location_id.slice(0, 8)}…</span>,
-        <span key="mn" className="tabular-nums font-medium">{formatNumber(p.min_qty)}</span>,
-        <span key="mx" className="tabular-nums">{p.max_qty ? formatNumber(p.max_qty) : "—"}</span>,
-        <span key="rp" className="tabular-nums">{p.reorder_point ? formatNumber(p.reorder_point) : "—"}</span>,
-        <span key="rq" className="tabular-nums">{p.reorder_qty ? formatNumber(p.reorder_qty) : "—"}</span>,
-      ])}
-    />
+    <div className="bg-white border border-hairline rounded-md max-w-4xl">
+      <div className="px-5 py-3 border-b border-hairline flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <AlertTriangle size={16} className="text-status-amber-text" />
+            Reorder thresholds
+          </h2>
+          <p className="text-[12px] text-foreground-secondary mt-0.5">
+            One policy per location. The Low Stock Alerts page reads from here.
+          </p>
+        </div>
+        {canWrite && (
+          <Button kind="primary" icon={<Plus size={13} />} onClick={() => setEditTarget("new")}>
+            Add threshold
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="py-12 flex justify-center"><Spinner size={22} /></div>
+      ) : !policies || policies.length === 0 ? (
+        <EmptyState
+          icon={<AlertTriangle size={20} />}
+          title="No reorder thresholds"
+          description="Set a min/reorder/max per location so this item starts showing on the Low Stock Alerts page when it runs low."
+          action={canWrite ? (
+            <Button kind="primary" icon={<Plus size={13} />} onClick={() => setEditTarget("new")}>
+              Add the first threshold
+            </Button>
+          ) : null}
+        />
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
+              <th className="text-left px-4 py-2.5">Location</th>
+              <th className="text-right px-4 py-2.5">Min</th>
+              <th className="text-right px-4 py-2.5">Reorder point</th>
+              <th className="text-right px-4 py-2.5">Reorder qty</th>
+              <th className="text-right px-4 py-2.5">Max</th>
+              {canWrite && <th className="w-20" />}
+            </tr>
+          </thead>
+          <tbody>
+            {policies.map((p) => (
+              <tr key={p.id} className="border-t border-hairline-light hover:bg-surface/50">
+                <td className="px-4 py-2.5 font-mono text-xs">{p.location_id.slice(0, 12)}…</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(p.min_qty)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{p.reorder_point ? formatNumber(p.reorder_point) : "—"}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{p.reorder_qty ? formatNumber(p.reorder_qty) : "—"}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{p.max_qty ? formatNumber(p.max_qty) : "—"}</td>
+                {canWrite && (
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      onClick={() => setEditTarget(p)}
+                      className="text-brand text-xs hover:underline mr-3"
+                    >Edit</button>
+                    <button
+                      onClick={() => setDeleteTarget(p)}
+                      className="text-status-red-text text-xs hover:underline"
+                    >Delete</button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {editTarget && (
+        <ReorderPolicyModal
+          itemId={itemId}
+          policy={editTarget === "new" ? null : editTarget}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <Dialog
+          open
+          onClose={() => setDeleteTarget(null)}
+          title="Delete this threshold?"
+          width="sm"
+        >
+          <p className="text-[13px] text-foreground-secondary">
+            This stops the Low Stock Alerts page from monitoring this item at this location. You can re-add it any time.
+          </p>
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-hairline">
+            <Button kind="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button
+              kind="danger"
+              loading={deleteMut.isPending}
+              onClick={() => deleteMut.mutate(deleteTarget.id)}
+            >Delete</Button>
+          </div>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+function ReorderPolicyModal({
+  itemId, policy, onClose,
+}: {
+  itemId: string;
+  policy: ReorderPolicy | null;       // null = create new
+  onClose: () => void;
+}) {
+  const isEdit = !!policy;
+  const qc = useQueryClient();
+  const toast = useToast();
+
+  const { data: locsRaw } = useQuery({
+    queryKey: ["locations"],
+    queryFn: async () => {
+      const { locationService } = await import("@/services/locations.service");
+      return locationService.list({ limit: 200 });
+    },
+  });
+  const locations = locsRaw?.data ?? [];
+
+  const [locationId, setLocationId] = useState(policy?.location_id ?? "");
+  const [minQty, setMinQty] = useState(policy?.min_qty ?? "");
+  const [reorderPoint, setReorderPoint] = useState(policy?.reorder_point ?? "");
+  const [reorderQty, setReorderQty] = useState(policy?.reorder_qty ?? "");
+  const [maxQty, setMaxQty] = useState(policy?.max_qty ?? "");
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (isEdit && policy) {
+        return itemService.updateReorderPolicy(itemId, policy.id, {
+          min_qty:       Number(minQty),
+          ...(reorderPoint ? { reorder_point: Number(reorderPoint) } : {}),
+          ...(reorderQty   ? { reorder_qty:   Number(reorderQty) }   : {}),
+          ...(maxQty       ? { max_qty:       Number(maxQty) }       : {}),
+        });
+      }
+      return itemService.addReorderPolicy(itemId, {
+        location_id: locationId,
+        min_qty:       Number(minQty),
+        ...(reorderPoint ? { reorder_point: Number(reorderPoint) } : {}),
+        ...(reorderQty   ? { reorder_qty:   Number(reorderQty) }   : {}),
+        ...(maxQty       ? { max_qty:       Number(maxQty) }       : {}),
+      });
+    },
+    onSuccess: () => {
+      toast.success(isEdit ? "Threshold updated" : "Threshold added");
+      qc.invalidateQueries({ queryKey: ["itemReorderPolicies", itemId] });
+      qc.invalidateQueries({ queryKey: ["reorderPoliciesAll"] });
+      onClose();
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not save"),
+  });
+
+  const canSave = !!locationId && !!minQty && Number(minQty) >= 0;
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={isEdit ? "Edit threshold" : "Add reorder threshold"}
+      description="Set the levels at which this item triggers a low-stock alert at one location."
+      width="md"
+    >
+      <div className="space-y-3">
+        <FieldDisplay label="Tip" value="Set 'Reorder point' = the qty at which you want the system to alert. Set 'Reorder qty' = how many to order when alerted. 'Min' is your absolute floor; 'Max' caps overstock alerts." />
+
+        {!isEdit && (
+          <div>
+            <label className="block text-[12px] font-medium mb-1">Location *</label>
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full text-[13px] rounded border border-hairline bg-white px-2 py-1.5 h-9"
+            >
+              <option value="">— Select location —</option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>{l.code} — {l.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {isEdit && (
+          <FieldDisplay label="Location" value={policy.location_id} mono />
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Min qty"
+            type="number"
+            min={0}
+            required
+            value={minQty}
+            onChange={(e) => setMinQty(e.target.value)}
+          />
+          <Input
+            label="Reorder point"
+            type="number"
+            min={0}
+            value={reorderPoint}
+            onChange={(e) => setReorderPoint(e.target.value)}
+          />
+          <Input
+            label="Reorder qty"
+            type="number"
+            min={0}
+            value={reorderQty}
+            onChange={(e) => setReorderQty(e.target.value)}
+          />
+          <Input
+            label="Max qty"
+            type="number"
+            min={0}
+            value={maxQty}
+            onChange={(e) => setMaxQty(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-3 border-t border-hairline">
+          <Button kind="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            kind="primary"
+            loading={save.isPending}
+            disabled={!canSave}
+            onClick={() => save.mutate()}
+          >
+            {isEdit ? "Save changes" : "Add threshold"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

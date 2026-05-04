@@ -1,0 +1,66 @@
+4. Admin Dashboard
+• Today’s Orders
+• Yesterday’s Orders
+• Total Orders
+• Filters: Day, Week, Month, Year, Custom
+5. Debtors Module
+• Total pending amount
+• Customer count with pending payments
+• Click to view full list
+• Entry of payment- according to payment type- Cash, Cheque, Online Payment
+• In case of cheque- Bank Name, Amount, Cheque Number, Deposit Date
+• In case of online payment- Amount, Payee, Transaction (Arpit Specific Thing)
+6. Inventory Management
+• Hardener: Progressive, Economic, Extra Thickness
+• ACP: Novabond, Neobond with variants – Batch Number Required
+• APP: 3mm, 4mm
+• Batch selection
+• Opening stock view
+• Date, Bill Number, Batch Number, Product Code, Product, Brand, Category, Thickness (mm), Size (ft*ft), Inventory Stock, Cost Price, Source/Vendor
+• Current Date, Bill Number, 444, 1201, ACP, Novabond, Plain Color Selection, 3mm, 8*4, 5pc, $10, Gautam Steels
+7. Inward Purchase
+• Add vendor, date, multiple products
+• Group under same order
+• Basically, the inventory information but without the cost price just the product and the stock.
+8. Outward Sales (Challan/Estimate)
+• Select Route and based on that- Customer
+• Customer selection
+• Bill / No Bill
+• Save and Print options- Two things- One print remarks which is the amount, the other is default is no print (Products print and blank remark) There is no amount column instead it will be remarks column
+• Once you enter your product code the rest of the fields are auto populated and if there are options in any of the field- they become a dropdown for you to select. If Inventory Stock=0 then show Out of Stock pop-up message.
+• Default prices are set in the backend
+• If you have already added a particular product, it shouldn’t be allowed again on the parameters as a whole concatenation.
+9. Invoices
+• Create from challan
+• Editable fields except invoice number
+10. Collections
+• Cash / GPay / Cheque
+• Ledger updates automatically
+11. Ledger
+• OVERVIEW-
+• Cash Ledger- The amount of cash you have in hand
+• Bank Ledger- The amount you have in your main bank account (Updated when Cheque deposited- Add/Credit)
+• Cheque Ledger- The amount for which you have cheques that are not yet deposited. (Deposited Button/Checkbox- Deduct)
+• Gpay Ledger- The amount you have given to others from a source
+SOURCE AMOUNT TARGET
+• PERSONAL VIEW-
+• Each Person- How much he owes/How much you owe
+• NAME ​​RELATION ​BALANCE
+• KANISHK​EMPLOYEE​24000
+• AAYUSH​CUSTOMER​-4000
+• In the frontend if less than 0 then lend else you owe
+• On every 1st of the month in all the people who are salaried under you- Automatically adds salary in this ledger as to how much you owe them.
+• Can mark employee active/inactive
+12. Expenses
+• Food, Drinks, Petrol, Diesel, Labour, Capital Expense
+13. Customers/Vendors
+• Name mandatory
+• GST conditional fields- REGISTERED FOR GST (YES OR NO)
+• IF YES THEN GST DETAILS COMPULSARY ELSE NO SHOW OF GST
+• In the case of customers, we also want to add- Description- Route
+• Opening Balance  
+14. Reports
+• Sales, Purchase, Inventory, Debt
+15. Database Tables
+• Orders, Purchases, Customers, Vendors, Inventory, Ledger, Expenses
+16.

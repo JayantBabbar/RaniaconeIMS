@@ -29,9 +29,10 @@ import { ArrowLeft, Save, Lock } from "lucide-react";
 
 const TYPE_MAP: Record<string, { label: string; codes: string[] }> = {
   "purchase-orders": { label: "Purchase Order", codes: ["PO"] },
-  "sales-orders": { label: "Sales Order", codes: ["SO"] },
-  "transfers": { label: "Transfer", codes: ["TRANSFER", "XFER"] },
-  "all": { label: "Document", codes: [] },
+  "goods-receipts":  { label: "Goods Receipt",  codes: ["GRN"] },
+  "sales-orders":    { label: "Sales Order",    codes: ["SO"] },
+  "transfers":       { label: "Transfer",       codes: ["TRANSFER", "XFER"] },
+  "all":             { label: "Document",       codes: [] },
 };
 
 const docSchema = z
@@ -42,6 +43,9 @@ const docSchema = z
     party_id: z.string().optional().or(z.literal("")),
     source_location_id: z.string().optional().or(z.literal("")),
     destination_location_id: z.string().optional().or(z.literal("")),
+    /** GRN only — optional link to a parent PO. Empty = direct receipt
+     *  (phone-deal). When set, party + lines should pre-fill from the PO. */
+    source_doc_id: z.string().optional().or(z.literal("")),
     remarks: z.string().max(2000, "Too long").optional().or(z.literal("")),
   })
   .superRefine((data, ctx) => {
@@ -88,6 +92,21 @@ export default function NewDocumentPage() {
   const parties = partiesRaw?.data || [];
   const locations = locsRaw?.data || [];
 
+  // Posted POs are the only valid GRN source documents.
+  const { data: posRaw } = useQuery({
+    queryKey: ["posted-pos-for-grn"],
+    queryFn: () => documentService.list({ limit: 200 }),
+    enabled: type === "goods-receipts",
+  });
+  const poTypeId = useMemo(() => allTypes.find((t) => t.code === "PO")?.id, [allTypes]);
+  const postedPos = useMemo(
+    () => (posRaw ?? []).filter((d) => d.document_type_id === poTypeId && !!d.posting_date),
+    [posRaw, poTypeId],
+  );
+
+  // GRN-specific: toggle between PO-backed and direct receipt.
+  const [grnMode, setGrnMode] = useState<"po-backed" | "direct">("po-backed");
+
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -107,9 +126,25 @@ export default function NewDocumentPage() {
       party_id: "",
       source_location_id: "",
       destination_location_id: "",
+      source_doc_id: "",
       remarks: "",
     },
   });
+
+  // When user picks a parent PO, pre-fill the party from that PO.
+  const watchedSourceDoc = watch("source_doc_id");
+  React.useEffect(() => {
+    if (!watchedSourceDoc) return;
+    const po = postedPos.find((p) => p.id === watchedSourceDoc);
+    if (po?.party_id) {
+      setValue("party_id", po.party_id);
+    }
+  }, [watchedSourceDoc, postedPos, setValue]);
+
+  // Reset source_doc_id when toggling to direct mode.
+  React.useEffect(() => {
+    if (grnMode === "direct") setValue("source_doc_id", "");
+  }, [grnMode, setValue]);
 
   // Auto-select document type if only one candidate
   React.useEffect(() => {
@@ -133,6 +168,16 @@ export default function NewDocumentPage() {
       setError("destination_location_id", { message: "Destination location is required" });
       return;
     }
+    // GRN-specific: vendor party becomes mandatory on direct receipts
+    // (otherwise we'd inherit it from the linked PO).
+    if (type === "goods-receipts" && grnMode === "direct" && !data.party_id) {
+      setError("party_id", { message: "Vendor is required for direct receipts (no PO selected)" });
+      return;
+    }
+    if (type === "goods-receipts" && grnMode === "po-backed" && !data.source_doc_id) {
+      setError("source_doc_id", { message: "Pick a parent PO, or switch to Direct receipt" });
+      return;
+    }
     setSubmitting(true);
     try {
       const doc = await documentService.create({
@@ -142,6 +187,7 @@ export default function NewDocumentPage() {
         party_id: data.party_id || undefined,
         source_location_id: data.source_location_id || undefined,
         destination_location_id: data.destination_location_id || undefined,
+        source_doc_id: data.source_doc_id || null,
         remarks: data.remarks || undefined,
       });
       toast.success("Document created", "Now add lines");
@@ -242,6 +288,80 @@ export default function NewDocumentPage() {
                 {candidateTypes.map((t) => <option key={t.id} value={t.id}>{t.code} — {t.name}</option>)}
               </select>
             </FormField>
+          )}
+
+          {/* GRN-specific: PO-backed vs Direct receipt mode toggle. */}
+          {type === "goods-receipts" && (
+            <div className="space-y-3 p-3 rounded-md bg-surface border border-hairline">
+              <div>
+                <p className="text-[12px] font-semibold mb-1.5">Receipt source</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGrnMode("po-backed")}
+                    className={cn(
+                      "flex-1 px-3 py-2 rounded-md text-[12.5px] font-medium border transition-colors text-left",
+                      grnMode === "po-backed"
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-hairline bg-white text-foreground-secondary hover:bg-surface/50"
+                    )}
+                  >
+                    Against a PO
+                    <span className="block text-[10.5px] font-normal opacity-70 mt-0.5">
+                      Goods arrived for an order we placed
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGrnMode("direct")}
+                    className={cn(
+                      "flex-1 px-3 py-2 rounded-md text-[12.5px] font-medium border transition-colors text-left",
+                      grnMode === "direct"
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-hairline bg-white text-foreground-secondary hover:bg-surface/50"
+                    )}
+                  >
+                    Direct receipt (no PO)
+                    <span className="block text-[10.5px] font-normal opacity-70 mt-0.5">
+                      Phone deal, walk-in, or unplanned receipt
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {grnMode === "po-backed" && (
+                <FormField
+                  label="Source Purchase Order"
+                  required
+                  error={errors.source_doc_id?.message}
+                  help="Pick the posted PO this receipt corresponds to. Vendor + lines pre-fill from there."
+                >
+                  <select
+                    className={cn(
+                      "w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary",
+                      errors.source_doc_id ? "border-status-red" : "border-hairline"
+                    )}
+                    disabled={submitting}
+                    {...register("source_doc_id")}
+                  >
+                    <option value="">— Select a posted PO —</option>
+                    {postedPos.map((po) => {
+                      const p = parties.find((pa) => pa.id === po.party_id);
+                      return (
+                        <option key={po.id} value={po.id}>
+                          {po.document_number}{p ? ` · ${p.name}` : ""} · {po.document_date}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </FormField>
+              )}
+              {grnMode === "direct" && (
+                <p className="text-[11px] text-foreground-muted leading-relaxed">
+                  Direct receipt — vendor below becomes mandatory; lines + costs are entered manually after creating this draft. Use this for phone-deal shipments, walk-in suppliers, or stock that arrived before the PO was raised.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

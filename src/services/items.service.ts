@@ -206,6 +206,18 @@ export const itemService = {
     return api.post<ReorderPolicy>(ITEMS.REORDER_POLICIES(itemId), data);
   },
 
+  async updateReorderPolicy(
+    itemId: string,
+    policyId: string,
+    data: Partial<{ min_qty: number; max_qty: number; reorder_point: number; reorder_qty: number }>,
+  ): Promise<ReorderPolicy> {
+    return api.patch<ReorderPolicy>(ITEMS.REORDER_POLICY(itemId, policyId), data);
+  },
+
+  async deleteReorderPolicy(itemId: string, policyId: string): Promise<void> {
+    return api.delete<void>(ITEMS.REORDER_POLICY(itemId, policyId));
+  },
+
   // ── Stock Balances for item ──
   async getBalances(itemId: string): Promise<Balance[]> {
     const res = await api.get<Balance[] | { items: Balance[] }>(STOCK.BALANCES, { item_id: itemId });

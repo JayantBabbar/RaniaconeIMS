@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,8 +17,10 @@ import { useCan } from "@/components/ui/can";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
 import { partyService } from "@/services/parties.service";
+import { ledgerService } from "@/services/ledger.service";
+import { accountService } from "@/services/accounts.service";
 import { isApiError } from "@/lib/api-client";
-import { formatDate, getInitials } from "@/lib/utils";
+import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
   ArrowLeft, MapPin, Phone, Mail, Plus, Building2, User,
 } from "lucide-react";
@@ -29,7 +31,15 @@ export default function PartyDetailPage() {
   const { can } = useCan();
   const canRead = can("inventory.parties.read");
   const canWrite = can("inventory.parties.write");
-  const [tab, setTab] = useState<"overview" | "addresses" | "contacts">("overview");
+  const sp = useSearchParams();
+  const initialTab = (sp.get("tab") as "overview" | "addresses" | "contacts" | "ledger") || "overview";
+  const [tab, setTab] = useState<"overview" | "addresses" | "contacts" | "ledger">(initialTab);
+  // Keep state in sync if query param changes (e.g. arriving from Debtors page)
+  useEffect(() => {
+    const t = sp.get("tab");
+    if (t && ["overview", "addresses", "contacts", "ledger"].includes(t)) setTab(t as typeof tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp]);
 
   const { data: party, isLoading } = useQuery({
     queryKey: ["party", id],
@@ -61,8 +71,20 @@ export default function PartyDetailPage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <Badge tone={party.party_type === "customer" ? "blue" : party.party_type === "supplier" ? "green" : "amber"}>
-                  {party.party_type || "—"}
+                <Badge tone={
+                  party.party_type === "customer"       ? "blue"
+                  : party.party_type === "supplier"     ? "green"
+                  : party.party_type === "vendor"       ? "amber"
+                  : party.party_type === "general_person" ? "gray"
+                  : "amber"
+                }>
+                  {party.party_type === "general_person"
+                    ? "General person"
+                    : party.party_type === "both"
+                      ? "Both (customer + supplier)"
+                      : party.party_type
+                        ? party.party_type.charAt(0).toUpperCase() + party.party_type.slice(1)
+                        : "—"}
                 </Badge>
                 {!party.is_active && <Badge tone="red">inactive</Badge>}
               </div>
@@ -83,7 +105,7 @@ export default function PartyDetailPage() {
         {/* Tabs */}
         <div className="border-b border-hairline">
           <div className="flex gap-0">
-            {(["overview", "addresses", "contacts"] as const).map((t) => (
+            {(["overview", "addresses", "contacts", "ledger"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -105,6 +127,7 @@ export default function PartyDetailPage() {
             <Row label="Code" value={party.code} mono />
             <Row label="Legal name" value={party.legal_name || "—"} />
             <Row label="Tax ID / GSTIN" value={party.tax_id || "—"} mono />
+            <Row label="Opening balance" value={party.opening_balance ? formatCurrency(party.opening_balance, "INR", "en-IN") : "—"} />
             <Row label="Currency" value={party.currency_id || "—"} mono />
             <Row label="Created" value={formatDate(party.created_at)} />
             <Row label="Updated" value={formatDate(party.updated_at)} />
@@ -113,6 +136,7 @@ export default function PartyDetailPage() {
 
         {tab === "addresses" && <AddressesTab partyId={party.id} canWrite={canWrite} />}
         {tab === "contacts" && <ContactsTab partyId={party.id} canWrite={canWrite} />}
+        {tab === "ledger" && <LedgerTab partyId={party.id} />}
       </div>
     </div>
   );
@@ -125,6 +149,76 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
         {label}
       </div>
       <div className={"text-sm font-medium flex-1 " + (mono ? "font-mono text-xs" : "")}>{value}</div>
+    </div>
+  );
+}
+
+function LedgerTab({ partyId }: { partyId: string }) {
+  // Personal ledger view from §11 of clientneeds.txt — every entry
+  // against this party's receivable + payable accounts, in date order
+  // with a running balance. Hands the user a complete settlement
+  // history without having to sum receipts and invoices manually.
+  const { data: entries, isLoading } = useQuery({
+    queryKey: ["party-ledger", partyId],
+    queryFn: () => ledgerService.listPartyEntries(partyId, { limit: 500 }),
+  });
+  const { data: accs } = useQuery({
+    queryKey: ["accounts", { party_id: partyId }],
+    queryFn: () => accountService.list({ party_id: partyId, limit: 10 }),
+  });
+  const arPay = (accs ?? []).find((a) => a.type === "party_receivable" || a.type === "party_payable");
+  const balanceNum = arPay ? Number(arPay.current_balance) : 0;
+
+  if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
+  if ((entries ?? []).length === 0) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">No ledger entries yet</p>
+        <p className="text-xs text-foreground-muted mt-1">Entries appear here when invoices are posted to or receipts/payments recorded against this party.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white border border-hairline rounded-md overflow-hidden">
+      <div className="px-4 py-3 border-b border-hairline flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold">Personal ledger</h3>
+        <div className="text-sm tabular-nums">
+          <span className="text-text-tertiary">Outstanding: </span>
+          <span className="font-semibold">{formatCurrency(Math.abs(balanceNum), "INR", "en-IN")}</span>
+          {balanceNum > 0 && <span className="ml-1 text-[10px] text-text-tertiary">they owe us</span>}
+          {balanceNum < 0 && <span className="ml-1 text-[10px] text-text-tertiary">we owe them / on-account credit</span>}
+        </div>
+      </div>
+      <table className="w-full text-[13px]">
+        <thead className="bg-bg-subtle text-text-tertiary text-[11px] uppercase tracking-wider">
+          <tr>
+            <th className="text-left px-3 py-2 font-medium">Date</th>
+            <th className="text-left px-3 py-2 font-medium">Source</th>
+            <th className="text-right px-3 py-2 font-medium">Debit</th>
+            <th className="text-right px-3 py-2 font-medium">Credit</th>
+            <th className="text-right px-3 py-2 font-medium">Running</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(entries ?? []).map((e) => {
+            const debit = Number(e.debit);
+            const credit = Number(e.credit);
+            const running = Number(e.running_balance);
+            return (
+              <tr key={e.id} className="border-t border-hairline">
+                <td className="px-3 py-2 text-text-tertiary whitespace-nowrap">{formatDate(e.entry_date)}</td>
+                <td className="px-3 py-2">{e.source_label}<div className="text-[11px] text-text-tertiary">{e.remarks ?? ""}</div></td>
+                <td className="px-3 py-2 text-right tabular-nums">{debit > 0 ? formatCurrency(debit, "INR", "en-IN") : ""}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{credit > 0 ? formatCurrency(credit, "INR", "en-IN") : ""}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                  {formatCurrency(Math.abs(running), "INR", "en-IN")}
+                  <span className="ml-1 text-[10px] text-text-tertiary">{running >= 0 ? "Dr" : "Cr"}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -33,6 +33,10 @@ import { formatDate } from "@/lib/utils";
 const TYPE_MAP: Record<string, { label: string; codes: string[]; module?: string }> = {
   "purchase-orders": { label: "Purchase Orders", codes: ["PO"], module: "purchase" },
   "sales-orders": { label: "Sales Orders", codes: ["SO"], module: "sales" },
+  // Goods Receipt Note — confirms physical receipt at the warehouse.
+  // Posting a GRN moves stock IN. Can be PO-backed (source_doc_id set)
+  // or "direct" (phone-deal / walk-in receipt with no parent PO).
+  "goods-receipts": { label: "Goods Receipts", codes: ["GRN"], module: "inventory" },
   "transfers": { label: "Transfers", codes: ["TRANSFER", "XFER"], module: "inventory" },
   "all": { label: "All Documents", codes: [] },
 };
@@ -74,6 +78,9 @@ export default function DocumentsListPage() {
   const parties = partiesRaw?.data || [];
   const typeMap = useMemo(() => new Map(allDocTypes.map((t) => [t.id, t])), [allDocTypes]);
   const partyMap = useMemo(() => new Map(parties.map((p) => [p.id, p])), [parties]);
+  // Map of document.id → document_number for "PO-backed GRN" link rendering.
+  const docNumMap = useMemo(() => new Map(allRowsRaw.map((d) => [d.id, d.document_number])), [allRowsRaw]);
+  const isGrnView = type === "goods-receipts";
 
   // Scope rows to this type's docType ids.
   const allRows = useMemo(
@@ -205,6 +212,9 @@ export default function DocumentsListPage() {
                 {rows.map((d) => {
                   const t = typeMap.get(d.document_type_id);
                   const p = d.party_id ? partyMap.get(d.party_id) : null;
+                  const isGrn = t?.code === "GRN";
+                  const direct = isGrn && !d.source_doc_id;
+                  const sourceNum = d.source_doc_id ? docNumMap.get(d.source_doc_id) : null;
                   return (
                     <Link
                       key={d.id}
@@ -224,6 +234,8 @@ export default function DocumentsListPage() {
                       )}
                       <div className="flex items-center gap-2 text-[11px] text-foreground-muted mt-0.5 flex-wrap">
                         <Badge tone="blue">{t?.code || "—"}</Badge>
+                        {isGrn && direct && <Badge tone="amber">Direct</Badge>}
+                        {isGrn && sourceNum && <span className="font-mono text-brand">↳ {sourceNum}</span>}
                         <span className="font-mono">{formatDate(d.document_date)}</span>
                         {p && <span className="font-mono">· {p.code}</span>}
                       </div>
@@ -248,6 +260,7 @@ export default function DocumentsListPage() {
                     </div>
                   </th>
                   <th className="text-left px-4 py-2.5">Type</th>
+                  {isGrnView && <th className="text-left px-4 py-2.5">Source</th>}
                   <th className="text-left px-4 py-2.5">
                     <div className="flex items-center gap-1">
                       <SortHeader col={columns[2]} sort={sort} toggleSort={toggleSort}>Party</SortHeader>
@@ -266,6 +279,9 @@ export default function DocumentsListPage() {
                 {rows.map((d) => {
                   const t = typeMap.get(d.document_type_id);
                   const p = d.party_id ? partyMap.get(d.party_id) : null;
+                  const isGrn = t?.code === "GRN";
+                  const direct = isGrn && !d.source_doc_id;
+                  const sourceNum = d.source_doc_id ? docNumMap.get(d.source_doc_id) : null;
                   return (
                     <tr key={d.id} className="border-t border-hairline-light hover:bg-surface/50">
                       <td className="px-4 py-2.5">
@@ -275,6 +291,15 @@ export default function DocumentsListPage() {
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs">{formatDate(d.document_date)}</td>
                       <td className="px-4 py-2.5"><Badge tone="blue">{t?.code || "—"}</Badge></td>
+                      {isGrnView && (
+                        <td className="px-4 py-2.5">
+                          {direct
+                            ? <Badge tone="amber">Direct</Badge>
+                            : sourceNum
+                              ? <Link href={`/documents/detail/${d.source_doc_id}`} className="font-mono text-xs text-brand hover:underline">↳ {sourceNum}</Link>
+                              : <span className="text-foreground-muted">—</span>}
+                        </td>
+                      )}
                       <td className="px-4 py-2.5">
                         {p ? <>
                           <div className="font-medium">{p.name}</div>

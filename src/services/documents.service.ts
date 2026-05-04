@@ -44,6 +44,10 @@ export const documentService = {
     exchange_rate?: string;
     status_id?: string;
     remarks?: string;
+    /** Optional link to a parent document. On a GRN, this is the
+     *  source PO (NULL for direct receipts). On an Invoice, this is
+     *  the source SO/Challan. */
+    source_doc_id?: string | null;
   }) => api.post<DocumentHeader>(DOCUMENTS.LIST, data),
 
   update: (
@@ -61,6 +65,15 @@ export const documentService = {
 
   post: (id: string) => api.post<DocumentHeader>(DOCUMENTS.POST(id)),
   cancel: (id: string) => api.post<DocumentHeader>(DOCUMENTS.CANCEL(id)),
+
+  /** Phase 10 — promote a posted Sales Order to a tax Invoice.
+   *  Backend creates the Invoice with `source_doc_id = <SO>`, copies
+   *  lines (adding GST math from item.default_tax_rate_pct), and
+   *  flips the SO's `is_promoted=true`, `invoice_id=<new id>`. */
+  promoteToInvoice: (id: string) =>
+    api.post<{ invoice_id: string; invoice_number: string }>(
+      DOCUMENTS.PROMOTE_TO_INVOICE(id),
+    ),
 
   // Lines
   listLines: async (documentId: string): Promise<DocumentLine[]> => {
@@ -81,9 +94,18 @@ export const documentService = {
       discount_pct?: string;
       tax_amount?: string;
       lot_id?: string;
+      /** Convenience for GRN — supplier's batch number or an internal
+       *  lot ID. Backend resolves to a Lot row (creates one if new)
+       *  and sets line.lot_id. Required when item.is_batch_tracked. */
+      lot_number?: string;
       serial_id?: string;
       bin_id?: string;
       remarks?: string;
+      /** Phase 13 — dimension snapshot. Backend uses these to
+       *  resolve the active pricing rule and populate unit_price
+       *  on lines that don't supply one. */
+      thickness_mm?: number;
+      size_code?: string;
     }
   ) => api.post<DocumentLine>(DOCUMENTS.LINES(documentId), data),
 

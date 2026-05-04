@@ -174,7 +174,7 @@ export interface ImportBatch {
   tenant_id: string;
   entity: string;
   file_name: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "processing" | "completed" | "completed_with_errors" | "failed";
   total_rows: number;
   success_rows: number;
   error_rows: number;

@@ -22,12 +22,27 @@ import {
 import { useTableFilters, type ColumnDef } from "@/hooks";
 import { useToast } from "@/components/ui/toast";
 import { partyService } from "@/services/parties.service";
+import { accountService } from "@/services/accounts.service";
 import { currencyService } from "@/services/platform.service";
 import { isApiError } from "@/lib/api-client";
+import { formatCurrency } from "@/lib/utils";
 import type { Party } from "@/types";
 import { Plus, Edit, Trash2, Building2, Eye } from "lucide-react";
 
-const PARTY_TYPES = ["customer", "supplier", "both"] as const;
+// Five party types — customer/supplier/both have always existed;
+// vendor + general_person added so Mr. Arpit can split commercial
+// goods-suppliers from one-off service vendors and informal contacts.
+const PARTY_TYPES = ["customer", "supplier", "vendor", "general_person", "both"] as const;
+
+// Human-friendly labels for the dropdowns + badges (party_type values
+// stay snake_case in the data layer for backend stability).
+const PARTY_TYPE_LABEL: Record<string, string> = {
+  customer:       "Customer",
+  supplier:       "Supplier",
+  vendor:         "Vendor",
+  general_person: "General person",
+  both:           "Both (customer + supplier)",
+};
 
 export default function PartiesPage() {
   const toast = useToast();
@@ -44,6 +59,22 @@ export default function PartiesPage() {
   });
   const parties = data?.data || [];
 
+  // Per-party current balance comes from the AR/AP accounts. Backed
+  // by a single list endpoint so this stays cheap on the wire.
+  const { data: accs } = useQuery({
+    queryKey: ["accounts", "party-aware"],
+    queryFn: () => accountService.list({ limit: 500 }),
+  });
+  const balanceByParty = React.useMemo(() => {
+    const m = new Map<string, number>();
+    (accs ?? []).forEach((a) => {
+      if (!a.party_id) return;
+      if (a.type !== "party_receivable" && a.type !== "party_payable") return;
+      m.set(a.party_id, (m.get(a.party_id) ?? 0) + Number(a.current_balance));
+    });
+    return m;
+  }, [accs]);
+
   const deleteMut = useMutation({
     mutationFn: (id: string) => partyService.delete(id),
     onSuccess: () => {
@@ -54,10 +85,12 @@ export default function PartiesPage() {
     onError: (e) => toast.error(isApiError(e) ? e.message : "Delete failed"),
   });
 
-  const typeTone = (t?: string): "green" | "blue" | "amber" | "neutral" => {
-    if (t === "customer") return "blue";
-    if (t === "supplier") return "green";
-    if (t === "both") return "amber";
+  const typeTone = (t?: string): "green" | "blue" | "amber" | "gray" | "neutral" => {
+    if (t === "customer")       return "blue";
+    if (t === "supplier")       return "green";
+    if (t === "vendor")         return "amber";
+    if (t === "general_person") return "gray";
+    if (t === "both")           return "amber";
     return "neutral";
   };
 
@@ -87,7 +120,7 @@ export default function PartiesPage() {
       label: "Type",
       sortable: true,
       filterType: "select",
-      options: PARTY_TYPES.map((t) => ({ value: t, label: t })),
+      options: PARTY_TYPES.map((t) => ({ value: t, label: PARTY_TYPE_LABEL[t] ?? t })),
     },
     {
       key: "tax_id",
@@ -225,6 +258,9 @@ export default function PartiesPage() {
                       />
                     </div>
                   </th>
+                  <th className="text-right px-4 py-2.5 text-[10.5px] font-medium uppercase tracking-wider text-foreground-muted">
+                    Balance
+                  </th>
                   <th className="text-center px-4 py-2.5">
                     <div className="flex items-center gap-1 justify-center">
                       <SortHeader col={columns[5]} sort={sort} toggleSort={toggleSort} align="center">
@@ -252,8 +288,21 @@ export default function PartiesPage() {
                     <td className="px-4 py-2.5 text-foreground-secondary">
                       {p.legal_name || "—"}
                     </td>
-                    <td className="px-4 py-2.5"><Badge tone={typeTone(p.party_type)}>{p.party_type || "—"}</Badge></td>
+                    <td className="px-4 py-2.5"><Badge tone={typeTone(p.party_type)}>{p.party_type ? (PARTY_TYPE_LABEL[p.party_type] ?? p.party_type) : "—"}</Badge></td>
                     <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">{p.tax_id || "—"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs">
+                      {(() => {
+                        const b = balanceByParty.get(p.id) ?? 0;
+                        if (Math.abs(b) < 0.005) return <span className="text-foreground-muted">—</span>;
+                        const owesUs = b > 0;
+                        return (
+                          <span className={owesUs ? "text-amber-700 font-semibold" : "text-emerald-700"}>
+                            {formatCurrency(Math.abs(b), "INR", "en-IN")}
+                            <span className="ml-1 text-[10px] text-foreground-muted">{owesUs ? "Dr" : "Cr"}</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-2.5 text-center">{p.is_active ? "✓" : "—"}</td>
                     {canWrite && (
                       <td className="px-4 py-2.5 text-center">
@@ -385,15 +434,20 @@ function PartyFormModal({ open, onClose, target }: { open: boolean; onClose: () 
           <FormField
             label="Type"
             required
-            help={`"Customer" = you sell to them. "Supplier" = you buy from them. "Both" = you do both.`}
+            help={
+              `"Customer" = you sell to them. "Supplier" = you buy goods from them. ` +
+              `"Vendor" = service provider (transport, repair, IT). ` +
+              `"General person" = freelancer / consultant / referral. ` +
+              `"Both" = customer + supplier.`
+            }
           >
             <select
               className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
               value={form.party_type}
-              onChange={(e) => setForm({ ...form, party_type: e.target.value })}
+              onChange={(e) => setForm({ ...form, party_type: e.target.value as typeof PARTY_TYPES[number] })}
             >
               {PARTY_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>{PARTY_TYPE_LABEL[t] ?? t}</option>
               ))}
             </select>
           </FormField>

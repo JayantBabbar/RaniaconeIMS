@@ -566,4 +566,1238 @@ button on the roles list.
 
 ---
 
+## REQ-4: Invoice module — full GST-compliant tax invoices
+
+### Severity
+NEW FEATURE — not a fix. Required for the distribution-vertical
+client (see Resources/CLIENT_NEEDS_GAP.md §Phase 2).
+
+### Status
+Frontend prototype is **complete and shipping in demo mode**:
+- `/invoices` list, `/invoices/new`, `/invoices/[id]`, `/invoices/[id]/print`
+- GST math module + 22 unit tests
+- Live availability hints, RBAC-gated actions, A4 print layout
+- Demo adapter handles all the new endpoints — clients can click
+  through the full flow without a backend
+
+The contract is now formal. Backend implements to the spec; FE flips
+from demo adapter to real endpoints with zero further FE changes.
+
+### Where the spec lives
+`frontend/Resources/INVOICE_BACKEND_SPEC.md` — comprehensive,
+covers:
+
+- §1 Overview (state machine, purpose)
+- §2 GST logic explained with worked examples (intra-state CGST+SGST
+  vs inter-state IGST, discounts, cess, rounding rule)
+- §3 Database schema (DDL for `invoices`, `invoice_lines`, plus
+  ALTERs for `items`, `parties`, `tenants`)
+- §4 API contract (7 endpoints with full request/response shapes)
+- §5 Error codes the FE specifically handles
+- §6 Permission codes (4 new, one per action)
+- §7 Number Series wiring
+- §8 Tests the backend should ship (matches FE GST suite line-by-line)
+- §9 Out of scope (e-Invoice IRN / e-Way Bill — Phase 4)
+- §10 What FE has built (so backend dev knows nothing is FE-blocked)
+- §11 Suggested ship sequence
+
+### GST math — must match the FE port
+
+The frontend already has a complete GST math implementation at
+`src/lib/gst.ts` with 22 passing unit tests. The backend
+implementation MUST agree to the rupee on every example in §2.4
+of the spec. Same rounding rule (per-line, 2dp, half-up).
+
+Specific cases the backend tests must cover (full list in §8):
+
+- intra-state → CGST + SGST (50/50 split of total rate)
+- inter-state → IGST (full rate, no CGST/SGST)
+- discount applied BEFORE tax
+- cess added on top of GST
+- mixed-rate invoice (different lines at different rates)
+- standard rates: 0, 0.25, 3, 5, 12, 18, 28
+- non-standard rates accepted but warned
+
+### Side effects on Post (transactional)
+
+For each line:
+1. Check qty_available >= quantity at the relevant location
+2. If insufficient: `422 INSUFFICIENT_STOCK` with field_errors
+3. Create OUT movement referencing the invoice
+4. Update balance qty_on_hand and qty_available
+
+On Cancel: reversal movements (paired IN with reference_movement_id),
+plus reversal of ledger entries (Phase 3 — out of scope here).
+
+### Permissions (already seeded in FE demo fixtures)
+
+```
+inventory.invoices.read    — view invoices
+inventory.invoices.write   — create / edit drafts
+inventory.invoices.post    — lock a draft, create movements
+inventory.invoices.cancel  — reverse a posted invoice
+```
+
+Each is a separate gate so tenants can build any role mix
+(e.g. "Sales Clerk: read+write" / "Billing Lead: all four"). The
+existing `/admin/roles/[id]` permission grid handles it without
+schema changes.
+
+### Frontend impact when backend lands
+
+Zero. The FE service layer (`src/services/invoices.service.ts`)
+uses the production api-client; demo mode just swaps the axios
+adapter for an in-memory mock. When backend ships:
+
+1. Set `NEXT_PUBLIC_DEMO_MODE=false` in `.env.local`
+2. FE hits real endpoints
+3. All four invoice pages work end-to-end
+
+No FE redeploy, no schema migration on the FE side, no flag flips
+beyond the env var.
+
+---
+
+## REQ-5: Challan module — delivery challans + promote-to-invoice
+
+### Severity
+NEW FEATURE — paired with REQ-4. Required for the
+distribution-vertical client (see Resources/CLIENT_NEEDS_GAP.md
+§Phase 2.5). Distribution clients ship goods on a challan first,
+then bill at end-of-day; Phase 2 invoices alone don't cover this.
+
+### Status
+Frontend prototype is **complete and shipping in demo mode**:
+- `/challans` list, `/challans/new`, `/challans/[id]`, `/challans/[id]/print`
+- "Source challan" picker on `/invoices/new` — auto-fills customer
+  and lines from a posted, unbilled challan
+- "Convert to invoice" action on `/challans/[id]` — RBAC-gated on
+  `inventory.challans.write` AND `inventory.invoices.write`
+- Two-mode print (with_remarks / no_amount) toggleable on the print
+  toolbar
+- Live availability hints, RBAC-gated actions, A4 print layout
+- Demo adapter handles all 8 new endpoints — clients can click
+  through the full flow (create → post → promote → invoice post →
+  cancel → reversal) without a backend
+- Sidebar updated with a "Billing" group containing both Challans
+  and Invoices, each gated on its respective `.read` permission
+
+### Where the spec lives
+`frontend/Resources/CHALLAN_BACKEND_SPEC.md` — comprehensive,
+covers:
+
+- §1 Overview (why challan ≠ invoice, status flow, billing flag)
+- §2 Print modes (with_remarks vs no_amount)
+- §3 Routes — slim master-data table (code + name + active flag)
+- §4 Database schema (DDL for `challans`, `challan_lines`, `routes`
+  + the `invoices.challan_id` back-link with unique partial index)
+- §5 API contract (8 endpoints — 7 challan + routes list/detail;
+  the headline is §5.8 promote-to-invoice)
+- §6 Error codes (incl. CHALLAN_ALREADY_BILLED, CHALLAN_BILLED,
+  HSN/RATE_REQUIRED_FOR_INVOICE)
+- §7 Permission codes (4 challan + 2 routes; promote requires both
+  challans.write AND invoices.write)
+- §8 Number Series wiring (`DC` series per tenant)
+- §9 Tests the backend should ship (matches FE smoke flow)
+- §10 Out of scope (eWB, multi-challan-to-invoice, partial billing)
+- §11 What FE has built
+- §12 Suggested ship sequence
+
+### Promote-to-invoice — the cross-module action
+
+`POST /challans/{id}/promote-to-invoice` is the headline. Body
+takes `place_of_supply` (drives GST split), optional `due_date`,
+`invoice_number`, `remarks`. Server:
+
+1. Validates challan is posted + unbilled.
+2. Creates a draft invoice with `challan_id` back-link.
+3. Copies every challan line into an invoice line, computing GST
+   per INVOICE_BACKEND_SPEC.md §2 using `place_of_supply` vs tenant
+   `state_code`.
+4. Falls back to `items.hsn_code` / `items.default_tax_rate_pct`
+   for any line missing those values.
+5. Marks the challan `is_billed=true`, `invoice_id=<new>`.
+6. Returns the new invoice.
+
+### Critical invariant — no double stock OUT
+
+Stock OUT is created on **challan post** (movements with
+`reference_doc_type='challan'`). When that challan's invoice is
+later **posted**, the invoice post handler MUST detect
+`invoice.challan_id IS NOT NULL` and **skip** the stock OUT step.
+The goods already left the warehouse on the challan — the invoice
+is only the financial entry at that point.
+
+This is a small change to the existing REQ-4 invoice post handler:
+
+```python
+# In invoice_service.post():
+if invoice.challan_id is None:
+    create_out_movements_and_decrement_balance(invoice)
+# else: stock already moved on the challan post — skip
+```
+
+Cancellation symmetry:
+- **Challan cancel** is forbidden if `is_billed=true` (must cancel
+  the invoice first). Returns `409 CHALLAN_BILLED`.
+- **Invoice cancel** must NOT create reversal movements when
+  `invoice.challan_id IS NOT NULL` (the movements belong to the
+  challan, not the invoice). Movement reversal happens on challan
+  cancel.
+
+### Permissions (already seeded in FE demo fixtures)
+
+```
+inventory.challans.read    — view challans
+inventory.challans.write   — create / edit drafts
+inventory.challans.post    — lock a draft, create movements
+inventory.challans.cancel  — reverse a posted challan
+inventory.routes.read      — list routes for picker
+inventory.routes.write     — reserved (no UI yet)
+```
+
+Promote-to-invoice requires BOTH `inventory.challans.write` AND
+`inventory.invoices.write`. The FE gates the action via
+`useCan().canAll([...])`.
+
+### Frontend impact when backend lands
+
+Zero. The FE service layer (`src/services/challans.service.ts`)
+uses the production api-client; demo mode just swaps the axios
+adapter for an in-memory mock. When backend ships:
+
+1. Set `NEXT_PUBLIC_DEMO_MODE=false` in `.env.local`
+2. FE hits real endpoints
+3. All four challan pages + the invoice promote flow work
+   end-to-end
+
+No FE redeploy, no schema migration on the FE side, no flag flips
+beyond the env var.
+
+---
+
+## REQ-6: Phase 3 Money — Accounts, Ledger, Payments, Employees
+
+### Severity
+NEW MODULE — biggest one yet. Closes §5 (Debtors), §10 (Collections),
+§11 (Ledger) of clientneeds.txt as one cohesive feature surface.
+Required before any sales-on-credit client can run their books.
+
+### Status
+Frontend prototype is **complete and shipping in demo mode**:
+
+- `/money` landing — 7 balance tiles (Cash / Bank / Cheque pending /
+  GPay / Receivable / Payable / Employee Float) + recent
+  receipts/payments feeds
+- `/money/receipts` (list + new + detail) — 4 mode-specific forms
+  (Cash, Bank, Cheque, GPay/UPI). GPay has Payee picker = company
+  account OR an Employee.
+- `/money/payments` (list + new + detail) — symmetric to receipts,
+  for vendor-side outgoing money
+- `/money/cheques` — pending list + Deposit dialog (transit→bank)
+- `/money/accounts` — Chart of Accounts grouped by type
+- `/money/ledger/[accountId]` — per-account journal with running
+  balance + Dr/Cr indicator
+- `/money/debtors` — debtors + creditors view (?direction=payable
+  flips); sorted by largest outstanding
+- `/money/employees` — minimal employee admin with Float column
+- New Ledger tab on `/parties/[id]` — personal-view journal of
+  every entry against the party's receivable/payable accounts
+- New "Balance" column on `/parties` list with Dr/Cr indicator
+- Sidebar gets a "Money" section gated on the new perms
+- 8 new permission codes seeded; `inventory.parties.write_balance`
+  added as a separate gate from parties.write
+- Demo adapter handles all 14 new endpoints; pre-baked balances are
+  consistent across every view
+
+### The headline mechanic — Employee Float
+
+When a customer GPays a salesman personally instead of the company
+UPI, the receipt records:
+
+```
+Dr. employee_float[ramesh]      8500.00     ← Ramesh holds it
+Cr. party_receivable[mehta]     8500.00     ← Mehta's invoice settles
+```
+
+That float gets net-settled at salary time:
+
+```
+Salary due:                       50000.00
+Less: float held                – 8500.00
+Net payout:                       41500.00
+```
+
+Storage is double-entry; UX collapses it on the salary screen.
+Constraint: receipts where mode=gpay AND payee_employee_id is set
+must use that employee's float account as account_id (server-side
+enforced as `EMPLOYEE_FLOAT_REQUIRED` 422).
+
+### Where the spec lives
+`frontend/Resources/PHASE3_BACKEND_SPEC.md` — comprehensive,
+covers:
+
+- §1 Overview (storage + sub-feature mapping + state machine)
+- §2 Critical business rule — Employee Float storage + UX +
+  constraint
+- §3 Database schema (DDL for financial_accounts, ledger_entries,
+  payments, payment_allocations, employees + system-account
+  auto-creation rules)
+- §4 API contract (14 endpoints across accounts/ledger/payments/
+  employees)
+- §5 Error codes the FE specifically handles (incl.
+  EMPLOYEE_FLOAT_REQUIRED, OVER_ALLOCATED, CHEQUE_ALREADY_CLEARED)
+- §6 Permission codes (10 new)
+- §7 **Cross-module wiring** — REQ-4 invoice POST must now write
+  ledger entries (Dr AR, Cr sales_income, Cr gst_output); cancel
+  must reverse them. The challan-linked-invoice case from REQ-5
+  still skips stock movements but DOES write ledger entries — the
+  financial entry only happens on invoice post, never on challan
+  post.
+- §8 Tests the backend should ship
+- §9 Out of scope (Expenses, Salary cron, Vendor bills, Reports —
+  all Phase 3.5)
+- §10 What FE has built
+- §11 Suggested ship sequence
+
+### Architectural call — confirm before building
+
+**Double-entry under the hood, multi-ledger UX on top.** Every
+business event writes paired debit/credit rows to ledger_entries.
+The UI presents these as separate "ledgers" by account type. This
+saves a rewrite at Phase 3.5 (expenses, salary, P&L all need
+double-entry).
+
+If the backend dev disagrees and wants a flat-transactions model,
+flag NOW before migrations land — switching later costs.
+
+### Critical invariants (DO NOT skip in tests)
+
+1. For every `group_id`, SUM(debit) = SUM(credit). Append-only,
+   never UPDATE/DELETE ledger_entries — reversals are new rows
+   with sign-flipped amounts and the same group_id.
+2. `payments.allocated_amount = SUM(payment_allocations WHERE
+   payment_id=...)`. Maintain in same transaction.
+3. `financial_accounts.current_balance` is denormalised — must be
+   updated in the same transaction as every ledger_entries
+   insert. Drift here breaks the /money/debtors page.
+4. Employee gpay constraint: receipt with mode=gpay AND
+   payee_employee_id set MUST have account_id = that employee's
+   float_account_id. 422 if not.
+
+### Permissions (already seeded in FE demo fixtures)
+
+```
+inventory.accounts.read / write
+inventory.ledger.read
+inventory.payments.read / write / post / cancel
+inventory.employees.read / write
+inventory.parties.write_balance       ← separate from parties.write
+```
+
+Each is a separate gate so tenants can build any role mix
+(Cashier vs Finance Lead vs Auditor — examples in spec §6).
+
+### Frontend impact when backend lands
+
+Zero. All four FE service files (accounts, payments, employees,
+ledger) use the production api-client. Demo mode just swaps the
+axios adapter for an in-memory mock. When backend ships:
+
+1. Set `NEXT_PUBLIC_DEMO_MODE=false` in `.env.local`
+2. FE hits real endpoints
+3. All 12 Money pages + party-ledger tab + parties balance column
+   work end-to-end
+
+No FE redeploy, no schema migration on the FE side, no flag flips
+beyond the env var.
+
+---
+
+## REQ-7: Phase 3.5 — AP completion (Vendor Bills, Expenses, Salary)
+
+### Severity
+Closes the AP side of the books and the operational expense + salary
+flows. With this in place, all six core workflows from §15 of
+clientneeds.txt (Orders / Purchases / Customers / Vendors / Inventory
+/ Ledger / Expenses) are end-to-end functional.
+
+### Status
+Frontend prototype is **complete and shipping in demo mode**:
+
+- `/bills` (list), `/bills/new` (4-section form, live GST math),
+  `/bills/[id]` (post/cancel + settlement panel)
+- `/money/expenses` (list), `/money/expenses/new` (category, amount,
+  paid-from = cash/bank/gpay, optional vendor)
+- `/money/expenses/categories` (CRUD on tenant-customisable master)
+- `/money/salary` (list), `/money/salary/new` (employee picker
+  auto-loads gross + current float, computes net), `/money/salary/[id]`
+  (post/cancel + pseudo-ledger preview)
+- Extended `/money/payments/new` with bill-allocation panel against
+  the vendor's open bills (mirror of how receipts allocate against
+  invoices)
+- New "Bills pending" tile on `/money` landing page
+- Sidebar gets Bills (under Billing) + Expenses + Salary entries
+  (under Money), all gated on the new perms
+- 14 new permission codes seeded
+- Demo adapter handles all 21 new endpoints
+- 6 default expense categories seeded (Food / Petrol / Diesel /
+  Labour / Capital / Travel) — tenant-customisable
+
+### The big architectural calls
+
+**1. Vendor bills are FINANCIAL ONLY — no stock movement.**
+A bill_post writes the AP ledger entry but does NOT create stock
+IN movements. Stock IN happens through the GRN/PO flow (existing
+documents module). This separates physical inventory tracking
+(GRN) from financial accounting (bill).
+
+**2. Expense categories own their own ledger account.**
+Each expense_category row has a 1:1 `expense_account_id` pointing
+at a financial_accounts row of type expense_category. Server
+auto-creates the account on category insert. Pays off at report
+time — "How much did we spend on Petrol this quarter?" is one
+query against ledger_entries WHERE account_id = X.
+
+**3. Salary closes the float loop.**
+Net = gross − float_held. On post:
+```
+Dr. salary_expense                   gross_salary
+Cr. employee_float[employee]         float_held    ← clears float
+Cr. paid_from_account_id             net_paid       ← cash leaves
+```
+Server re-validates float at post time and rejects with
+SALARY_FLOAT_DRIFT if the balance moved between draft and post.
+Constraint: one posted salary per (employee, period_month) —
+prevents accidental double-pay.
+
+### Where the spec lives
+`frontend/Resources/PHASE3_5_BACKEND_SPEC.md` — comprehensive,
+covers:
+
+- §1 Overview (entities + state machines)
+- §2 Critical scope decisions (financial-only bills, per-category
+  accounts, salary-float loop)
+- §3 Database schema (DDL for vendor_bills + lines,
+  expense_categories, expenses, salary_entries; ALTERs for
+  payment_allocations.bill_id and employees.payable_account_id)
+- §4 API contract (21 endpoints across bills/expenses/salary,
+  plus payment_allocations extension)
+- §5 Error codes the FE specifically handles (incl.
+  SALARY_FLOAT_DRIFT, BILL_HAS_PAYMENTS, SALARY_PERIOD_DUPLICATE)
+- §6 Permission codes (14 new)
+- §7 Tests the backend should ship
+- §8 Out of scope (salary cron, bill-from-GRN, reports)
+- §9 What FE has built
+- §10 Suggested ship sequence
+
+### Cross-module wiring (the tricky part)
+
+1. **Bill post** writes a 3-row ledger entry: Dr expense (per-line
+   override or default purchase_expense) + Dr gst_input + Cr
+   party_payable[vendor]. Reversal on cancel.
+
+2. **Expense post** writes a 2-row entry: Dr expense_category +
+   Cr paid_from. Reversal on cancel.
+
+3. **Salary post** writes a 2 or 3-row entry: Dr salary_expense
+   + (optional) Cr employee_float + Cr paid_from. Skip the float
+   row when float_held=0.
+
+4. **Payment allocation** to a bill increments
+   `vendor_bills.allocated_amount` (cached counter) but does NOT
+   write new ledger entries — the original payment's posting
+   already settled the party_payable. Same pattern as receipt-
+   to-invoice allocation.
+
+5. **Cancel-with-payments rule**: bills with allocated_amount > 0
+   cannot be cancelled. Caller must cancel/unallocate the
+   payments first. Returns `409 BILL_HAS_PAYMENTS`.
+
+### Permissions (already seeded in FE demo fixtures)
+
+```
+inventory.bills.read / write / post / cancel               (4)
+inventory.expenses.read / write / post / cancel            (4)
+inventory.expense_categories.read / write                   (2)
+inventory.salary.read / write / post / cancel              (4)
+```
+
+Each is a separate gate so tenants can build any role mix.
+Examples: a "Store keeper" gets bills.read+write but not post.
+A "Field salesman" gets expenses.read+write (for daily petrol
+slips) but no salary perms. The accountant gets all 14.
+
+### Frontend impact when backend lands
+
+Zero. Three new FE service files (bills, expenses, salary) and
+the extended payments service all use the production api-client.
+Demo mode just swaps the axios adapter for an in-memory mock.
+When backend ships:
+
+1. Set `NEXT_PUBLIC_DEMO_MODE=false` in `.env.local`
+2. FE hits real endpoints
+3. All 9 new pages + extended payment-new page work end-to-end
+
+No FE redeploy, no schema migration on the FE side, no flag flips
+beyond the env var.
+
+---
+
+## REQ-8: Phase 4 — Reports & Statements
+
+**Status:** Frontend prototype complete (2026-05-01). All 6 report
+routes working in demo mode against in-memory fixtures. Backend
+endpoints not yet implemented.
+
+**What it covers:**
+1. Sales register (foundation for GSTR-1)
+2. Purchase register (foundation for GSTR-2)
+3. Debtors aging (open receivables, bucketed 0–30 / 31–60 / 61–90 / 90+)
+4. Creditors aging (open payables, same buckets)
+5. Profit & loss (date-range income statement: revenue − COGS − expenses − salary)
+6. /reports landing tile grid
+
+**FE artefacts shipped:**
+- `src/services/reports.service.ts` — 5 methods, mirrors endpoints
+- `src/app/(dashboard)/reports/{page,sales,purchases,debtors-aging,creditors-aging,profit-loss}/page.tsx`
+- `src/lib/demo/adapter.ts` — 5 new request handlers (~260 LOC)
+- `src/lib/api-constants.ts` — `REPORTS.*` constants
+- `src/types/index.ts` — 9 new types: `SalesRegisterRow`, `PurchaseRegisterRow`,
+  `RegisterTotals`, `AgingRow`, `AgingTotals`, `AgingResponse`,
+  `ProfitLossExpenseRow`, `ProfitLossResponse`, plus 2 register response wrappers
+- `src/components/layout/sidebar.tsx` — new "Reports" group with 6 entries
+- `src/lib/demo/fixtures.ts` — 1 new permission code: `inventory.reports.read`
+
+**Backend endpoints requested (full spec at
+`Resources/PHASE4_BACKEND_SPEC.md`):**
+```
+GET /reports/sales-register      — sales register (rows + totals)
+GET /reports/purchase-register   — purchase register
+GET /reports/debtors-aging       — bucketed open receivables
+GET /reports/creditors-aging     — bucketed open payables
+GET /reports/profit-loss         — date-range income statement
+```
+
+**Critical invariants documented in spec:**
+1. Server returns `{ rows, totals }`; FE never re-totals.
+2. Aging buckets inclusive at lower edge (≤30 → 0_30, 31–60, 61–90, 90+).
+3. Cancelled docs visible in registers, hidden from aging.
+4. P&L revenue uses `taxable_value` (subtotal), NOT `grand_total` —
+   GST is a pass-through, not revenue.
+5. P&L COGS sums valuation_layer.consumed_cost on stock-out moves
+   from posted invoices, EXCLUDING challan-promoted invoices
+   (those reuse the challan's stock-out — never double-count).
+6. P&L salary uses `gross_salary`, NOT `net_paid` — float clears
+   internally; gross is the actual cost-of-labour.
+7. Single permission gate `inventory.reports.read` for all five
+   endpoints — additive split possible later if needed.
+
+**Zero schema changes.** Phase 4 is pure aggregations over existing
+tables. Indexes already in place cover the date-range filters.
+
+**FE flip plan when backend lands:**
+1. Set `NEXT_PUBLIC_DEMO_MODE=false`
+2. FE hits real endpoints
+3. All 6 reports work end-to-end
+
+No FE redeploy beyond env flip; no schema migrations on the FE side.
+
+**Remaining FE work (Phase 5+, deferred):**
+- GSTR-1 / GSTR-2 / GSTR-3B JSON exports
+- Cash flow statement (needs opening balances)
+- Trial balance / Balance sheet (needs equity accounts)
+- PDF rendering (CSV is shipped)
+- Server-side caching for large tenants
+
+## REQ-9: Phase 5 — Compliance close (GSTR-1 / GSTR-3B / Period close)
+
+**Status:** Frontend prototype complete (2026-05-01). All 3 new
+routes working in demo mode against in-memory fixtures. Backend
+endpoints not yet implemented.
+
+**What it covers:**
+1. GSTR-1 export — JSON in GSTN-portal schema (B2B + B2CL + B2CS)
+2. GSTR-3B export — Monthly summary return JSON
+3. Period close — Tenant-level `lock_before_date` floor that
+   prevents edits to documents whose posting_date is on or before
+   the lock date.
+
+**FE artefacts shipped:**
+- `src/services/gstr.service.ts` — two methods (gstr1, gstr3b)
+- `src/services/period-close.service.ts` — get + set
+- `src/app/(dashboard)/reports/{gstr-1,gstr-3b}/page.tsx`
+- `src/app/(dashboard)/settings/period-close/page.tsx`
+- `src/lib/demo/adapter.ts` — 3 new request handlers (~220 LOC)
+- `src/lib/api-constants.ts` — `REPORTS.GSTR_*` + `PERIOD_CLOSE.*`
+- `src/types/index.ts` — 5 GSTR types + `PeriodCloseConfig`
+- `src/components/layout/sidebar.tsx` — GSTR sub-items + Period close link
+- `src/lib/demo/fixtures.ts` — 2 new permission codes
+
+**Backend endpoints requested (full spec at
+`Resources/PHASE5_BACKEND_SPEC.md`):**
+```
+GET  /reports/gstr-1?period=YYYY-MM   — GSTR-1 JSON
+GET  /reports/gstr-3b?period=YYYY-MM  — GSTR-3B JSON
+GET  /period-close                    — Read lock setting
+PUT  /period-close                    — Set or clear lock
+```
+
+**Critical invariants documented in spec:**
+1. GSTR JSON shape mirrors GSTN portal schema **exactly** —
+   `ctin`, `inum`, `idt`, `txval`, `rt`, `camt`/`samt`/`iamt`/`csamt`.
+   Downloaded JSON should be uploadable to portal as-is.
+2. B2B / B2CL / B2CS bucketing rules:
+   - B2B = registered party
+   - B2CL = unregistered + inter-state + grand_total > ₹2.5L
+   - B2CS = everything else (aggregated by sply_ty × pos × rt)
+3. Date format `DD-MM-YYYY` for GSTR; period as `MMYYYY`.
+4. Period close is a **hard floor** — `423 LOCKED` on every
+   mutation (POST/PATCH/DELETE/post/cancel) for any document with
+   `posting_date ≤ lock_before_date`. Boundary inclusive.
+5. Period close enforced as **generic middleware**, not per-route.
+   Resources covered: invoices, challans, vendor_bills, payments,
+   expenses, salary_entries, documents, counts.
+6. Reads always work — only mutations are blocked.
+7. New error code: `423 PERIOD_LOCKED`.
+
+**Schema changes:**
+- ZERO new tables.
+- Setting stored in existing `tenant_config` under
+  `key = "period_close"` with JSON value containing
+  `lock_before_date`, `locked_at`, `locked_by`, `reason`.
+
+**Permissions added (FE seeded):**
+- `inventory.period_close.read` — view current lock
+- `inventory.period_close.write` — set/clear lock
+GSTR endpoints reuse `inventory.reports.read` from Phase 4.
+
+**FE flip plan when backend lands:**
+1. Set `NEXT_PUBLIC_DEMO_MODE=false`
+2. FE hits real endpoints
+3. All 3 routes work end-to-end
+
+The `423 LOCKED` response is already surfaced by the existing
+error normaliser in api-client; mutation `onError` handlers
+can react to `e.status === 423` to show a friendly toast.
+
+**Suggested backend ship order** (least to most disruptive):
+1. Period close GET/PUT — small, testable in isolation
+2. Period close enforcement middleware — bigger lift, most
+   load-bearing for production correctness
+3. GSTR-3B endpoint — simpler aggregation
+4. GSTR-1 endpoint — bucket logic with the most test coverage
+
+## REQ-10: Phase 6 — Payroll automation (batch + payslip)
+
+**Status:** Frontend prototype complete (2026-05-01). Two new
+routes + payslip view working in demo mode against in-memory
+fixtures. Backend endpoints + cron not yet implemented.
+
+**What it covers:**
+1. **Payroll batch grid** — `/money/salary/batch` — period picker
+   showing all active employees with their draft entry (or "no
+   draft" badge). Generate-drafts (idempotent) + Bulk-post
+   (atomic) actions.
+2. **Payslip view** — `/money/salary/[id]/payslip` — printable
+   layout with `window.print()` trigger; A4-ready CSS.
+3. **Cron contract** — backend wires `POST /salary/batch/generate`
+   to a 02:00 IST monthly cron; FE button stays as manual override.
+
+**FE artefacts shipped:**
+- `src/services/payroll.service.ts` — 4 methods (getBatch,
+  generateBatch, postBatch, getPayslip)
+- `src/app/(dashboard)/money/salary/batch/page.tsx` — KPI strip
+  + actions + per-employee table with float-drift warning
+- `src/app/(dashboard)/money/salary/[id]/payslip/page.tsx` —
+  print-optimised payslip
+- `src/app/(dashboard)/money/salary/[id]/page.tsx` — "Payslip"
+  button in actions
+- `src/lib/demo/adapter.ts` — 4 new request handlers (~250 LOC)
+- `src/lib/api-constants.ts` — `SALARY.BATCH*` + `PAYSLIP` constants
+- `src/types/index.ts` — 4 new types (PayrollBatchEntry,
+  PayrollBatchSummary, PayrollBatchPostResponse, PayslipData)
+- `src/components/layout/sidebar.tsx` — "Payroll batch" entry
+- `src/lib/demo/fixtures.ts` — 1 new permission code
+
+**Backend endpoints requested (full spec at
+`Resources/PHASE6_BACKEND_SPEC.md`):**
+```
+GET  /salary/batch?period=YYYY-MM       — list all employees + drafts
+POST /salary/batch/generate             — idempotent draft creation
+POST /salary/batch/post                 — atomic bulk post
+GET  /salary/{id}/payslip               — hydrated printable data
+```
+
+**Critical invariants documented in spec:**
+1. **Idempotent generate** — UNIQUE(tenant_id, employee_id, period_month)
+   already enforces no duplicates; re-running is safe (cron retries,
+   manual triggers). Returns `created` count distinct from
+   `entries.length`.
+2. **All-or-nothing bulk post** — single transaction; per-entry
+   `SALARY_FLOAT_DRIFT` re-validation; ANY drift fails the whole
+   batch and returns 422 with the drifting entries.
+3. **Cron + manual share the endpoint** — same route, same
+   idempotency. `caller.kind` audit-only distinguishes.
+4. **Payslip is FE-rendered HTML, not server PDF** — `window.print()`
+   handles PDF for now. Server PDF deferred until volume justifies.
+5. **`amount_in_words` is server-side** — canonical legal phrasing
+   stays consistent across CSV/PDF/UI.
+6. **Period close interaction** — bulk post returns 423 LOCKED if
+   `period_month` <= `period_close.lock_before_date`. Reuses Phase 5
+   middleware; no special-casing.
+
+**New error code:**
+- `422 SALARY_BATCH_FLOAT_DRIFT` — `field_errors.drift_entries`
+  contains JSON-stringified list of `{salary_id, employee_name,
+  expected_float, actual_float}`.
+
+**Schema changes:**
+- ZERO new tables.
+- Confirm UNIQUE constraint exists:
+  `UNIQUE (tenant_id, employee_id, period_month)`
+
+**Permissions added (FE seeded):**
+- `inventory.salary.batch` — Run payroll batch (generate + bulk post)
+  Distinct from existing salary.write/post; tenants might want to
+  block junior staff from one-click bulk operations even if they
+  can edit individual entries.
+
+**Cron registration (production):**
+```
+0 2 1 * *  /usr/bin/payroll-batch-generate-all  # 02:00 IST, 1st of month
+```
+Cron iterates active tenants and calls
+`POST /salary/batch/generate { period: "<current_month>" }` for each.
+
+**FE flip plan when backend lands:**
+1. Set `NEXT_PUBLIC_DEMO_MODE=false`
+2. Wire cron entry (or expose feature-flag toggle)
+3. FE works unchanged
+
+**Suggested backend ship order** (least to most disruptive):
+1. Payslip endpoint — read-only, unblocks /payslip route today
+2. Batch GET — read-only, second simplest
+3. Batch generate — the idempotent write; lock idempotency
+   in tests (re-run produces created: 0)
+4. Batch post — atomic transaction, ship LAST; drift handling
+   and ledger writes need extra review
+5. Cron registration — only after all four are green; cron
+   should respect a feature flag for staged rollout
+
+## REQ-11: Phase 7 — Bulk CSV imports
+
+**Status:** Frontend prototype complete (2026-05-02). Three new
+endpoints + 4 importable entities working in demo mode against
+in-memory fixtures. Backend endpoints not yet implemented.
+
+**What it covers (the go-live unblocker):**
+1. `Items` — bulk-create SKU master with HSN, GST rate, UoM, brand, category
+2. `Parties` — bulk-create customers + suppliers with GSTIN, state code, opening balance
+3. `Stock balances` — opening qty_on_hand per item per location, with unit cost (idempotent upsert)
+4. `Opening balances` — carry-forward AR/AP per party as of go-live date
+
+**FE artefacts shipped:**
+- `src/services/imports.service.ts` — 3 methods (getTemplate, preview, commit)
+- `src/app/(dashboard)/settings/imports/page.tsx` — replaced stub with tile grid + history table
+- `src/app/(dashboard)/settings/imports/[type]/page.tsx` — 3-step wizard
+- `src/lib/demo/adapter.ts` — per-entity schemas + row validator + commit (~280 LOC)
+- `src/lib/api-constants.ts` — `IMPORTS.TEMPLATE/PREVIEW/COMMIT` constants
+- `src/types/index.ts` — 5 new types: `ImportEntityType`, `ImportColumn`,
+  `ImportRowError`, `ImportPreviewResponse`, `ImportCommitResponse`
+- `src/components/layout/sidebar.tsx` — "Bulk imports" entry under Admin
+- `src/services/settings.service.ts` — extended ImportBatch.status union with
+  `completed_with_errors`
+- `src/lib/demo/fixtures.ts` — 2 new permission codes
+
+**Backend endpoints requested (full spec at
+`Resources/PHASE7_BACKEND_SPEC.md`):**
+```
+GET  /imports/template/{entity}  — CSV template (header + example row)
+POST /imports/preview            — Server-side validation; nothing persisted
+POST /imports/commit             — Create entities; partial success allowed
+```
+
+**Critical invariants documented in spec:**
+1. **Two-step preview/commit** — preview validates without persisting;
+   user fixes CSV and re-uploads before committing. Catches dependency
+   errors (missing brand, missing UoM) before any state changes.
+2. **Server-side validation** — FE has minimal CSV parser only; all
+   validation (required, enum, FK existence, within-file uniqueness)
+   lives backend. No FE/DB drift possible.
+3. **Commit re-validates** — last line of defence against time-gap
+   races (preview blessed → DB state changed → commit). Re-validation
+   failures land in `errors[]`, no rollback, partial success allowed.
+4. **Templates are drift-locked** — header row in template MUST match
+   keys validator + commit expect. One source of truth.
+5. **Within-file uniqueness** — duplicates in the same upload flagged
+   on BOTH rows during preview.
+6. **Numbers/booleans are strings** — CSV is text; coerce explicitly.
+   Reject obvious fat-finger errors (`"Y"`/`"₹100"`) at validator.
+7. **Period-close interaction** — `opening_balances` rows with
+   `as_of_date <= period_close.lock_before_date` rejected with 423
+   per Phase 5 middleware.
+8. **Stock balance idempotent** — re-upload overwrites existing
+   `(item_id, location_id)` balance instead of duplicating.
+
+**Schema changes:**
+- ZERO new tables.
+- One enum extension on existing `imports` table:
+  ```sql
+  ALTER TABLE imports
+    ADD CONSTRAINT chk_imports_status
+    CHECK (status IN ('pending','processing','completed',
+                      'completed_with_errors','failed'));
+  ```
+
+**Permissions added (FE seeded):**
+- `inventory.imports.read`  — View import history
+- `inventory.imports.write` — Run bulk CSV imports
+
+**FE flip plan when backend lands:**
+1. Set `NEXT_PUBLIC_DEMO_MODE=false`
+2. FE hits real endpoints
+3. All 5 import paths work — no FE redeploy beyond env flip
+
+**Suggested backend ship order:**
+1. Template endpoint — pure read-only, sets column-schema contract
+2. Preview endpoint — validation logic, lock semantics in tests
+3. Items commit — anchor the 7-step pattern
+4. Parties commit — copy of items pattern
+5. Stock balances commit — adds idempotent upsert
+6. Opening balances commit — most complex (ledger writes +
+   period-close interaction); ship LAST
+
+Items + parties can ship together; stock + opening balances are
+typically loaded once at go-live and can follow in a separate PR.
+
+---
+
+## REQ-12: Phase 8 — Cash flow statement
+
+**Status:** Frontend prototype complete (2026-05-02).
+
+**FE artefacts:**
+- `src/services/reports.service.ts` — `cashFlow` method
+- `src/app/(dashboard)/reports/cash-flow/page.tsx`
+- Adapter handler computing from existing fixtures
+- New REPORTS.CASH_FLOW constant + types CashFlowResponse / CashFlowLineItem
+- Sidebar entry under Reports
+
+**Backend endpoint requested (full spec at
+`Resources/PHASE8_BACKEND_SPEC.md`):**
+```
+GET /reports/cash-flow?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+```
+
+**Critical invariants:**
+1. Direct method (cash inflows/outflows by activity, NOT indirect
+   reconcile-from-net-profit).
+2. Cash = cash_in_hand + bank + gpay (excludes cheque-in-transit
+   until cleared).
+3. Operating: receipts from customers + payments to vendors +
+   salary paid (net) + non-capital expenses.
+4. Investing: capital expenses only (categories with is_capital=true).
+5. Financing activities deferred (no loans/equity modelling yet).
+6. Opening + Net change = Closing — invariant.
+
+Zero schema changes; pure aggregation.
+
+---
+
+## REQ-13: Phase 9 — Audit log viewer
+
+**Status:** Frontend prototype complete (2026-05-02).
+
+**FE artefacts:**
+- `src/services/audit-log.service.ts`
+- `src/app/(dashboard)/admin/audit-log/page.tsx` — filter timeline
+  with expandable before/after diff blocks
+- Adapter GET handler with prefix-match action filter
+- 6 sample fixture entries spanning common actions
+- New AUDIT_LOG.LIST constant + AuditLogEntry type
+- Sidebar entry under Admin
+- New permission `inventory.audit_log.read`
+
+**Backend endpoint requested (full spec at
+`Resources/PHASE9_BACKEND_SPEC.md`):**
+```
+GET /audit-log?user_id=&action=&entity_type=&start_date=&end_date=&limit=
+```
+
+**Critical invariants:**
+1. **Append-only at DB role level** — `REVOKE UPDATE, DELETE` on
+   audit_log; only INSERT + SELECT for app role.
+2. **Same-transaction inline writes** — audit entry rolls back
+   with the action; never half-written.
+3. Action codes are dotted (`<resource>.<verb>`) — FE filter
+   accepts exact OR prefix-ending-in-dot.
+4. before/after JSON snapshots; truncate at 64 KB with marker.
+5. IP + UA captured at the load balancer.
+6. Cross-tenant isolation enforced server-side.
+
+**Schema changes:**
+- New `audit_log` table (DDL in spec §3).
+
+---
+
+## REQ-14: Phase 10 — Sales order → Invoice promotion
+
+**Status:** Frontend prototype complete (2026-05-02).
+
+**FE artefacts:**
+- `src/services/documents.service.ts` — `promoteToInvoice` method
+- `src/app/(dashboard)/documents/detail/[id]/page.tsx` — "Promote
+  to invoice" button (only on posted SO, not already promoted)
+- Adapter handler creates draft invoice with computed GST math,
+  flips SO `is_promoted`
+- New DOCUMENTS.PROMOTE_TO_INVOICE constant
+
+**Backend endpoint requested (full spec at
+`Resources/PHASE10_BACKEND_SPEC.md`):**
+```
+POST /documents/{id}/promote-to-invoice
+```
+
+**Critical invariants:**
+1. Only `posted` SOs are promotable.
+2. Idempotent via `is_promoted` flag — once promoted, locked.
+3. GST math computed at promotion using `item.default_tax_rate_pct`
+   + customer's state_code for IGST vs CGST+SGST split.
+4. No stock movement at promotion — that happens when the
+   resulting draft invoice is posted (mirroring challan→invoice).
+5. Bidirectional source link (`source_doc_id` on invoice +
+   `invoice_id` on SO).
+6. Invoice number from standard NumberSeries; lands as draft for
+   review.
+
+**Schema changes:**
+```sql
+ALTER TABLE documents
+  ADD COLUMN is_promoted BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN invoice_id UUID REFERENCES invoices(id);
+
+ALTER TABLE invoices
+  ADD COLUMN source_doc_id UUID REFERENCES documents(id);
+```
+
+---
+
+## REQ-15: Phase 11 — Mobile responsive sweep
+
+**Status:** Frontend complete (2026-05-02). No backend changes
+required.
+
+**What changed:**
+- All table-wrapping divs in dashboard pages updated from
+  `overflow-hidden` → `overflow-x-auto` so wide tables scroll
+  horizontally on mobile rather than overflow the viewport.
+- Reviewed pages already using `grid-cols-1 md:grid-cols-X`
+  filter bar pattern from Phase 4+; older pages already had
+  this from initial build.
+- Sidebar drawer + topbar hamburger plumbing already in place
+  from initial build (`src/components/layout/sidebar.tsx` +
+  `topbar.tsx`); no changes needed.
+- Print stylesheets on payslip route already use `@media print`
+  and `print:hidden` to hide the chrome.
+
+**Files affected (24 pages):**
+- All 8 reports pages (sales, purchases, debtors-aging,
+  creditors-aging, profit-loss, gstr-1, gstr-3b, cash-flow)
+- Audit log, imports landing, payroll batch
+- Bills list + detail
+- Money pages: receipts list+detail, payments, cheques,
+  accounts, employees, debtors, expenses + categories,
+  salary list, ledger detail
+
+**No FE service / API / type changes.** Pure CSS / Tailwind
+adjustment.
+
+---
+
+## REQ-16: Phase 12 — Cost & Financials visibility split + GRN↔Bill matching
+
+**Status:** Frontend prototype complete (2026-05-02). Implements
+Mr. Arpit's requirement that only Admin sees costs/amounts. All other
+roles (Operator, Salesman, future Cashier) get a no-money UI.
+
+**Why this matters (per clientneeds.txt):**
+- §7 Inward Purchase: "Basically, the inventory information but
+  without the cost price just the product and the stock."
+- §8 Outward Sales: "There is no amount column instead it will be
+  remarks column"
+
+**FE artefacts:**
+- `src/lib/demo/fixtures.ts` — 2 new permission codes; trimmed Operator
+  bundle (no bills/invoices/payments/expenses/salary/accounts/employees/
+  reports/period_close/audit_log/cost/financials reads)
+- `src/components/ui/cost-mask.tsx` — `<CostMask>`, `<FinancialsMask>`,
+  `useCanSeeCost()`, `useCanSeeFinancials()` hooks
+- `src/app/(dashboard)/documents/detail/[id]/page.tsx` — PO/GRN/Transfer
+  line form omits unit_price + discount_pct entirely; line table hides
+  Unit price + Total columns; Line total summary hidden
+- `src/app/(dashboard)/balances/page.tsx` — Value column + Inventory
+  value KPI gated on cost.read
+- `src/app/(dashboard)/movements/page.tsx` — unit_cost + total_cost
+  columns gated on cost.read
+- `src/app/(dashboard)/valuation/page.tsx` — route gate changed from
+  balances.read → cost.read
+- `src/app/(dashboard)/dashboard/page.tsx` — new "GRNs pending bill"
+  KPI for Admin (replaces Stock counts tile)
+- `src/components/layout/sidebar.tsx` — Valuation gate updated;
+  cost/money/reports/audit_log entries auto-hide via existing
+  permission filter
+
+**Backend endpoints + schema needed (full spec at
+`Resources/PHASE12_BACKEND_SPEC.md`):**
+
+```
+GET /dashboard/pending-bills-count    — count of unmatched GRNs
+```
+
+**Schema changes:**
+```sql
+ALTER TABLE valuation_layers
+  ADD COLUMN cost_pending BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE balances
+  ALTER COLUMN value DROP NOT NULL;     -- allow NULL while cost pending
+
+ALTER TABLE challans  ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'no_amount';
+ALTER TABLE invoices  ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'with_amount';
+-- print_mode enum: 'no_amount' | 'with_amount'
+
+INSERT INTO permissions (code, name, module) VALUES
+  ('inventory.cost.read',       'View cost prices and stock value',   'inventory'),
+  ('inventory.financials.read', 'View payments, ledger, and reports', 'inventory');
+```
+
+**Critical invariants:**
+
+1. **GRN line stores `unit_cost = NULL`** when posted by Operator.
+   Cost is recorded LATER by Admin via the matching Vendor Bill.
+
+2. **GRN→Bill matching contract** (the load-bearing change):
+   - GRN post: writes stock_movement with NULL unit_cost; valuation_layer
+     with cost_pending=TRUE
+   - Bill post: matches bill lines to oldest cost-pending GRN layer for
+     the same (party, item) — backfills unit_cost, sets
+     cost_pending=FALSE, updates balances.value
+   - Soft warning if bill has no matching GRN (admin may have skipped
+     receiving step)
+
+3. **Operator bundle**: only inventory + documents + counts + sale-side
+   challan permissions. NO money-touching permissions.
+
+4. **Print mode separates UI from print**: Operator's UI hides amounts
+   on Challan; the customer's print-out includes amounts when print_mode
+   = 'with_amount'. Same data, different render.
+
+5. **Single permission gate per concern**: cost.read for cost surfaces;
+   financials.read for money/reports surfaces. No field-level RBAC
+   complexity.
+
+6. **Server still returns full data**: the FE handles the visual mask.
+   Backend can later add server-side field redaction as defense-in-depth
+   if needed.
+
+**Operator-facing UX (per Nova Bond's design):**
+- GRN line form: item + qty + uom + lot. NO cost. Caption: "Cost prices
+  are recorded on the matching Vendor Bill posted by the office team."
+- Stock balances: qty columns only. Value column gone.
+- Movements: qty + lot + date. Cost columns gone.
+- Sidebar: no Bills, no Money, no Reports, no Period-close, no
+  Audit-log, no Valuation. Just Inventory, Documents, Stock Counts,
+  Parties, Imports.
+
+**Admin-facing UX (Mr. Arpit):**
+- Full visibility, plus a new "GRNs pending bill" KPI on dashboard
+  showing how many recent receipts haven't been billed yet — flags
+  cost-pending P&L distortions.
+
+**FE flip plan when backend lands:**
+1. Run migration (§7 of spec)
+2. Seed 2 new permission rows
+3. Update existing tenants' Operator role per §3 of spec
+4. Set `NEXT_PUBLIC_DEMO_MODE=false` — FE works unchanged
+
+**Suggested backend ship order** (least to most disruptive):
+1. Permission seeds + Operator role trim (config-only)
+2. Schema migration (cost_pending col + balances.value nullable)
+3. GRN line accepts unit_cost=NULL
+4. Bill-post backfill logic (most load-bearing — needs full test coverage)
+5. Pending-bills count endpoint
+6. Print-mode columns + template variants
+
+(End of file — append future requests below this marker.)
+
+## REQ-17: Phase 13 — Item Dimensions + Versioned Pricing Rules
+
+**Status:** Frontend prototype complete (2026-05-02). New admin
+config page + dimension fields on line forms + auto-lookup.
+
+**Problem solved:** Nova Bond's ACP price varies by thickness × size,
+and Mr. Arpit needs to update prices over time without retroactively
+mutating old invoices. Lines snapshot price at creation; rule changes
+only affect new lines.
+
+**FE artefacts:**
+- `src/types/index.ts` — `ItemDimension`, `ItemPricingRule`,
+  `ItemPricingLookupResponse`. Line types extended with
+  `thickness_mm` + `size_code`.
+- `src/lib/demo/fixtures.ts` — 12 dimension rows (4 thicknesses × 3
+  sizes), 18 sample pricing rules including 1 historical.
+- `src/services/pricing.service.ts` — list/lookup/create methods.
+- `src/lib/demo/adapter.ts` — GET /item-dimensions; GET/POST /pricing-rules;
+  GET /pricing-rules/lookup with version-close-on-create semantics
+  (~110 LOC).
+- `src/lib/api-constants.ts` — `ITEM_DIMENSIONS`, `PRICING_RULES`.
+- `src/app/(dashboard)/master-data/item-pricing/page.tsx` — admin
+  config page with grouped rows by (item × dim), expandable price
+  history, Update-price modal that auto-closes prior rule.
+- `src/app/(dashboard)/documents/detail/[id]/page.tsx` — line modal
+  gets Thickness + Size dropdowns; auto-lookup populates unit_price.
+- `src/services/documents.service.ts` — createLine signature accepts
+  thickness_mm/size_code.
+- `src/components/layout/sidebar.tsx` — "Item Pricing" entry under
+  Master Data (admin-gated).
+
+**Backend endpoints requested (full spec at
+`Resources/PHASE13_BACKEND_SPEC.md`):**
+```
+GET  /item-dimensions                      — list active dimension combos
+GET  /pricing-rules?item_id=&active_only=  — list rules
+GET  /pricing-rules/lookup                 — auto-fill helper for line forms
+POST /pricing-rules                        — create new (auto-closes prior)
+```
+
+**Critical invariants:**
+
+1. **Single active rule** per (tenant, item, thickness, size) at any
+   moment. Enforced by:
+   ```
+   CREATE UNIQUE INDEX idx_pricing_rules_one_active
+     ON item_pricing_rules (tenant_id, item_id, thickness_mm, size_code)
+     WHERE valid_until IS NULL;
+   ```
+
+2. **POST is transactional** — new rule's insert + prior rule's
+   `valid_until = (new.valid_from − 1 day)` happen in one transaction.
+
+3. **Lines snapshot the price** — historical lines never change when
+   a new pricing rule is created. The line's `unit_price` is the
+   record of truth for that document.
+
+4. **Auto-lookup contract** — on line POST, if `thickness_mm` and
+   `size_code` are supplied AND `unit_price` is missing/0, server
+   runs the lookup and uses the rule's price.
+
+5. **Per-tenant dimensions** — `item_dimensions` is tenant-scoped.
+   Nova Bond has 12 (4 × 3); other tenants seed their own.
+
+**Schema changes:**
+
+```sql
+CREATE TABLE item_dimensions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  thickness_mm INTEGER NOT NULL,
+  size_code TEXT NOT NULL,
+  label TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, thickness_mm, size_code)
+);
+
+CREATE TABLE item_pricing_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  item_id UUID NOT NULL REFERENCES items(id),
+  thickness_mm INTEGER NOT NULL,
+  size_code TEXT NOT NULL,
+  sale_price NUMERIC(14,2) NOT NULL CHECK (sale_price >= 0),
+  valid_from DATE NOT NULL,
+  valid_until DATE,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES users(id),
+  CHECK (valid_until IS NULL OR valid_until >= valid_from)
+);
+
+CREATE INDEX idx_pricing_rules_lookup
+  ON item_pricing_rules (tenant_id, item_id, thickness_mm, size_code, valid_from DESC);
+
+CREATE UNIQUE INDEX idx_pricing_rules_one_active
+  ON item_pricing_rules (tenant_id, item_id, thickness_mm, size_code)
+  WHERE valid_until IS NULL;
+
+-- Line table extensions (4 ALTERs)
+ALTER TABLE invoice_lines     ADD COLUMN thickness_mm INTEGER, ADD COLUMN size_code TEXT;
+ALTER TABLE challan_lines     ADD COLUMN thickness_mm INTEGER, ADD COLUMN size_code TEXT;
+ALTER TABLE document_lines    ADD COLUMN thickness_mm INTEGER, ADD COLUMN size_code TEXT;
+ALTER TABLE vendor_bill_lines ADD COLUMN thickness_mm INTEGER, ADD COLUMN size_code TEXT;
+```
+
+**Permissions:** reuses `inventory.master_data.read` for view (already
+exists) and `inventory.master_data.write` for create (add this code
+to permissions if not yet seeded).
+
+**Suggested backend ship order:**
+1. Schema migrations (low risk, schema-only)
+2. Seed `item_dimensions` for Nova Bond (12 rows)
+3. GET endpoints (`/item-dimensions`, `/pricing-rules`, `/pricing-rules/lookup`)
+4. POST `/pricing-rules` with version-close transaction
+5. Wire dimension fields into existing line POST endpoints
+6. Auto-lookup on line POST when unit_price is missing
+
+(End of file — append future requests below this marker.)
+
+## Future / deferred integrations (not in current build scope)
+
+Captured here so the scope is on record without committing to a
+delivery date. Each is a meaningful build with its own spec phase
+when prioritised.
+
+### NIC e-Invoice / IRN integration (deferred)
+
+What it would add:
+- Auto-call NIC e-Invoice portal (`einvoice1.gst.gov.in`) when an
+  invoice transitions draft → posted. Receive `irn` (Invoice
+  Reference Number) + `qr_code_data` payload + signed JSON.
+- Persist them on the existing Invoice fields (`irn`, `qr_code_data`
+  — already modelled in `src/types/index.ts`).
+- Render the QR on the printed invoice.
+- Mandatory only for tenants whose aggregate turnover >₹5 crore.
+
+Why deferred: requires real HTTP client to third-party API,
+per-tenant API-key + GSP credential management, retry queue for
+flaky portal, sandbox-vs-production environment handling. Not a
+day-1 client need.
+
+### NIC e-Way Bill integration (deferred)
+
+What it would add:
+- Auto-generate 12-digit e-Way Bill on Challan/Invoice post when
+  goods value >₹50,000 and inter-location transport is involved.
+- Capture vehicle number + driver/transport details on the
+  Challan form.
+- Store EWB number on the document; reprint on the challan.
+- Cancel EWB on document cancel.
+
+Why deferred: same infrastructure ask as IRN (HTTP client,
+credentials, retries) plus an additional "transport details" UI
+flow on the challan. Defer until a tenant ships goods >₹50K
+regularly.
+
+### Direct GSTN portal upload (deferred)
+
+What it would add:
+- Replace the "download JSON, CA uploads to portal" workflow
+  (Phase 5) with direct upload from the app.
+
+Why deferred: requires a contracted GSP (GST Suvidha Provider)
+relationship with credentials. Phase 5's CSV/JSON download
+already unblocks filing — just one extra manual step for the CA.
+
 (End of file — append future requests below this marker.)

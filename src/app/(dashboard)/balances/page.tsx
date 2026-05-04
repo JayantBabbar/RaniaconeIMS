@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, Spinner, FilterChip } from "@/components/ui/shared";
 import { RequireRead } from "@/components/ui/forbidden-state";
+import { CostMask, useCanSeeCost } from "@/components/ui/cost-mask";
+import { cn } from "@/lib/utils";
 import {
   GlobalSearch,
   SortHeader,
@@ -23,6 +25,7 @@ import { Package } from "lucide-react";
 
 export default function StockBalancesPage() {
   const [onlyNonzero, setOnlyNonzero] = useState(true);
+  const canSeeCost = useCanSeeCost();
 
   const { data, isLoading } = useQuery({
     queryKey: ["balances", onlyNonzero],
@@ -133,11 +136,13 @@ export default function StockBalancesPage() {
           }
         />
 
-        {/* KPI row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl">
+        {/* KPI row — inventory value tile gated by cost.read (Nova Bond req) */}
+        <div className={cn("grid grid-cols-1 gap-3 max-w-3xl", canSeeCost ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2")}>
           <KpiCard label="Distinct items" value={totals.items.toLocaleString()} />
           <KpiCard label="Locations in use" value={totals.locations.toLocaleString()} />
-          <KpiCard label="Inventory value" value={totals.totalValue.toFixed(2)} />
+          {canSeeCost && (
+            <KpiCard label="Inventory value" value={totals.totalValue.toFixed(2)} />
+          )}
         </div>
 
         {/* Filters */}
@@ -223,10 +228,12 @@ export default function StockBalancesPage() {
                           <div className="text-foreground-muted">Available</div>
                           <div className="tabular-nums font-medium text-status-green-text">{b.qty_available}</div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-foreground-muted">Value</div>
-                          <div className="tabular-nums font-medium">{parseFloat(b.value).toFixed(2)}</div>
-                        </div>
+                        {canSeeCost && (
+                          <div className="text-right">
+                            <div className="text-foreground-muted">Value</div>
+                            <div className="tabular-nums font-medium">{parseFloat(b.value).toFixed(2)}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -264,11 +271,13 @@ export default function StockBalancesPage() {
                       <SortHeader col={columns[3]} sort={sort} toggleSort={toggleSort} align="right">Available</SortHeader>
                     </div>
                   </th>
-                  <th className="text-right px-4 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      <SortHeader col={columns[5]} sort={sort} toggleSort={toggleSort} align="right">Value</SortHeader>
-                    </div>
-                  </th>
+                  {canSeeCost && (
+                    <th className="text-right px-4 py-2.5">
+                      <div className="flex items-center gap-1 justify-end">
+                        <SortHeader col={columns[5]} sort={sort} toggleSort={toggleSort} align="right">Value</SortHeader>
+                      </div>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -288,7 +297,9 @@ export default function StockBalancesPage() {
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{b.qty_on_hand}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-status-amber-text">{b.qty_reserved}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium text-status-green-text">{b.qty_available}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{parseFloat(b.value).toFixed(2)}</td>
+                      {canSeeCost && (
+                        <td className="px-4 py-2.5 text-right tabular-nums">{parseFloat(b.value).toFixed(2)}</td>
+                      )}
                     </tr>
                   );
                 })}

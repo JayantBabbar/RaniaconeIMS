@@ -17,9 +17,11 @@ import { Input, FormField } from "@/components/ui/form-elements";
 import { useCan } from "@/components/ui/can";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
+import { CostMask } from "@/components/ui/cost-mask";
 import { cn } from "@/lib/utils";
 import { documentService } from "@/services/documents.service";
 import { documentTypeService } from "@/services/master-data.service";
+import { pricingService } from "@/services/pricing.service";
 import { partyService } from "@/services/parties.service";
 import { locationService } from "@/services/locations.service";
 import { itemService } from "@/services/items.service";
@@ -28,7 +30,7 @@ import { isApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
 import type { DocumentLine } from "@/types";
 import {
-  ArrowLeft, CheckCircle, XCircle, Plus, Trash2, FileText, Printer,
+  ArrowLeft, CheckCircle, XCircle, Plus, Trash2, FileText, Printer, ArrowRight as ArrowRightIcon,
 } from "lucide-react";
 
 export default function DocumentDetailPage() {
@@ -108,6 +110,17 @@ export default function DocumentDetailPage() {
     onError: (e) => toast.error(isApiError(e) ? e.message : "Cancel failed"),
   });
 
+  const promoteMut = useMutation({
+    mutationFn: () => documentService.promoteToInvoice(id),
+    onSuccess: (res) => {
+      toast.success(`Invoice ${res.invoice_number} created`, "Lines + GST math copied; review and post in /invoices");
+      qc.invalidateQueries({ queryKey: ["document", id] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      router.push(`/invoices/${res.invoice_id}`);
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Promotion failed"),
+  });
+
   const deleteLineMut = useMutation({
     mutationFn: (lineId: string) => documentService.deleteLine(id, lineId),
     onSuccess: () => {
@@ -131,6 +144,15 @@ export default function DocumentDetailPage() {
 
   const lineTotal = lines.reduce((sum, l) => sum + parseFloat(l.line_total || "0"), 0);
 
+  // Phase 12 (Nova Bond): PO/GRN/Transfer documents have no money on
+  // them by design — cost is recorded separately on the matching
+  // vendor bill. Hide the Unit price + Total columns for these doc
+  // types regardless of permission. SO/Challan keep them (sale side).
+  const docCode = docType?.code;
+  const documentHasNoPrice =
+    docCode === "PO" || docCode === "GRN" ||
+    docCode === "TRANSFER" || docCode === "XFER";
+
   return (
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar
@@ -153,11 +175,24 @@ export default function DocumentDetailPage() {
                 )}
               </>
             ) : (
-              canCancel && (
-                <Button icon={<XCircle size={13} />} onClick={() => setCancelConfirm(true)}>
-                  Cancel (creates reversals)
-                </Button>
-              )
+              <>
+                {/* Phase 10: Promote to invoice (sales orders only) */}
+                {docType?.code === "SO" && !(doc as { is_promoted?: boolean }).is_promoted && can("inventory.invoices.write") && (
+                  <Button
+                    kind="primary"
+                    icon={<ArrowRightIcon size={13} />}
+                    onClick={() => promoteMut.mutate()}
+                    disabled={promoteMut.isPending}
+                  >
+                    Promote to invoice
+                  </Button>
+                )}
+                {canCancel && (
+                  <Button icon={<XCircle size={13} />} onClick={() => setCancelConfirm(true)}>
+                    Cancel (creates reversals)
+                  </Button>
+                )}
+              </>
             )}
           </>
         }
@@ -189,10 +224,12 @@ export default function DocumentDetailPage() {
                 {docType?.name} · {formatDate(doc.document_date)}
               </div>
             </div>
-            <div className="text-right text-sm flex-shrink-0">
-              <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">Line total</div>
-              <div className="text-xl font-semibold tabular-nums">{lineTotal.toFixed(2)}</div>
-            </div>
+            {!documentHasNoPrice && (
+              <div className="text-right text-sm flex-shrink-0">
+                <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">Line total</div>
+                <div className="text-xl font-semibold tabular-nums">{lineTotal.toFixed(2)}</div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 pt-4 border-t border-hairline-light text-sm">
@@ -240,8 +277,8 @@ export default function DocumentDetailPage() {
                   <th className="text-left px-3 py-2.5">Item</th>
                   <th className="text-right px-3 py-2.5">Qty</th>
                   <th className="text-left px-3 py-2.5">UoM</th>
-                  <th className="text-right px-3 py-2.5">Unit price</th>
-                  <th className="text-right px-3 py-2.5">Total</th>
+                  {!documentHasNoPrice && <th className="text-right px-3 py-2.5">Unit price</th>}
+                  {!documentHasNoPrice && <th className="text-right px-3 py-2.5">Total</th>}
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -258,8 +295,16 @@ export default function DocumentDetailPage() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{l.quantity}</td>
                       <td className="px-3 py-2 text-xs">{uom?.code || "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{parseFloat(l.unit_price).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">{parseFloat(l.line_total).toFixed(2)}</td>
+                      {!documentHasNoPrice && (
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <CostMask value={parseFloat(l.unit_price).toFixed(2)} />
+                        </td>
+                      )}
+                      {!documentHasNoPrice && (
+                        <td className="px-3 py-2 text-right tabular-nums font-medium">
+                          <CostMask value={parseFloat(l.line_total).toFixed(2)} />
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-center">
                         {!posted && canWrite && (
                           <button onClick={() => setDeleteLineTarget(l)}
@@ -280,6 +325,7 @@ export default function DocumentDetailPage() {
       {showAddLine && (
         <AddLineModal
           documentId={id}
+          docTypeCode={docType?.code ?? null}
           items={items}
           uoms={uoms}
           onClose={() => setShowAddLine(false)}
@@ -352,19 +398,38 @@ const lineSchema = z.object({
       },
       "Must be between 0 and 100",
     ),
+  /** Supplier's batch number or internal lot ID. Required at submit
+   *  time when the picked item is batch-tracked (validated in onSubmit). */
+  lot_number: z.string().max(80, "Max 80 characters").optional().or(z.literal("")),
+  /** Phase 13 — panel thickness in mm. */
+  thickness_mm: z.string().optional().or(z.literal("")),
+  /** Phase 13 — panel size code (e.g. "1220x2440"). */
+  size_code: z.string().optional().or(z.literal("")),
 });
 
 type LineFormValues = z.infer<typeof lineSchema>;
 
 function AddLineModal({
-  documentId, items, uoms, onClose, nextLineNumber,
+  documentId, docTypeCode, items, uoms, onClose, nextLineNumber,
 }: {
   documentId: string;
-  items: { id: string; item_code: string; name: string }[];
+  /** Document type code (PO / GRN / SO / TRANSFER etc). Drives whether
+   *  cost-related fields appear on the form. Per clientneeds.txt §7,
+   *  PO and GRN show NO cost — just product + qty. Transfers also
+   *  have no monetary fields. SO/Challan keep unit_price (sale side). */
+  docTypeCode: string | null;
+  items: { id: string; item_code: string; name: string; is_batch_tracked?: boolean }[];
   uoms: { id: string; code: string; name: string }[];
   onClose: () => void;
   nextLineNumber: number;
 }) {
+  // Cost-bearing surfaces are PO + GRN (purchase side) and TRANSFER
+  // (no money concept). Hide unit_price + discount_pct + line_total
+  // for these. SO + Challan keep unit_price (sale side, fine for
+  // operator and salesman to see — see Mr. Arpit's brief).
+  const hidePriceFields =
+    docTypeCode === "PO" || docTypeCode === "GRN" ||
+    docTypeCode === "TRANSFER" || docTypeCode === "XFER";
   const toast = useToast();
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
@@ -373,6 +438,9 @@ function AddLineModal({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
+    setError,
     formState: { errors },
   } = useForm<LineFormValues>({
     resolver: zodResolver(lineSchema),
@@ -382,19 +450,57 @@ function AddLineModal({
       quantity: "",
       unit_price: "0",
       discount_pct: "0",
+      lot_number: "",
+      thickness_mm: "",
+      size_code: "",
     },
   });
 
+  // Watch the picked item so the lot field can flag itself as required
+  // when the item has is_batch_tracked=true.
+  const watchedItemId = watch("item_id");
+  const watchedThickness = watch("thickness_mm");
+  const watchedSize = watch("size_code");
+  const selectedItem = items.find((i) => i.id === watchedItemId);
+  const lotRequired = !!selectedItem?.is_batch_tracked;
+
+  // Phase 13 — auto-lookup the active pricing rule whenever item +
+  // thickness + size are all chosen. Backfills unit_price unless the
+  // user has typed something manual already (we don't override their
+  // input). Skipped for PO/GRN/Transfer where the cost field is hidden.
+  const { data: priceLookup } = useQuery({
+    queryKey: ["pricing-lookup", watchedItemId, watchedThickness, watchedSize],
+    enabled: !hidePriceFields && !!watchedItemId && !!watchedThickness && !!watchedSize,
+    queryFn: () => pricingService.lookup({
+      item_id: watchedItemId,
+      thickness_mm: Number(watchedThickness ?? "0"),
+      size_code: watchedSize ?? "",
+    }),
+  });
+  React.useEffect(() => {
+    if (!priceLookup?.rule) return;
+    setValue("unit_price", priceLookup.rule.sale_price);
+  }, [priceLookup, setValue]);
+
   const onSubmit = async (data: LineFormValues) => {
     setServerError(null);
+    if (lotRequired && !data.lot_number?.trim()) {
+      setError("lot_number", { message: "Lot/batch number is required for batch-tracked items" });
+      return;
+    }
     setSubmitting(true);
     try {
       await documentService.createLine(documentId, {
         item_id: data.item_id,
         uom_id: data.uom_id,
         quantity: data.quantity,
-        unit_price: data.unit_price,
-        discount_pct: data.discount_pct,
+        // PO/GRN/Transfer: no price input on form — submit as zero so
+        // line saves cleanly. Cost lands on the matching vendor bill.
+        unit_price: hidePriceFields ? "0" : data.unit_price,
+        discount_pct: hidePriceFields ? "0" : data.discount_pct,
+        lot_number: data.lot_number?.trim() || undefined,
+        thickness_mm: data.thickness_mm ? Number(data.thickness_mm) : undefined,
+        size_code: data.size_code || undefined,
         line_number: nextLineNumber,
       });
       toast.success("Line added");
@@ -445,7 +551,51 @@ function AddLineModal({
             {items.map((i) => <option key={i.id} value={i.id}>{i.item_code} — {i.name}</option>)}
           </select>
         </FormField>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+        {/* Phase 13 — Thickness + Size dropdowns. Hardcoded enums for
+            Nova Bond's ACP catalog (the same 12 combos as ITEM_DIMENSIONS
+            fixture). When both selected on a sale-side doc, unit_price
+            auto-fills from the active pricing rule via useQuery above. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField label="Thickness" help="Panel thickness in mm. Drives the price.">
+            <select
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded border-hairline focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary"
+              disabled={submitting}
+              {...register("thickness_mm")}
+            >
+              <option value="">— Select —</option>
+              <option value="2">2 mm</option>
+              <option value="3">3 mm</option>
+              <option value="4">4 mm</option>
+              <option value="5">5 mm</option>
+            </select>
+          </FormField>
+          <FormField label="Size" help="Panel size (width × length, mm).">
+            <select
+              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded border-hairline focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary"
+              disabled={submitting}
+              {...register("size_code")}
+            >
+              <option value="">— Select —</option>
+              <option value="1220x2440">1220 × 2440 mm (4×8 ft)</option>
+              <option value="1220x3050">1220 × 3050 mm (4×10 ft)</option>
+              <option value="1220x3660">1220 × 3660 mm (4×12 ft)</option>
+            </select>
+          </FormField>
+        </div>
+        {!hidePriceFields && watchedItemId && watchedThickness && watchedSize && (
+          <p className={cn(
+            "text-[11px] -mt-1",
+            priceLookup?.rule
+              ? "text-emerald-700 dark:text-emerald-400"
+              : "text-amber-700 dark:text-amber-400",
+          )}>
+            {priceLookup?.rule
+              ? `✓ Price auto-filled: ${priceLookup.rule.sale_price} per sheet — ${priceLookup.effective_label ?? ""}`
+              : "⚠ No active pricing rule for this combination. Enter unit price manually or set one in /master-data/item-pricing."}
+          </p>
+        )}
+        <div className={cn("grid grid-cols-1 gap-3", hidePriceFields ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
           <Input
             label="Quantity"
             type="number"
@@ -470,30 +620,62 @@ function AddLineModal({
               {uoms.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
             </select>
           </FormField>
+          {!hidePriceFields && (
+            <Input
+              label="Unit price"
+              type="number"
+              step="0.01"
+              min={0}
+              placeholder="0.00"
+              help="Sale price per unit. For challans/SOs this is the price quoted to the customer."
+              error={errors.unit_price?.message}
+              disabled={submitting}
+              {...register("unit_price")}
+            />
+          )}
+        </div>
+        {!hidePriceFields && (
           <Input
-            label="Unit price"
+            label="Discount %"
             type="number"
             step="0.01"
             min={0}
-            placeholder="0.00"
-            help="Price per unit. For purchase documents this is the cost; for sales it's the sell price."
-            error={errors.unit_price?.message}
+            max={100}
+            placeholder="0"
+            help="Optional line-level discount as a percentage between 0 and 100."
+            error={errors.discount_pct?.message}
             disabled={submitting}
-            {...register("unit_price")}
+            {...register("discount_pct")}
           />
-        </div>
+        )}
+        {hidePriceFields && (
+          <p className="text-[11px] text-text-tertiary leading-relaxed">
+            <span className="font-medium">No price entered on this document.</span>{" "}
+            {docTypeCode === "GRN" || docTypeCode === "PO"
+              ? "Cost prices are recorded on the matching Vendor Bill posted by the office team."
+              : "Transfers move stock between locations — no price applies."}
+          </p>
+        )}
+
+        {/* Lot / batch number — always shown but tagged required when
+            the picked item has is_batch_tracked=true. */}
         <Input
-          label="Discount %"
-          type="number"
-          step="0.01"
-          min={0}
-          max={100}
-          placeholder="0"
-          help="Optional line-level discount as a percentage between 0 and 100."
-          error={errors.discount_pct?.message}
-          disabled={submitting}
-          {...register("discount_pct")}
+          label={lotRequired ? "Lot / batch number" : "Lot / batch number (optional)"}
+          required={lotRequired}
+          placeholder={lotRequired ? "e.g. NB1101-2026-05-02" : "Leave blank for non-batch items"}
+          help={
+            lotRequired
+              ? "This item is batch-tracked. Enter the supplier's batch number, or assign your own internal lot ID — used for traceability under the 10-year warranty."
+              : selectedItem
+                ? "This item is not batch-tracked, so a lot number isn't required. You can still record one for your own reference."
+                : "Pick an item above first."
+          }
+          error={errors.lot_number?.message}
+          maxLength={80}
+          disabled={submitting || !selectedItem}
+          {...register("lot_number")}
         />
+
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" onClick={onClose}>Cancel</Button>
           <Button type="submit" kind="primary" loading={submitting}>Add line</Button>

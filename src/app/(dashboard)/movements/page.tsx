@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, Spinner } from "@/components/ui/shared";
 import { Can } from "@/components/ui/can";
 import { RequireRead } from "@/components/ui/forbidden-state";
+import { useCanSeeCost } from "@/components/ui/cost-mask";
 import {
   GlobalSearch,
   SortHeader,
@@ -25,6 +26,7 @@ import { ArrowLeftRight, ArrowDownToLine, ArrowUpFromLine, Truck } from "lucide-
 import { formatDate } from "@/lib/utils";
 
 export default function MovementsPage() {
+  const canSeeCost = useCanSeeCost();
   const { data, isLoading } = useQuery({
     queryKey: ["movements"],
     queryFn: () =>
@@ -231,8 +233,8 @@ export default function MovementsPage() {
                     </div>
                   </th>
                   <th className="text-right px-4 py-2.5">Qty</th>
-                  <th className="text-right px-4 py-2.5">Unit cost</th>
-                  <th className="text-right px-4 py-2.5">Total</th>
+                  {canSeeCost && <th className="text-right px-4 py-2.5">Unit cost</th>}
+                  {canSeeCost && <th className="text-right px-4 py-2.5">Total</th>}
                   <th className="text-left px-4 py-2.5">
                     <div className="flex items-center gap-1">
                       <SortHeader col={columns[4]} sort={sort} toggleSort={toggleSort}>
@@ -269,8 +271,12 @@ export default function MovementsPage() {
                         <div className="font-mono text-xs">{loc?.code || "—"}</div>
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{m.quantity}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{parseFloat(m.unit_cost).toFixed(2)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{parseFloat(m.total_cost).toFixed(2)}</td>
+                      {canSeeCost && (
+                        <td className="px-4 py-2.5 text-right tabular-nums">{parseFloat(m.unit_cost).toFixed(2)}</td>
+                      )}
+                      {canSeeCost && (
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{parseFloat(m.total_cost).toFixed(2)}</td>
+                      )}
                       <td className="px-4 py-2.5">
                         {m.source && <Badge tone="neutral">{m.source}</Badge>}
                       </td>
