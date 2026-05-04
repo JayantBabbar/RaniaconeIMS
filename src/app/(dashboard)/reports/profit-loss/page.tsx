@@ -73,7 +73,7 @@ export default function ProfitLossPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-4xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Profit & loss"
           description="Revenue minus the cost of running the business in a date range. Net at the bottom is what you actually took home."
@@ -84,7 +84,7 @@ export default function ProfitLossPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
           <Input type="date" label="From" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <Input type="date" label="To"   value={endDate}   onChange={(e) => setEndDate(e.target.value)} />
         </div>
@@ -92,7 +92,7 @@ export default function ProfitLossPage() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : !data ? null : (
-          <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
+          <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto max-w-3xl">
             <table className="w-full text-[13px]">
               <tbody>
                 {/* Revenue */}
@@ -153,12 +153,14 @@ export default function ProfitLossPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary flex items-center gap-1.5">
-          <PiggyBank size={12} /> Revenue is taxable value (GST excluded — it's a pass-through). Salary uses gross, not net, since the employer's float settles internally.
-        </p>
-        <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-          <TriangleAlert size={12} /> COGS is a placeholder in demo mode (~60% of revenue). Production will compute it from posted stock-out valuation layers.
-        </p>
+        <div className="max-w-3xl space-y-1">
+          <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
+            <PiggyBank size={12} /> Revenue is taxable value (GST excluded — it's a pass-through). Salary uses gross, not net, since the employer's float settles internally.
+          </p>
+          <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+            <TriangleAlert size={12} /> COGS is a placeholder in demo mode (~60% of revenue). Production will compute it from posted stock-out valuation layers.
+          </p>
+        </div>
       </div>
     </RequireRead>
   );

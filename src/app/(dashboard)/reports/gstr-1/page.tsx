@@ -50,7 +50,7 @@ export default function Gstr1Page() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-5xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="GSTR-1 export"
           description="Monthly outward-supply return. Pick a month, preview the row counts, then download the JSON to upload on the GST portal."
@@ -61,7 +61,7 @@ export default function Gstr1Page() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input
             type="month"
             label="Filing period"
@@ -90,8 +90,8 @@ export default function Gstr1Page() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : !data ? null : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <SectionCard
                 code="§4 B2B"
                 label="Registered customers"
@@ -140,22 +140,24 @@ export default function Gstr1Page() {
             </div>
 
             {data.summary.b2b_count + data.summary.b2cl_count + data.summary.b2cs_count === 0 && (
-              <p className="mt-3 text-[12px] text-text-tertiary text-center py-6">
+              <p className="text-[12px] text-text-tertiary text-center py-6">
                 No posted invoices in this period. Pick a different month or post some invoices first.
               </p>
             )}
-          </>
+          </div>
         )}
 
-        <p className="mt-3 text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
-          <TriangleAlert size={12} className="flex-shrink-0 mt-0.5" />
-          <span>
-            Always have your accountant review the JSON before uploading to the GST portal. Once filed, GSTR-1 amendments require a separate amendment return.
-          </span>
-        </p>
-        <p className="mt-1 text-[11px] text-text-tertiary flex items-center gap-1.5">
-          <Download size={12} /> The downloaded file matches the GSTN portal JSON schema (`b2b`, `b2cl`, `b2cs` arrays under `gstin` + `fp`).
-        </p>
+        <div className="space-y-1">
+          <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+            <TriangleAlert size={12} className="flex-shrink-0 mt-0.5" />
+            <span>
+              Always have your accountant review the JSON before uploading to the GST portal. Once filed, GSTR-1 amendments require a separate amendment return.
+            </span>
+          </p>
+          <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
+            <Download size={12} /> The downloaded file matches the GSTN portal JSON schema (`b2b`, `b2cl`, `b2cs` arrays under `gstin` + `fp`).
+          </p>
+        </div>
       </div>
     </RequireRead>
   );

@@ -84,7 +84,7 @@ export default function SalesRegisterPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Sales register"
           description="Every invoice you raised in the date range, with the GST split. This is the foundation for GSTR-1; export to CSV for your CA."
@@ -95,7 +95,7 @@ export default function SalesRegisterPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 md:grid-cols-4 gap-3">
           <Input type="date" label="From" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <Input type="date" label="To"   value={endDate}   onChange={(e) => setEndDate(e.target.value)} />
           <div>
@@ -180,7 +180,7 @@ export default function SalesRegisterPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary flex items-center gap-1.5">
+        <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
           <TrendingUp size={12} /> Cancelled invoices appear with a red badge but contribute zero to totals only if your tenant policy excludes them — check with your accountant.
         </p>
       </div>

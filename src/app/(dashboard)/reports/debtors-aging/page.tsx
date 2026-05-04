@@ -55,7 +55,7 @@ export default function DebtorsAgingPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Debtors aging"
           description="Money your customers owe you, grouped by how overdue. Click any party to see the underlying invoices."
@@ -66,7 +66,7 @@ export default function DebtorsAgingPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 flex flex-wrap gap-3 items-end">
           <Input
             type="date"
             label="As of"
@@ -133,7 +133,7 @@ export default function DebtorsAgingPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary flex items-center gap-1.5">
+        <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
           <AlarmClock size={12} /> Anything in the 90+ column is a candidate for a follow-up call or a write-off conversation with your accountant.
         </p>
       </div>

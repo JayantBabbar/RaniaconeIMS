@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RequireRead } from "@/components/ui/forbidden-state";
 import {
   TrendingUp, TrendingDown, AlarmClock, Hourglass,
-  PiggyBank, Boxes, ArrowRight,
+  PiggyBank, Boxes, ArrowRight, FileJson, Lock,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -34,6 +34,26 @@ const TONES: Record<ReportCardProps["tone"], string> = {
   neutral: "from-slate-50 to-slate-100/40 text-slate-800 dark:from-slate-900 dark:to-slate-900/30 dark:text-slate-300",
 };
 
+function Section({
+  title, hint, children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-text-secondary">{title}</h2>
+        {hint && <p className="text-[11px] text-text-tertiary">{hint}</p>}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function ReportCard({ title, blurb, href, icon: Icon, tone }: ReportCardProps) {
   return (
     <Link
@@ -54,14 +74,13 @@ export default function ReportsLandingPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+      <div className="p-4 md:p-5 space-y-6">
         <PageHeader
           title="Reports"
-          description="Statements over your invoices, bills, payments, expenses and salary. Pick the question you're trying to answer; each report is a date-bounded view you can filter and (eventually) export."
+          description="Statements over your invoices, bills, payments, expenses and salary. Pick the question you're trying to answer; each report is a date-bounded view you can filter and export."
         />
 
-        <h2 className="text-sm font-semibold text-text-secondary mt-2 mb-3">Tax registers</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Section title="Tax registers" hint="Pick a date range, see every line. Foundation for GST returns.">
           <ReportCard
             title="Sales register"
             blurb="Every invoice you raised in a date range, with taxable + GST split. Foundation for GSTR-1."
@@ -76,10 +95,9 @@ export default function ReportsLandingPage() {
             icon={TrendingDown}
             tone="blue"
           />
-        </div>
+        </Section>
 
-        <h2 className="text-sm font-semibold text-text-secondary mt-6 mb-3">Outstanding (aging)</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Section title="Outstanding (aging)" hint="Who owes whom, bucketed by how overdue.">
           <ReportCard
             title="Debtors aging"
             blurb="Who owes you, bucketed by how overdue. Use this on your weekly collections call."
@@ -94,10 +112,9 @@ export default function ReportsLandingPage() {
             icon={Hourglass}
             tone="purple"
           />
-        </div>
+        </Section>
 
-        <h2 className="text-sm font-semibold text-text-secondary mt-6 mb-3">Profit &amp; valuation</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Section title="Profit & cash" hint="Period-end statements and stock value.">
           <ReportCard
             title="Profit &amp; loss"
             blurb="Revenue minus COGS, expenses and salary. Pick a date range; net at the bottom is what you took home."
@@ -119,11 +136,31 @@ export default function ReportsLandingPage() {
             icon={Boxes}
             tone="neutral"
           />
-        </div>
+        </Section>
 
-        <p className="mt-8 text-[11px] text-text-tertiary">
-          Need GSTR JSON exports, cash-flow, or trial balance? On the Phase 5 roadmap.
-        </p>
+        <Section title="GST compliance" hint="Monthly returns + period close.">
+          <ReportCard
+            title="GSTR-1"
+            blurb="Monthly outward-supply return. Preview B2B / B2CL / B2CS sections; download GSTN JSON for portal upload."
+            href="/reports/gstr-1"
+            icon={FileJson}
+            tone="green"
+          />
+          <ReportCard
+            title="GSTR-3B"
+            blurb="Monthly summary of outward supplies and eligible Input Tax Credit. JSON ready for the GST portal."
+            href="/reports/gstr-3b"
+            icon={FileJson}
+            tone="blue"
+          />
+          <ReportCard
+            title="Period close"
+            blurb="Lock the books for a filed month so no one (not even Admin) can edit posted documents from that period."
+            href="/settings/period-close"
+            icon={Lock}
+            tone="neutral"
+          />
+        </Section>
       </div>
     </RequireRead>
   );

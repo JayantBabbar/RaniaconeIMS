@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useBranding } from "@/providers/branding-provider";
 import { useSidebar } from "@/components/layout/sidebar-context";
-import { X } from "lucide-react";
+import { X, ChevronDown } from "lucide-react";
 import {
   LayoutDashboard,
   Box,
@@ -247,6 +247,8 @@ const NAVIGATION: NavSection[] = [
   },
 ];
 
+const STORAGE_KEY = "sidebar.collapsedSections";
+
 export function Sidebar() {
   const pathname = usePathname();
   const { hasPermission, isModuleSubscribed } = useAuth();
@@ -256,13 +258,48 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
+  // Hydrate collapsed-sections from localStorage on first mount only.
+  // Server render starts empty (all expanded) so SSR + first client paint match.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setCollapsedSections(new Set(arr.filter((x) => typeof x === "string")));
+      }
+    } catch {
+      // localStorage unavailable or malformed payload — ignore.
+    }
+  }, []);
+
+  const persist = (next: Set<string>) => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(next)));
+    } catch {
+      // best-effort; quota / privacy mode failures are non-fatal.
+    }
+  };
+
   const toggleSection = (label: string) => {
     setCollapsedSections((s) => {
       const n = new Set(s);
       if (n.has(label)) n.delete(label); else n.add(label);
+      persist(n);
       return n;
     });
   };
+
+  // Section that owns the current route — always expanded so the user can
+  // never end up looking at a page whose nav entry is hidden behind a
+  // collapsed accordion.
+  const activeSectionLabel = useMemo(() => {
+    for (const section of NAVIGATION) {
+      if (section.items.some((it) => pathname === it.href || pathname.startsWith(it.href + "/"))) {
+        return section.label;
+      }
+    }
+    return null;
+  }, [pathname]);
 
   return (
     <aside
@@ -305,50 +342,85 @@ export function Sidebar() {
           );
           if (visibleItems.length === 0) return null;
 
-          const sectionCollapsed = section.label && collapsedSections.has(section.label);
+          // Active section is always expanded — the user is never trapped on a
+          // page whose nav entry has been hidden by a collapsed accordion.
+          const isActiveSection = section.label === activeSectionLabel;
+          const userCollapsed = !!section.label && collapsedSections.has(section.label);
+          const sectionCollapsed = userCollapsed && !isActiveSection;
+          // Sections without a label (e.g. Dashboard) are always shown — no header, no chevron.
+          const hasHeader = !!section.label && !collapsed;
+          const sectionId = `nav-section-${sIdx}`;
 
           return (
-            <div key={sIdx} className={sIdx > 0 ? "mt-3" : ""}>
-              {section.label && !collapsed && (
+            <div key={sIdx} className={sIdx > 0 ? "mt-2" : ""}>
+              {hasHeader && (
                 <button
+                  type="button"
                   onClick={() => toggleSection(section.label)}
-                  className="sidebar-section text-sidebar-text-muted w-full text-left hover:text-sidebar-text transition-colors cursor-pointer flex items-center gap-1"
+                  aria-expanded={!sectionCollapsed}
+                  aria-controls={sectionId}
+                  className={cn(
+                    "group w-full flex items-center justify-between gap-1",
+                    "text-[10px] font-semibold uppercase tracking-wider",
+                    "px-2.5 py-1.5 rounded-md",
+                    "text-sidebar-text-muted hover:text-sidebar-text hover:bg-sidebar-bg-hover/60",
+                    "transition-colors cursor-pointer",
+                  )}
                 >
-                  {section.label}
+                  <span>{section.label}</span>
+                  <ChevronDown
+                    size={12}
+                    strokeWidth={2}
+                    className={cn(
+                      "transition-transform duration-200 opacity-60 group-hover:opacity-100",
+                      sectionCollapsed ? "-rotate-90" : "rotate-0",
+                    )}
+                  />
                 </button>
               )}
               {section.label && collapsed && <div className="h-px bg-sidebar-border mx-1 my-2" />}
-              {!sectionCollapsed && visibleItems.map((item) => {
-                const isActive =
-                  pathname === item.href || pathname.startsWith(item.href + "/");
-                const Icon = item.icon;
 
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium",
-                      "transition-colors duration-100",
-                      isActive
-                        ? "bg-sidebar-bg-hover text-sidebar-text"
-                        : "text-sidebar-text-muted hover:bg-sidebar-bg-hover hover:text-sidebar-text",
-                      collapsed && "justify-center px-0"
-                    )}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <Icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge && (
-                          <span className="text-[10px] text-sidebar-text-muted tabular-nums">{item.badge}</span>
-                        )}
-                      </>
-                    )}
-                  </Link>
-                );
-              })}
+              <div
+                id={sectionId}
+                className={cn(
+                  "overflow-hidden transition-[max-height,opacity] duration-200 ease-out",
+                  // Generous max-height handles even the longest section (Inventory has ~10 items × 32px).
+                  sectionCollapsed ? "max-h-0 opacity-0" : "max-h-[600px] opacity-100",
+                  hasHeader && !sectionCollapsed ? "mt-0.5" : "",
+                )}
+              >
+                {visibleItems.map((item) => {
+                  const isActive =
+                    pathname === item.href || pathname.startsWith(item.href + "/");
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-[7px] rounded-md text-[13px] font-medium",
+                        "transition-colors duration-100",
+                        isActive
+                          ? "bg-sidebar-bg-hover text-sidebar-text"
+                          : "text-sidebar-text-muted hover:bg-sidebar-bg-hover hover:text-sidebar-text",
+                        collapsed && "justify-center px-0"
+                      )}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <Icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.badge && (
+                            <span className="text-[10px] text-sidebar-text-muted tabular-nums">{item.badge}</span>
+                          )}
+                        </>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           );
         })}

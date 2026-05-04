@@ -51,7 +51,7 @@ export default function Gstr3BPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-5xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="GSTR-3B export"
           description="Monthly summary return — outward supplies + ITC. Pick a month, review the totals, then download the JSON for portal upload."
@@ -62,7 +62,7 @@ export default function Gstr3BPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input
             type="month"
             label="Filing period"
@@ -87,9 +87,10 @@ export default function Gstr3BPage() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : !data ? null : (
-          <>
+          <div className="space-y-5">
             {/* §3.1 Outward */}
-            <h2 className="text-[13px] font-semibold mt-4 mb-2 flex items-center gap-2">
+            <div>
+            <h2 className="text-[13px] font-semibold mb-2 flex items-center gap-2">
               <span className="text-text-tertiary font-mono">§3.1</span>
               Outward supplies
             </h2>
@@ -111,9 +112,11 @@ export default function Gstr3BPage() {
                 </tbody>
               </table>
             </div>
+            </div>
 
             {/* §4 ITC */}
-            <h2 className="text-[13px] font-semibold mt-6 mb-2 flex items-center gap-2">
+            <div>
+            <h2 className="text-[13px] font-semibold mb-2 flex items-center gap-2">
               <span className="text-text-tertiary font-mono">§4</span>
               Eligible Input Tax Credit
             </h2>
@@ -134,10 +137,11 @@ export default function Gstr3BPage() {
                 </tbody>
               </table>
             </div>
-          </>
+            </div>
+          </div>
         )}
 
-        <p className="mt-4 text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
           <TriangleAlert size={12} className="flex-shrink-0 mt-0.5" />
           <span>
             Always reconcile against GSTR-2B (auto-populated by GSTN) before claiming ITC. Mismatches between this report and 2B may signal a vendor that hasn't filed their GSTR-1.

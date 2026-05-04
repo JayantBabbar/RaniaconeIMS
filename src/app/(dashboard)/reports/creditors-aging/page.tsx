@@ -54,7 +54,7 @@ export default function CreditorsAgingPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Creditors aging"
           description="Money you owe vendors, grouped by how overdue. Use this list to prioritise the next payment run."
@@ -65,7 +65,7 @@ export default function CreditorsAgingPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 flex flex-wrap gap-3 items-end">
           <Input
             type="date"
             label="As of"
@@ -132,7 +132,7 @@ export default function CreditorsAgingPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary flex items-center gap-1.5">
+        <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
           <Hourglass size={12} /> Items in the 90+ bucket may be straining vendor relationships — settle these first if cash allows.
         </p>
       </div>

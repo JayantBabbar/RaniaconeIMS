@@ -82,7 +82,7 @@ export default function PurchaseRegisterPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Purchase register"
           description="Every vendor bill you posted in the date range, with the input GST split. Foundation for GSTR-2; export to CSV for your CA."
@@ -93,7 +93,7 @@ export default function PurchaseRegisterPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 md:grid-cols-4 gap-3">
           <Input type="date" label="From" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <Input type="date" label="To"   value={endDate}   onChange={(e) => setEndDate(e.target.value)} />
           <div>
@@ -178,7 +178,7 @@ export default function PurchaseRegisterPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary flex items-center gap-1.5">
+        <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
           <TrendingDown size={12} /> Only posted bills count toward your input-GST claim. Drafts and cancelled bills appear here for audit but should be excluded by your accountant.
         </p>
       </div>

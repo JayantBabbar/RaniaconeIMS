@@ -73,7 +73,7 @@ export default function CashFlowPage() {
   return (
     <RequireRead perm="inventory.reports.read">
       <TopBar />
-      <div className="px-4 lg:px-6 py-4 max-w-4xl mx-auto">
+      <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Cash flow statement"
           description="Where cash actually moved in the date range. Receipts in, payments out, grouped by activity. Closing = Opening + Net change."
@@ -84,7 +84,7 @@ export default function CashFlowPage() {
           }
         />
 
-        <div className="rounded-lg border border-border bg-bg-elevated p-3 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-bg-elevated p-3 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
           <Input type="date" label="From" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           <Input type="date" label="To"   value={endDate}   onChange={(e) => setEndDate(e.target.value)} />
         </div>
@@ -92,7 +92,7 @@ export default function CashFlowPage() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : !data ? null : (
-          <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
+          <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto max-w-3xl">
             <table className="w-full text-[13px]">
               <tbody>
                 {/* Opening */}
@@ -142,7 +142,7 @@ export default function CashFlowPage() {
           </div>
         )}
 
-        <p className="mt-3 text-[11px] text-text-tertiary">
+        <p className="text-[11px] text-text-tertiary max-w-3xl">
           Cash = Cash on hand + Bank + GPay account balances. Cheque-in-transit is excluded until cleared. Capital expenditure is taken from expense categories flagged is_capital=true.
         </p>
       </div>
