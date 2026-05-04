@@ -1428,6 +1428,60 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     return delay(ok(newRule, 201));
   }
 
+  // ── Pricing dimension options (thickness / size catalogues) ──
+  // Tenant-scoped lists kept in fixtures so the UI can add or remove
+  // entries. New combinations only become "real" once a pricing rule
+  // is created against them.
+  if (method === "GET" && path === "/pricing-dimension-options/thickness") {
+    return delay(ok([...F.PRICING_THICKNESS_OPTIONS].sort((a, b) => a - b)));
+  }
+  if (method === "POST" && path === "/pricing-dimension-options/thickness") {
+    const v = Number((body as { thickness_mm?: number | string })?.thickness_mm);
+    if (!v || v <= 0) throw fail(400, "BAD_REQUEST", "thickness_mm must be a positive number");
+    if (F.PRICING_THICKNESS_OPTIONS.includes(v)) {
+      throw fail(409, "CONFLICT", `${v} mm is already in the list`);
+    }
+    F.PRICING_THICKNESS_OPTIONS.push(v);
+    return delay(ok({ thickness_mm: v }, 201));
+  }
+  if (method === "DELETE" && /^\/pricing-dimension-options\/thickness\/\d+(\.\d+)?$/.test(path)) {
+    const v = Number(path.split("/").pop());
+    // Block delete if any pricing rule (active or historical) references this thickness.
+    const inUse = (F.ITEM_PRICING_RULES as Array<{ thickness_mm: number; tenant_id: string }>)
+      .some((r) => r.tenant_id === tid && r.thickness_mm === v);
+    if (inUse) throw fail(409, "IN_USE", `Cannot remove ${v} mm — pricing rules reference it.`);
+    const idx = F.PRICING_THICKNESS_OPTIONS.indexOf(v);
+    if (idx < 0) throw fail(404, "NOT_FOUND", `${v} mm is not in the list`);
+    F.PRICING_THICKNESS_OPTIONS.splice(idx, 1);
+    return delay(ok({}, 204));
+  }
+
+  if (method === "GET" && path === "/pricing-dimension-options/size") {
+    return delay(ok([...F.PRICING_SIZE_OPTIONS]));
+  }
+  if (method === "POST" && path === "/pricing-dimension-options/size") {
+    const reqBody = (body ?? {}) as { code?: string; label?: string };
+    const code = (reqBody.code ?? "").trim();
+    const label = (reqBody.label ?? "").trim();
+    if (!code) throw fail(400, "BAD_REQUEST", "code is required (e.g. 1220x2440)");
+    if (F.PRICING_SIZE_OPTIONS.some((s) => s.code === code)) {
+      throw fail(409, "CONFLICT", `${code} is already in the list`);
+    }
+    const row = { code, label: label || code };
+    F.PRICING_SIZE_OPTIONS.push(row);
+    return delay(ok(row, 201));
+  }
+  if (method === "DELETE" && /^\/pricing-dimension-options\/size\/[^/]+$/.test(path)) {
+    const code = decodeURIComponent(path.split("/").pop() ?? "");
+    const inUse = (F.ITEM_PRICING_RULES as Array<{ size_code: string; tenant_id: string }>)
+      .some((r) => r.tenant_id === tid && r.size_code === code);
+    if (inUse) throw fail(409, "IN_USE", `Cannot remove ${code} — pricing rules reference it.`);
+    const idx = F.PRICING_SIZE_OPTIONS.findIndex((s) => s.code === code);
+    if (idx < 0) throw fail(404, "NOT_FOUND", `${code} is not in the list`);
+    F.PRICING_SIZE_OPTIONS.splice(idx, 1);
+    return delay(ok({}, 204));
+  }
+
   // ── Phase 8 — Cash flow statement ──
   if (method === "GET" && path === "/reports/cash-flow") {
     const start = (query.start_date as string | undefined) ?? "1900-01-01";

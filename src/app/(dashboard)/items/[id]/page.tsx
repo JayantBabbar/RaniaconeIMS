@@ -66,7 +66,9 @@ const TABS = [
   { id: "variants", label: "Variants", icon: Layers },
   { id: "uoms", label: "UoMs", icon: Ruler },
   { id: "lots", label: "Lots", icon: Package },
-  { id: "serials", label: "Serials", icon: Hash },
+  // Hidden for Nova Bond — items are batch-tracked (lots), not serial-tracked.
+  // Re-add when items with per-unit IDs are introduced.
+  // { id: "serials", label: "Serials", icon: Hash },
   { id: "stock", label: "Stock", icon: BarChart3 },
   { id: "reorder", label: "Reorder", icon: AlertTriangle },
   { id: "custom-fields", label: "Custom Fields", icon: FileText },
@@ -186,7 +188,8 @@ export default function ItemDetailPage() {
         {activeTab === "variants" && <VariantsTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "uoms" && <UoMsTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "lots" && <LotsTab itemId={id} canWrite={canLotsWrite} />}
-        {activeTab === "serials" && <SerialsTab itemId={id} canWrite={canSerialsWrite} />}
+        {/* Serials tab hidden — see TABS const above. SerialsTab kept in code for re-enable. */}
+        {/* {activeTab === "serials" && <SerialsTab itemId={id} canWrite={canSerialsWrite} />} */}
         {activeTab === "stock" && <StockTab itemId={id} />}
         {activeTab === "reorder" && <ReorderTab itemId={id} canWrite={canReorderWrite} />}
         {activeTab === "custom-fields" && <CustomFieldsTab itemId={id} />}
@@ -357,18 +360,21 @@ function AddIdentifierDialog({ open, onClose, itemId }: { open: boolean; onClose
 // Empty cell = no rule yet for that combination. Filled cell
 // shows the current price + the date it became effective.
 
-const PRICING_THICKNESSES = [2, 3, 4, 5];
-const PRICING_SIZES = [
-  { code: "1220x2440", short: "4×8 ft",  label: "1220 × 2440 mm" },
-  { code: "1220x3050", short: "4×10 ft", label: "1220 × 3050 mm" },
-  { code: "1220x3660", short: "4×12 ft", label: "1220 × 3660 mm" },
-];
-
 function PricingTab({ itemId }: { itemId: string }) {
   const { data: rules, isLoading } = useQuery({
     queryKey: ["pricing-rules", itemId],
     queryFn: () => pricingService.list({ item_id: itemId, active_only: true, limit: 200 }),
   });
+  const { data: thicknessOptions } = useQuery({
+    queryKey: ["pricing-dimension-options", "thickness"],
+    queryFn: () => pricingService.listThicknessOptions(),
+  });
+  const { data: sizeOptions } = useQuery({
+    queryKey: ["pricing-dimension-options", "size"],
+    queryFn: () => pricingService.listSizeOptions(),
+  });
+  const thicknesses = thicknessOptions ?? [];
+  const sizes = sizeOptions ?? [];
 
   // Build a quick (thickness|size) → rule lookup so the grid renders fast.
   const ruleMap = new Map(
@@ -376,7 +382,7 @@ function PricingTab({ itemId }: { itemId: string }) {
   );
 
   const filledCount = rules?.length ?? 0;
-  const totalCells = PRICING_THICKNESSES.length * PRICING_SIZES.length;
+  const totalCells = thicknesses.length * sizes.length;
 
   return (
     <div className="space-y-4">
@@ -412,19 +418,19 @@ function PricingTab({ itemId }: { itemId: string }) {
             <thead className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
               <tr>
                 <th className="text-left px-3 py-2.5 border-b border-hairline">Thickness ↓ &nbsp; Size →</th>
-                {PRICING_SIZES.map((s) => (
+                {sizes.map((s) => (
                   <th key={s.code} className="text-right px-3 py-2.5 border-b border-hairline">
-                    <div>{s.short}</div>
+                    <div className="text-[10px] font-mono opacity-80">{s.code}</div>
                     <div className="text-[9.5px] font-mono opacity-60">{s.label}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {PRICING_THICKNESSES.map((t) => (
+              {thicknesses.map((t) => (
                 <tr key={t} className="border-b border-hairline-light hover:bg-surface/50">
                   <td className="px-3 py-3 font-medium">{t} mm</td>
-                  {PRICING_SIZES.map((s) => {
+                  {sizes.map((s) => {
                     const rule = ruleMap.get(`${t}|${s.code}`);
                     return (
                       <td key={s.code} className="px-3 py-3 text-right">

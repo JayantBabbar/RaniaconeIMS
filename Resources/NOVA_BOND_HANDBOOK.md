@@ -1,6 +1,6 @@
 # Nova Bond — Handbook
 
-Last updated: 2026-05-02 *(refreshed after Phase 12 cost-split, Phase 13 versioned pricing, GRN/Bill two-stage flow, sidebar reorg, UoM expansion, legacy data purge)*
+Last updated: 2026-05-05 *(refreshed after editable thickness/size catalogues, party-type expansion to 5 kinds, Employees moved under Parties, Raniac Technologies vendor seed, inline threshold editing, Serials/Transfers hidden, Movements pushed last)*
 
 > Everything Mr. Arpit and his team need to know about the system.
 > What it does, who does what, how the day flows, and what's
@@ -152,7 +152,7 @@ Now COGS is correct. The "GRNs pending bill" KPI drops from 3 → 2.
 
 Aluminum prices have moved. Mr. Arpit goes to **Master Data → Item Pricing**, filters to NB-1101.
 
-He sees the 12-cell grid showing the current price for each thickness × size combination. He clicks **Update price** on the 3mm × 4×8 row → enters new price ₹6,100 → effective date 15 May → notes "Q1 raw material cost up 6%" → saves.
+He sees the grid showing the current price for each thickness × size combination. He clicks **Update price** on the 3mm × 4×8 row → enters new price ₹6,100 → effective date 15 May → notes "Q1 raw material cost up 6%" → saves.
 
 The system:
 1. Closes the prior rule's `valid_until = 14 May`
@@ -161,6 +161,10 @@ The system:
 4. New lines created on or after 15 May will auto-fill ₹6,100
 
 He can see the prior price in the expanded history row beneath the active one.
+
+> **Side note**: A new customer just asked about 6mm panels in a 4×16 ft size — combinations Nova Bond hasn't carried before. Mr. Arpit clicks **Manage dimensions** at the top of the page, types `6` under "Add a thickness" → Add, then enters `1220x4880` / "1220 × 4880 mm (4×16 ft)" under Sizes → Add. Both options are immediately available everywhere — pricing rules, GRNs, challans, invoices. Removing a thickness/size is blocked while any pricing rule references it, so history can't be orphaned by accident.
+
+> **+ Add price rule** at the top right is the discoverable entry point for fresh combinations: it opens the modal with an item picker (so he can pick any item and create the very first rule for any thickness × size combo).
 
 ### 7:00 PM · Posting an invoice for Greenfield
 
@@ -339,6 +343,9 @@ These are the requirements from `clientneeds.txt`. Each marks how it landed.
 | ✅ | Description field |
 | ✅ | Opening Balance field |
 | ✅ | Route field (linked to Routes master) |
+| ✅ | **5 party types** — Customer, Supplier, Vendor (services/IT), General Person, Both. Filter dropdown + colour-coded badges everywhere |
+| ✅ | **Employees nested under Parties** sidebar group (was under Money before) |
+| ✅ | Raniac Technologies seeded as the first IT vendor (`VEN-IT-001`) — pattern for future service-vendor entries |
 
 ### §14 — Reports
 > *Sales / Purchase / Inventory / Debt*
@@ -368,6 +375,7 @@ This compares what existed when we started vs what's there now (after Phases 1�
 | **GRN flow** | Did not exist as distinct flow; cost was always required on receipt | Distinct `/documents/goods-receipts` route; PO-backed or Direct mode; **NO cost field**; Thickness + Size + Lot capture required |
 | **Vendor Bills** | Did not exist | Full bill module (`/bills/*`) with line-by-line GST math; Admin-only; backfills cost into GRN valuation layers |
 | **Pricing model** | Single `default_sale_price` per item | **Versioned pricing rules** per (item × thickness × size). Old invoices keep snapshot; new lines auto-fill from active rule. Full version history visible in admin UI. |
+| **Thickness / size catalogues** | Hardcoded — required a code change to add 6mm or a new sheet size | **Editable from UI** via Master Data → Item Pricing → "Manage dimensions". Add or remove thickness values + size codes; deletion blocked while any pricing rule references the option. |
 | **Item detail page** | 10 tabs (General / Identifiers / Variants / UoMs / Lots / Serials / Stock / Reorder / Custom / Attachments) | **11 tabs** — added **Pricing tab** (read-only thickness×size grid with current prices) |
 | **Lots** | Manual "Add Lot" button on `/items/lots` (could create orphan lots) | Read-only viewer. **Lots are born from GRN line entry only** — no manual creation path |
 | **UoMs** | 6 units in 3 categories | **22 units in 5 categories** (count/weight/length/area/volume) — covers SHEET, BUNDLE, SQ.FT, MTR, MT, ROLL, DRUM, NOS, etc. + 12 conversion factors |
@@ -383,6 +391,12 @@ This compares what existed when we started vs what's there now (after Phases 1�
 | **Audit log** | None | Every critical action logged with before/after JSON; `/admin/audit-log` viewer |
 | **Mobile responsive** | Partial | Tables scroll horizontally; sidebar drawer; topbar collapse |
 | **Money pages spacing** | `max-w-7xl mx-auto` causing big margins on wide screens | Full-width `p-4 md:p-5 space-y-4` like Items/Balances pages |
+| **Party types** | 3 (Customer / Supplier / Both) | **5** — added Vendor (services/IT) + General Person; colour-coded badges, filter dropdown, 5 distinct labels |
+| **Employees** | Lived under Money group | **Moved into Parties group** (alongside Customers + Vendors) — they are people Nova Bond has a financial relationship with |
+| **Inventory sidebar** | Movements pinned near top; Serials + Transfers always visible | **Movements moved to last** position; **Serials + Transfers hidden** from sidebar (Nova Bond doesn't track per-unit serials and runs a single warehouse). Code preserved — re-enable by un-commenting in `sidebar.tsx` if a tenant needs them. |
+| **Item create form** | Showed "Enable serial-number tracking" checkbox | Checkbox **hidden** — Nova Bond catalog uses lots only. Re-enable by un-commenting in `items/new/page.tsx` |
+| **Item detail tabs** | 11 tabs incl. dedicated **Serials** | Serials tab **hidden** for the same reason |
+| **Low-stock thresholds** | Read-only on `/alerts` (set via Reorder tab on each item) | **Inline "Threshold" button per row** opens a quick-edit modal; updates the reorder policy in place |
 
 ---
 
@@ -413,6 +427,8 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 | Routes (sales territories) | ✅ | |
 | Document types | platform | |
 | **Item Dimensions master** | ✅ | **Phase 13** — 12 (thickness × size) combinations seeded |
+| **Thickness option catalogue** | ✅ | Editable from UI via "Manage dimensions" modal — add new mm values (e.g. 6, 10, 12); deletion blocked when in-use |
+| **Size option catalogue** | ✅ | Editable from UI — add new size codes (e.g. `1220x4880`) with friendly labels; deletion blocked when in-use |
 
 ### 6.2 Stock & Inventory
 
@@ -423,10 +439,10 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 | Reservations | platform | Soft-hold for open documents |
 | FIFO valuation layers | platform | Behind the scenes; backfilled from Vendor Bills |
 | Lots / batches | ✅ | Mandatory on GRN; auto-created from line entry |
-| Serials | platform | Available |
+| Serials | platform | Code intact; sidebar entry + item-detail tab + create-form checkbox **hidden** for Nova Bond |
 | Stock counts (cycle counts) | ✅ | |
-| Low-stock alerts | implied | `/alerts` page |
-| Stock transfers between locations | platform | |
+| Low-stock alerts | ✅ | `/alerts` page; **per-row inline Threshold edit** updates reorder policy in place |
+| Stock transfers between locations | platform | Code intact; sidebar entry **hidden** for Nova Bond (single warehouse) |
 | Valuation layers viewer | platform | Admin-only post Phase 12 (cost.read) |
 | Item Pricing tab on item detail | ✅ | **Phase 13 update** — read-only price grid view |
 
@@ -462,7 +478,7 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 |---|---|---|
 | Multi-account ledger (Cash / Bank / Cheque pending / GPay) | ✅ | Per spec §11 |
 | Per-party ledger (AR / AP) | ✅ | |
-| Per-employee float ledger | ✅ | Customer-paid-salesman flow |
+| Per-employee float ledger | ✅ | Customer-paid-salesman flow. Note: the **Employees list** sits under Parties group, but the float ledger is reached from the Money group (Money → Employees) |
 | Receipts (incoming payments) | ✅ | Cash / Bank / Cheque / GPay |
 | Payments (outgoing) | ✅ | |
 | Cheque deposit workflow | ✅ | cheque_in_transit → bank on clear |
@@ -554,11 +570,11 @@ Dashboard
 Sales              (Challans · Invoices · Sales Orders)
 Purchases          (Goods Receipts · Vendor Bills · Purchase Orders)
 Money              (Overview · Debtors · Receipts · Payments · Cheques ·
-                    Expenses · Salary · Payroll Batch · Accounts · Employees)
-Inventory          (Items · Stock Balances · Lots · Movements ·
-                    Stock Counts · Transfers · Locations · Low Stock Alerts ·
-                    Reservations · Serials · Valuation Layers · Attachments)
-Parties            (Customers & Vendors)
+                    Expenses · Salary · Payroll Batch · Accounts)
+Inventory          (Items · Stock Balances · Lots · Stock Counts ·
+                    Locations & Bins · Low Stock Alerts · Reservations ·
+                    Valuation Layers · Attachments · Movements)
+Parties            (Customers & Vendors · Employees)
 ─────────────────
 Reports            (Overview · Sales register · Purchase register ·
                     Debtors aging · Creditors aging · P&L · Cash flow ·
@@ -571,6 +587,8 @@ Admin              (Users · Roles · Permissions · Bulk imports ·
                     Period close · Audit log · Settings)
 ```
 
+> **Hidden but kept in code** — Serials and Transfers nav entries are commented out in `sidebar.tsx`. Nova Bond's ACP is batch-tracked (lots, not serials) and runs a single warehouse, so neither surface is useful today. Un-comment to re-enable for a tenant that needs them.
+
 ### Operator sidebar (Warehouse staff) — auto-filtered by permissions
 
 ```
@@ -578,10 +596,10 @@ Dashboard
 ─────────────────
 Sales              (Challans · Sales Orders — Invoices hidden)
 Purchases          (Goods Receipts · Purchase Orders — Vendor Bills hidden)
-Inventory          (Items · Stock Balances · Lots · Movements ·
-                    Stock Counts · Transfers · Locations · Low Stock Alerts ·
-                    Reservations · Serials — Valuation Layers + Attachments hidden)
-Parties            (Customers & Vendors)
+Inventory          (Items · Stock Balances · Lots · Stock Counts ·
+                    Locations & Bins · Low Stock Alerts · Reservations ·
+                    Movements — Valuation Layers + Attachments hidden)
+Parties            (Customers & Vendors — Employees hidden)
 ─────────────────
 Admin              (Settings only — everything else hidden)
 ```
@@ -625,58 +643,106 @@ Open the file `frontend/changes_required.txt` for the running list of backend ch
 
 ## 9 · Recent changes since the first edition
 
-### Phase 12 — Cost & Financials split (REQ-16)
-- Three permission gates: `cost.read`, `financials.read`, `master_data.read`
-- GRN form strips cost; Vendor Bills become Admin-only; cost back-fills via bill posting
-- "GRNs pending bill" KPI flags unbilled receipts on Admin dashboard
-- Operator now sees zero money on screen
+> Newest at the top. Older Phase 12/13 entries kept for context.
 
-### Phase 13 — Item Dimensions + Versioned Pricing (REQ-17)
-- 12 thickness × size combinations seeded (4 mm × 3 sizes)
+### Editable thickness & size catalogues *(May 5)*
+- Master Data → Item Pricing now has a **"Manage dimensions"** button + modal
+- Add a thickness in mm (e.g. `6`, `10`, `12`) → instantly available on every line form, pricing rule, and report
+- Add a size by code + label (e.g. `1220x4880` / "1220 × 4880 mm (4×16 ft)")
+- Removal blocked while any pricing rule references the option (clear error toast — no orphaned history)
+- Backed by new `/pricing-dimension-options/{thickness,size}` endpoints + `pricingService.{addThicknessOption,removeThicknessOption,addSizeOption,removeSizeOption}`
+- Both consumers (Master Data Item Pricing page + the Pricing tab on item detail) now read from `useQuery` instead of hardcoded arrays — the matrix grid auto-grows when a new option is added
+
+### Discoverable "Add price rule" *(May 5)*
+- Primary **+ Add price rule** button in the page header AND in the empty-state action
+- Modal supports an **item picker** when invoked without an item filter; locked to a fixed item when invoked from an existing row
+- Title flips between "Add price rule" / "Add price for {item}" / "Update price — {item}" based on context
+- Save button now disabled until both an item is picked and a positive sale price is entered
+
+### Party types expanded — 3 → 5 *(May 4)*
+- Added **Vendor** (services / IT) and **General Person** to the existing Customer / Supplier / Both
+- 5 distinct colour-coded badges across `/parties` and party detail
+- Filter dropdown extended; party form `party_type` select extended
+
+### Employees moved under Parties *(May 4)*
+- Sidebar entry relocated from Money → Parties group (employees are *people*, not money)
+- Underlying URL `/money/employees` unchanged for back-compat
+- Money group is now: Overview · Debtors · Receipts · Payments · Cheques · Expenses · Salary · Payroll Batch · Accounts (no Employees)
+- Parties group is now: Customers & Vendors · Employees
+
+### Raniac Technologies vendor seed *(May 4)*
+- First IT vendor `VEN-IT-001` (Raniac Technologies) seeded in fixtures.PARTIES
+- Pattern for Mr. Arpit to add other service vendors (CA firm, software vendors, etc.)
+
+### Inline threshold edit on Low-Stock Alerts *(May 4)*
+- "Threshold" button per row on `/alerts` opens a quick-edit modal
+- Updates the reorder policy in place via `itemService.updateReorderPolicy`
+- Item detail page also got full CRUD on the Reorder tab (was read-only)
+
+### Serials & Transfers hidden *(May 4)*
+- Serials nav entry, item-detail Serials tab, and item-create form's "Enable serial-number tracking" checkbox all **hidden** (commented, not deleted)
+- Transfers nav entry hidden — Nova Bond runs a single warehouse
+- Re-enable any of them by un-commenting the relevant block when a tenant grows into them
+
+### Movements pushed to last *(May 4)*
+- Within the Inventory group, **Movements** sits at the very bottom — it's a forensic / read-only audit trail, not a daily-flow surface
+
+### Demo adapter persistence fixes *(May 3)*
+- POST `/documents` now persists with auto-numbering (`GRN-00001`, `SO-00001`, etc.) — fixes "Add line" failing after creating a new GRN/SO
+- POST/PATCH/DELETE `/parties` now persist — fixes Add Vendor form silently failing
+- Lots de-dupe by `(item_id, lot_number)` so multiple GRNs against the same lot append rather than create duplicates
+
+### Money pages spacing *(May 3)*
+- All 11 list/dashboard Money pages re-padded to match Items/Balances
+- Removed `max-w-7xl mx-auto` centering that caused big margins on wide screens
+- Same fix later applied to Invoice + Bill detail pages
+
+### UoM expansion *(May 2)*
+- 6 → 22 UoMs across 5 categories (added Length + Area)
+- 2 → 12 conversion factors
+
+### Legacy data purge *(May 2)*
+- All non-Nova Bond items, brands, categories, lots, serials, balances, attachments removed
+- `/items` shows ONLY 39 NB-* items
+- `/master-data/brands` shows ONLY Nova Bond
+- Fixes empty-list confusion when filtering by a removed legacy entity
+
+### Master Data tightening *(May 1)*
+- All Master Data entries now require `inventory.master_data.read` (Admin-only)
+- Operator never sees the Master Data sidebar group
+- Underlying read perms (brands/categories/uoms) stay granted so item rows still render
+
+### Sidebar reorganisation *(May 1)*
+- Order changed from "setup-first" to "action-first"
+- Documents + Billing groups dissolved; merged into Sales + Purchases
+- Stock Counts moved from Operations into Inventory
+- Master Data pushed from #2 to second-to-last
+- Money group reordered with Debtors near top (most-checked-daily)
+
+### GRN flow upgrades *(Apr 30)*
+- "Direct receipt (no PO)" mode for phone-deal arrivals
+- "Source PO" link on GRN list with "Direct" badge
+- Lot/batch number capture mandatory at line entry for batch-tracked items
+- Auto-create Lot record from GRN line (no manual `/items/lots/new` needed)
+- Manual "Add Lot" button removed entirely from `/items/lots`
+
+### Phase 13 — Item Dimensions + Versioned Pricing (REQ-17) *(Apr 29)*
+- 12 thickness × size combinations seeded (4 mm × 3 sizes; now extensible from UI)
 - Versioned pricing rules per (item × dimension) with `valid_from` / `valid_until`
 - New admin page `/master-data/item-pricing` with grid view + history
 - Line forms (GRN/SO/Challan) get Thickness + Size dropdowns + auto-fill unit price
 - New "Pricing" tab on item detail page showing the price grid
 - Old invoices keep snapshotted prices; rule changes only affect new lines
 
-### GRN flow upgrades
-- "Direct receipt (no PO)" mode for phone-deal arrivals
-- "Source PO" link on GRN list with "Direct" badge
-- Lot/batch number capture mandatory at line entry for batch-tracked items
-- Auto-create Lot record from GRN line (no manual `/items/lots/new` needed)
+### Phase 12 — Cost & Financials split (REQ-16) *(Apr 28)*
+- Three permission gates: `cost.read`, `financials.read`, `master_data.read`
+- GRN form strips cost; Vendor Bills become Admin-only; cost back-fills via bill posting
+- "GRNs pending bill" KPI flags unbilled receipts on Admin dashboard
+- Operator now sees zero money on screen
 
-### Sidebar reorganisation
-- Order changed from "setup-first" to "action-first"
-- Documents + Billing groups dissolved; merged into Sales + Purchases
-- Stock Counts moved from Operations into Inventory
-- Master Data pushed from #2 to second-to-last (rarely visited after onboarding)
-- Money group reordered with Debtors near top (most-checked-daily)
-
-### Master Data tightening
-- All 8 Master Data entries now require `inventory.master_data.read` (Admin-only)
-- Operator never sees the Master Data sidebar group
-
-### UoM expansion
-- 6 → 22 UoMs across 5 categories (added Length + Area)
-- 2 → 12 conversion factors
-
-### Legacy data purge
-- All non-Nova Bond items, brands, categories, lots, serials, balances, attachments removed
-- `/items` shows ONLY 39 NB-* items
-- `/master-data/brands` shows ONLY Nova Bond
-
-### Print mode toggle
+### Print mode toggle *(Apr 28)*
 - Inline 2-button toggle on Challan detail page (No amounts / With amounts)
 - Saves immediately via PATCH on click
-
-### Money pages spacing
-- All 11 list/dashboard Money pages re-padded to match Items/Balances
-- Removed `max-w-7xl mx-auto` centering that caused big margins on wide screens
-
-### Demo adapter persistence
-- New documents (PO/GRN/SO/Transfer) now actually persist to fixtures
-- `Add line` modal works on newly-created docs (was broken — 404 redirect)
-- Pricing rules persist via POST; auto-close prior rule
 
 ---
 

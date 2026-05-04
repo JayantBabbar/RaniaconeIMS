@@ -157,16 +157,23 @@ const NAVIGATION: NavSection[] = [
       { id: "items",        label: "Items",            icon: Box,            href: "/items",          permission: "inventory.items.read" },
       { id: "balances",     label: "Stock Balances",   icon: BarChart3,      href: "/balances",       permission: "inventory.balances.read" },
       { id: "lots",         label: "Lots",             icon: Layers,         href: "/items/lots",     permission: "inventory.lots.read" },
-      { id: "movements",    label: "Movements",        icon: ArrowLeftRight, href: "/movements",      permission: "inventory.movements.read" },
       { id: "counts",       label: "Stock Counts",     icon: ClipboardList,  href: "/counts",         permission: "inventory.counts.read" },
-      { id: "transfers",    label: "Transfers",        icon: ArrowLeftRight, href: "/documents/transfers", permission: "inventory.documents.read" },
       { id: "locations",    label: "Locations & Bins", icon: MapPin,         href: "/locations",      permission: "inventory.locations.read" },
       { id: "alerts",       label: "Low Stock Alerts", icon: AlertTriangle,  href: "/alerts",         permission: "inventory.items.read" },
       // Advanced — rarely touched by Operator or Admin in day-to-day flow
       { id: "reservations", label: "Reservations",     icon: Lock,           href: "/reservations",   permission: "inventory.reservations.read" },
-      { id: "serials",      label: "Serials",          icon: Fingerprint,    href: "/items/serials",  permission: "inventory.serials.read" },
       { id: "valuation",    label: "Valuation Layers", icon: Layers,         href: "/valuation",      permission: "inventory.cost.read" },
       { id: "attachments",  label: "Attachments",      icon: Paperclip,      href: "/attachments" },
+      // Movements — the audit-trail ledger. Pushed to the last spot
+      // because it's a forensic / read-only surface, rarely visited
+      // during day-to-day work (only when investigating "why did stock
+      // change last Tuesday?").
+      { id: "movements",    label: "Movements",        icon: ArrowLeftRight, href: "/movements",      permission: "inventory.movements.read" },
+      // Hidden for Nova Bond — kept in code but not in nav.
+      // Serials: Nova Bond's ACP is batch-tracked (lots), not serial-tracked. Re-enable when items with per-unit IDs are added.
+      // { id: "serials",   label: "Serials",          icon: Fingerprint,    href: "/items/serials",        permission: "inventory.serials.read" },
+      // Transfers: single-warehouse setup; uncomment when a second location goes live.
+      // { id: "transfers", label: "Transfers",        icon: ArrowLeftRight, href: "/documents/transfers", permission: "inventory.documents.read" },
     ],
   },
 

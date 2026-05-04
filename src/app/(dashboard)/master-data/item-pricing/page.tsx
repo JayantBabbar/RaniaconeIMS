@@ -17,9 +17,10 @@ import { itemService } from "@/services/items.service";
 import { isApiError } from "@/lib/api-client";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import {
-  Plus, ChevronDown, ChevronRight, Tag, Clock, History,
+  Plus, ChevronDown, ChevronRight, Tag, Clock, History, Settings, Trash2,
 } from "lucide-react";
 import type { ItemPricingRule } from "@/types";
+import type { SizeOption } from "@/services/pricing.service";
 
 // ═══════════════════════════════════════════════════════════
 // /master-data/item-pricing — versioned pricing config (Admin)
@@ -30,15 +31,12 @@ import type { ItemPricingRule } from "@/types";
 //
 // This is Mr. Arpit's main control panel for sale prices. Operator
 // + Salesman never see this page (gated on master_data.read).
+//
+// The thickness + size catalogues are tenant-editable: click
+// "Manage dimensions" to add a new thickness (e.g. 6mm, 10mm) or a
+// new size code. Removing one is blocked while pricing rules
+// reference it.
 // ═══════════════════════════════════════════════════════════
-
-const THICKNESSES = [2, 3, 4, 5];
-const SIZES = ["1220x2440", "1220x3050", "1220x3660"];
-const SIZE_LABEL: Record<string, string> = {
-  "1220x2440": "1220 × 2440 mm (4×8 ft)",
-  "1220x3050": "1220 × 3050 mm (4×10 ft)",
-  "1220x3660": "1220 × 3660 mm (4×12 ft)",
-};
 
 export default function ItemPricingPage() {
   const searchParams = useSearchParams();
@@ -53,6 +51,7 @@ export default function ItemPricingPage() {
     itemId: string; thickness: number; size: string; currentPrice?: string;
   } | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showDimensionsModal, setShowDimensionsModal] = useState(false);
 
   const { data: items } = useQuery({
     queryKey: ["items"],
@@ -65,6 +64,21 @@ export default function ItemPricingPage() {
     queryKey: ["pricing-rules", itemFilter],
     queryFn: () => pricingService.list({ item_id: itemFilter || undefined, limit: 500 }),
   });
+
+  const { data: thicknessOptions } = useQuery({
+    queryKey: ["pricing-dimension-options", "thickness"],
+    queryFn: () => pricingService.listThicknessOptions(),
+  });
+  const { data: sizeOptions } = useQuery({
+    queryKey: ["pricing-dimension-options", "size"],
+    queryFn: () => pricingService.listSizeOptions(),
+  });
+  const thicknesses = thicknessOptions ?? [];
+  const sizes = sizeOptions ?? [];
+  const sizeLabelMap = useMemo(
+    () => Object.fromEntries(sizes.map((s) => [s.code, s.label])) as Record<string, string>,
+    [sizes],
+  );
 
   // Group rules by (item, thickness, size); within each group sort by
   // valid_from desc so the active rule is on top. Skip groups whose
@@ -105,6 +119,28 @@ export default function ItemPricingPage() {
             title="Item pricing"
             description="Versioned sale prices per (item × thickness × size). When you update a price, the previous rule stays in history — old invoices keep their original price; new lines pick up the new rule."
             learnMore="ACP panels are sold by the sheet, but the sheet's price depends on its thickness and size. This page is the master price list. To update a price, click 'Update price' on any row — the system records the change with an effective date and closes the prior rule automatically."
+            actions={
+              <div className="flex items-center gap-2">
+                <Button
+                  kind="ghost"
+                  onClick={() => setShowDimensionsModal(true)}
+                  title="Add or remove thickness/size options"
+                >
+                  <Settings size={13} /> Manage dimensions
+                </Button>
+                <Button
+                  kind="primary"
+                  disabled={thicknesses.length === 0 || sizes.length === 0}
+                  onClick={() => setEditTarget({
+                    itemId: itemFilter || "",
+                    thickness: thicknesses[0],
+                    size: sizes[0]?.code ?? "",
+                  })}
+                >
+                  <Plus size={14} /> Add price rule
+                </Button>
+              </div>
+            }
           />
 
           {/* Filter */}
@@ -144,7 +180,20 @@ export default function ItemPricingPage() {
             <EmptyState
               icon={<Tag size={20} />}
               title="No pricing rules yet"
-              description="Pick an item above and click 'Add price' to set the first rule for any thickness × size combination."
+              description="Add the first rule for any thickness × size combination. Once you set a price, it auto-fills on invoices/challans for that item, and you can update it later (with full version history)."
+              action={
+                <Button
+                  kind="primary"
+                  disabled={thicknesses.length === 0 || sizes.length === 0}
+                  onClick={() => setEditTarget({
+                    itemId: itemFilter || "",
+                    thickness: thicknesses[0],
+                    size: sizes[0]?.code ?? "",
+                  })}
+                >
+                  <Plus size={14} /> Add price rule
+                </Button>
+              }
             />
           ) : (
             <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
@@ -193,7 +242,7 @@ export default function ItemPricingPage() {
                             <div className="text-[11px] text-text-tertiary font-mono">{item?.item_code}</div>
                           </td>
                           <td className="px-3 py-2 tabular-nums">{active.thickness_mm} mm</td>
-                          <td className="px-3 py-2 text-[12px] font-mono">{SIZE_LABEL[active.size_code] ?? active.size_code}</td>
+                          <td className="px-3 py-2 text-[12px] font-mono">{sizeLabelMap[active.size_code] ?? active.size_code}</td>
                           <td className="px-3 py-2 text-right tabular-nums font-semibold">
                             {formatCurrency(active.sale_price, "INR", "en-IN")}
                           </td>
@@ -245,20 +294,17 @@ export default function ItemPricingPage() {
             </div>
           )}
 
-          {/* Add-rule modal — reuse for new combos when no rule exists */}
-          {!itemFilter ? null : (
-            <div className="rounded-lg border border-dashed border-border bg-bg-subtle/40 p-4">
-              <p className="text-[12px] text-text-secondary">
-                Want to add a price for a thickness×size combo not shown above?{" "}
-                <button
-                  onClick={() => setEditTarget({ itemId: itemFilter, thickness: THICKNESSES[0], size: SIZES[0] })}
-                  className="text-brand hover:underline"
-                >
-                  Add new combo →
-                </button>
-              </p>
-            </div>
-          )}
+          {/* Helper hint — point at "Manage dimensions" if a needed
+              thickness/size isn't on the list yet. */}
+          <p className="text-[11px] text-text-tertiary">
+            Need a thickness or size that isn&apos;t on the list?{" "}
+            <button
+              onClick={() => setShowDimensionsModal(true)}
+              className="text-brand hover:underline"
+            >
+              Manage dimensions →
+            </button>
+          </p>
 
           <p className="text-[11px] text-text-tertiary">
             Pricing changes take effect from the date you choose. Historical invoices and challans keep their original price (snapshotted on the line); only NEW lines created after the effective date use the new price.
@@ -267,12 +313,23 @@ export default function ItemPricingPage() {
 
         {editTarget && (
           <UpdatePriceModal
-            itemName={itemById.get(editTarget.itemId)?.name ?? editTarget.itemId}
+            itemName={itemById.get(editTarget.itemId)?.name ?? ""}
             itemId={editTarget.itemId}
             thickness={editTarget.thickness}
             size={editTarget.size}
             currentPrice={editTarget.currentPrice}
+            allItems={itemsList.filter((i) => i.is_active)}
+            thicknessOptions={thicknesses}
+            sizeOptions={sizes}
             onClose={() => setEditTarget(null)}
+          />
+        )}
+
+        {showDimensionsModal && (
+          <ManageDimensionsModal
+            thicknesses={thicknesses}
+            sizes={sizes}
+            onClose={() => setShowDimensionsModal(false)}
           />
         )}
       </div>
@@ -281,26 +338,40 @@ export default function ItemPricingPage() {
 }
 
 function UpdatePriceModal({
-  itemName, itemId, thickness, size, currentPrice, onClose,
+  itemName, itemId, thickness, size, currentPrice, allItems,
+  thicknessOptions, sizeOptions, onClose,
 }: {
   itemName: string;
+  /** Empty string when adding a fresh rule (item picker shown). */
   itemId: string;
   thickness: number;
   size: string;
   currentPrice?: string;
+  allItems: Array<{ id: string; item_code: string; name: string }>;
+  thicknessOptions: number[];
+  sizeOptions: SizeOption[];
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const [itemIdVal, setItemIdVal] = useState(itemId);
   const [thicknessVal, setThicknessVal] = useState(thickness);
   const [sizeVal, setSizeVal] = useState(size);
   const [salePrice, setSalePrice] = useState(currentPrice ?? "");
   const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
 
+  const isNew = !itemId; // when invoked without itemId, this is "add fresh"
+  const isExistingCombo = !!currentPrice;
+  const titleText = isExistingCombo
+    ? `Update price — ${itemName}`
+    : isNew
+      ? "Add price rule"
+      : `Add price for ${itemName}`;
+
   const create = useMutation({
     mutationFn: () => pricingService.create({
-      item_id: itemId,
+      item_id: itemIdVal,
       thickness_mm: thicknessVal,
       size_code: sizeVal,
       sale_price: salePrice,
@@ -308,7 +379,12 @@ function UpdatePriceModal({
       notes: notes || undefined,
     }),
     onSuccess: () => {
-      toast.success("New price recorded", "Prior rule's effective period closed automatically.");
+      toast.success(
+        isExistingCombo ? "New price recorded" : "Pricing rule created",
+        isExistingCombo
+          ? "Prior rule's effective period closed automatically."
+          : "Will auto-fill on invoices/challans for this combination.",
+      );
       qc.invalidateQueries({ queryKey: ["pricing-rules"] });
       onClose();
     },
@@ -316,11 +392,37 @@ function UpdatePriceModal({
   });
 
   return (
-    <Dialog open onClose={onClose} title={`Update price — ${itemName}`} width="md">
+    <Dialog open onClose={onClose} title={titleText} width="md">
       <div className="space-y-3">
         <p className="text-[12px] text-text-secondary">
-          The new price takes effect from the date below. The previous price for this combination will be marked as historical with its end date set to the day before.
+          {isExistingCombo
+            ? "The new price takes effect from the date below. The previous price for this combination will be marked as historical with its end date set to the day before."
+            : "Set the first price for this combination. It will be the active rule from the effective date you choose, until you update it."}
         </p>
+
+        {/* Item picker — shown when creating fresh from the top button.
+            Locked to a fixed item when triggered from an existing row. */}
+        {isNew && (
+          <FormField label="Item" required help="Pick the item this price rule applies to.">
+            <select
+              value={itemIdVal}
+              onChange={(e) => setItemIdVal(e.target.value)}
+              className="w-full text-[13px] rounded-md border border-border bg-bg-base px-2 py-1.5 h-9"
+            >
+              <option value="">— Select item —</option>
+              {allItems
+                .sort((a, b) => a.item_code.localeCompare(b.item_code))
+                .map((i) => (
+                  <option key={i.id} value={i.id}>{i.item_code} — {i.name}</option>
+                ))}
+            </select>
+          </FormField>
+        )}
+        {!isNew && itemId && (
+          <div className="text-[12px] text-text-tertiary p-2.5 rounded bg-bg-subtle border border-border">
+            Item: <span className="font-medium text-text-primary">{itemName}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Thickness" required help="Panel thickness in millimetres.">
@@ -329,7 +431,7 @@ function UpdatePriceModal({
               onChange={(e) => setThicknessVal(Number(e.target.value))}
               className="w-full text-[13px] rounded-md border border-border bg-bg-base px-2 py-1.5 h-9"
             >
-              {THICKNESSES.map((t) => <option key={t} value={t}>{t} mm</option>)}
+              {thicknessOptions.map((t) => <option key={t} value={t}>{t} mm</option>)}
             </select>
           </FormField>
           <FormField label="Size" required help="Panel dimensions (width × length).">
@@ -340,7 +442,7 @@ function UpdatePriceModal({
                 "w-full text-[13px] rounded-md border border-border bg-bg-base px-2 py-1.5 h-9",
               )}
             >
-              {SIZES.map((s) => <option key={s} value={s}>{SIZE_LABEL[s]}</option>)}
+              {sizeOptions.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
             </select>
           </FormField>
         </div>
@@ -348,7 +450,7 @@ function UpdatePriceModal({
         {currentPrice && (
           <div className="text-[12px] text-text-tertiary p-2.5 rounded bg-bg-subtle border border-border">
             Currently <span className="font-mono">{formatCurrency(currentPrice, "INR", "en-IN")}</span>
-            {" "}for {thickness}mm · {SIZE_LABEL[size] ?? size}.
+            {" "}for {thickness}mm · {sizeOptions.find((s) => s.code === size)?.label ?? size}.
           </div>
         )}
 
@@ -382,11 +484,191 @@ function UpdatePriceModal({
           <Button kind="ghost" onClick={onClose}>Cancel</Button>
           <Button
             kind="primary"
-            disabled={!salePrice || Number(salePrice) <= 0 || create.isPending}
+            disabled={!salePrice || Number(salePrice) <= 0 || !itemIdVal || create.isPending}
             onClick={() => create.mutate()}
           >
             <Plus size={13} /> Save new price
           </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Manage thickness/size catalogues
+// ═══════════════════════════════════════════════════════════
+
+function ManageDimensionsModal({
+  thicknesses, sizes, onClose,
+}: {
+  thicknesses: number[];
+  sizes: SizeOption[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [newThickness, setNewThickness] = useState("");
+  const [newSizeCode, setNewSizeCode] = useState("");
+  const [newSizeLabel, setNewSizeLabel] = useState("");
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["pricing-dimension-options"] });
+  };
+
+  const addThickness = useMutation({
+    mutationFn: (v: number) => pricingService.addThicknessOption(v),
+    onSuccess: () => {
+      toast.success("Thickness added", "It is now selectable when creating pricing rules.");
+      setNewThickness("");
+      invalidate();
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not add"),
+  });
+  const removeThickness = useMutation({
+    mutationFn: (v: number) => pricingService.removeThicknessOption(v),
+    onSuccess: () => { toast.success("Thickness removed"); invalidate(); },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not remove"),
+  });
+  const addSize = useMutation({
+    mutationFn: (payload: SizeOption) => pricingService.addSizeOption(payload),
+    onSuccess: () => {
+      toast.success("Size added", "It is now selectable when creating pricing rules.");
+      setNewSizeCode("");
+      setNewSizeLabel("");
+      invalidate();
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not add"),
+  });
+  const removeSize = useMutation({
+    mutationFn: (code: string) => pricingService.removeSizeOption(code),
+    onSuccess: () => { toast.success("Size removed"); invalidate(); },
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not remove"),
+  });
+
+  const submitThickness = () => {
+    const v = Number(newThickness);
+    if (!v || v <= 0) {
+      toast.error("Enter a positive number, e.g. 6 or 10");
+      return;
+    }
+    addThickness.mutate(v);
+  };
+  const submitSize = () => {
+    const code = newSizeCode.trim();
+    if (!code) {
+      toast.error("Size code is required (e.g. 1220x4880)");
+      return;
+    }
+    addSize.mutate({ code, label: newSizeLabel.trim() || code });
+  };
+
+  return (
+    <Dialog open onClose={onClose} title="Manage thickness & size options" width="lg">
+      <div className="space-y-5">
+        <p className="text-[12px] text-text-secondary">
+          These lists drive the thickness and size dropdowns on every pricing rule, invoice, and challan.
+          Add a new option here to make it available everywhere it&apos;s needed.
+          You cannot remove an option while pricing rules still reference it.
+        </p>
+
+        {/* Thicknesses */}
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
+            Thicknesses (mm)
+          </h3>
+          <div className="rounded-md border border-border bg-bg-base divide-y divide-border">
+            {thicknesses.length === 0 ? (
+              <div className="p-3 text-[12px] text-text-tertiary">No thicknesses configured yet.</div>
+            ) : thicknesses.map((t) => (
+              <div key={t} className="flex items-center justify-between px-3 py-2">
+                <span className="text-[13px] tabular-nums">{t} mm</span>
+                <Button
+                  kind="ghost"
+                  onClick={() => {
+                    if (window.confirm(`Remove ${t}mm from the list?`)) removeThickness.mutate(t);
+                  }}
+                  disabled={removeThickness.isPending}
+                  title="Remove"
+                >
+                  <Trash2 size={12} />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-end gap-2">
+            <div className="flex-1">
+              <FormField label="Add a thickness" help="Enter the value in millimetres, e.g. 6, 10, 12.">
+                <Input
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  placeholder="e.g. 6"
+                  value={newThickness}
+                  onChange={(e) => setNewThickness(e.target.value)}
+                />
+              </FormField>
+            </div>
+            <Button
+              kind="primary"
+              onClick={submitThickness}
+              disabled={!newThickness || addThickness.isPending}
+            >
+              <Plus size={13} /> Add
+            </Button>
+          </div>
+        </section>
+
+        {/* Sizes */}
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wider text-text-tertiary mb-2">
+            Sizes
+          </h3>
+          <div className="rounded-md border border-border bg-bg-base divide-y divide-border">
+            {sizes.length === 0 ? (
+              <div className="p-3 text-[12px] text-text-tertiary">No sizes configured yet.</div>
+            ) : sizes.map((s) => (
+              <div key={s.code} className="flex items-center justify-between px-3 py-2">
+                <div>
+                  <span className="text-[13px] font-mono">{s.code}</span>
+                  <span className="ml-2 text-[12px] text-text-tertiary">{s.label}</span>
+                </div>
+                <Button
+                  kind="ghost"
+                  onClick={() => {
+                    if (window.confirm(`Remove ${s.code} from the list?`)) removeSize.mutate(s.code);
+                  }}
+                  disabled={removeSize.isPending}
+                  title="Remove"
+                >
+                  <Trash2 size={12} />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+            <FormField label="Code" required help="Compact identifier, e.g. 1220x4880.">
+              <Input
+                placeholder="1220x4880"
+                value={newSizeCode}
+                onChange={(e) => setNewSizeCode(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Label" help="Friendly name shown in dropdowns.">
+              <Input
+                placeholder="1220 × 4880 mm (4×16 ft)"
+                value={newSizeLabel}
+                onChange={(e) => setNewSizeLabel(e.target.value)}
+              />
+            </FormField>
+            <Button kind="primary" onClick={submitSize} disabled={!newSizeCode || addSize.isPending}>
+              <Plus size={13} /> Add size
+            </Button>
+          </div>
+        </section>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-border">
+          <Button kind="ghost" onClick={onClose}>Done</Button>
         </div>
       </div>
     </Dialog>

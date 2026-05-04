@@ -18,7 +18,6 @@ export function uid(prefix = "id"): string {
   return `${prefix}-${seq.toString(36).padStart(6, "0")}-${Date.now().toString(36)}`;
 }
 
-const now = () => new Date().toISOString();
 const iso = (daysAgo = 0) =>
   new Date(Date.now() - daysAgo * 86_400_000).toISOString();
 
@@ -1128,6 +1127,21 @@ export const TENANT_CONFIG: Array<any> = [
 // These are the FIXED set Nova Bond manufactures; tenants in another
 // industry would seed different combos (or none, if their items don't
 // vary by dimension).
+
+/** Tenant-level catalog of valid thickness values (millimetres) for
+ *  pricing rules and document line entry. Editable via Master Data →
+ *  Item Pricing → "Manage dimensions". */
+export const PRICING_THICKNESS_OPTIONS: number[] = [2, 3, 4, 5];
+
+/** Tenant-level catalog of valid panel size codes. `code` is the
+ *  storage key (e.g. "1220x2440"); `label` is what users see
+ *  (e.g. "1220 × 2440 mm (4×8 ft)"). */
+export const PRICING_SIZE_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: "1220x2440", label: "1220 × 2440 mm (4×8 ft)"  },
+  { code: "1220x3050", label: "1220 × 3050 mm (4×10 ft)" },
+  { code: "1220x3660", label: "1220 × 3660 mm (4×12 ft)" },
+];
+
 export const ITEM_DIMENSIONS: Array<any> = [
   // Thickness 2mm
   { id: "dim-2-1220x2440", tenant_id: TENANTS[0].id, thickness_mm: 2, size_code: "1220x2440", label: "2mm · 1220 × 2440 mm (4×8 ft)",  is_active: true, created_at: iso(120), updated_at: iso(120) },

@@ -302,6 +302,14 @@ export const PRICING_RULES = {
   LOOKUP: "/pricing-rules/lookup",
 } as const;
 
+/** Tenant-level catalog of valid thickness values + size codes used for
+ *  pricing rules and document line entry. Editable from the
+ *  Master Data → Item Pricing page. */
+export const PRICING_DIMENSION_OPTIONS = {
+  THICKNESS: "/pricing-dimension-options/thickness",
+  SIZE:      "/pricing-dimension-options/size",
+} as const;
+
 // ── Phase 4: Reports & Statements ─────────────────────────
 //
 // All read-only aggregations. The backend never mutates state on

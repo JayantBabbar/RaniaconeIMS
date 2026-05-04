@@ -1,12 +1,14 @@
 import { api } from "@/lib/api-client";
 import { unwrapList } from "@/lib/utils";
-import { ITEM_DIMENSIONS, PRICING_RULES } from "@/lib/api-constants";
+import { ITEM_DIMENSIONS, PRICING_RULES, PRICING_DIMENSION_OPTIONS } from "@/lib/api-constants";
 import type {
   ItemDimension,
   ItemPricingRule,
   ItemPricingLookupResponse,
   PaginatedResponse,
 } from "@/types";
+
+export interface SizeOption { code: string; label: string }
 
 // ═══════════════════════════════════════════════════════════════════
 // Pricing service — Phase 13 (REQ-17).
@@ -79,4 +81,29 @@ export const pricingService = {
    *  (item, thickness, size) by setting its valid_until. */
   create: (payload: CreateRulePayload) =>
     api.post<ItemPricingRule>(PRICING_RULES.LIST, payload),
+
+  // ── Dimension option catalogues (thickness + size) ──
+  // The lists of thickness values + size codes that pricing rules can
+  // be created against. Editable from the Item Pricing master page.
+  listThicknessOptions: async (): Promise<number[]> => {
+    const res = await api.get<number[] | PaginatedResponse<number>>(
+      PRICING_DIMENSION_OPTIONS.THICKNESS,
+    );
+    return unwrapList(res);
+  },
+  addThicknessOption: (thickness_mm: number) =>
+    api.post<{ thickness_mm: number }>(PRICING_DIMENSION_OPTIONS.THICKNESS, { thickness_mm }),
+  removeThicknessOption: (thickness_mm: number) =>
+    api.delete<void>(`${PRICING_DIMENSION_OPTIONS.THICKNESS}/${thickness_mm}`),
+
+  listSizeOptions: async (): Promise<SizeOption[]> => {
+    const res = await api.get<SizeOption[] | PaginatedResponse<SizeOption>>(
+      PRICING_DIMENSION_OPTIONS.SIZE,
+    );
+    return unwrapList(res);
+  },
+  addSizeOption: (payload: SizeOption) =>
+    api.post<SizeOption>(PRICING_DIMENSION_OPTIONS.SIZE, payload),
+  removeSizeOption: (code: string) =>
+    api.delete<void>(`${PRICING_DIMENSION_OPTIONS.SIZE}/${encodeURIComponent(code)}`),
 };

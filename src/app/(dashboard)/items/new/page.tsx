@@ -251,11 +251,14 @@ export default function NewItemPage() {
                 checked={watch("is_batch_tracked")}
                 onChange={(v) => setValue("is_batch_tracked", v)}
               />
+              {/* Hidden for Nova Bond — ACP catalog uses lots, not serials.
+                  Re-enable when serial-tracked items are introduced.
               <Checkbox
                 label="Enable Serial Number Tracking"
                 checked={watch("is_serial_tracked")}
                 onChange={(v) => setValue("is_serial_tracked", v)}
               />
+              */}
               <Checkbox
                 label="Active (visible in catalog)"
                 checked={watch("is_active")}
