@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/topbar";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/services/items.service";
 import { partyPricingService } from "@/services/party-pricing.service";
 import { partyService } from "@/services/parties.service";
+import { THICKNESSES_MM } from "@/lib/constants";
 import type {
   ItemIdentifier,
   ItemVariant,
@@ -55,6 +56,8 @@ import {
   ExternalLink,
   Truck,
   Users,
+  DollarSign,
+  Save,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -63,6 +66,7 @@ import {
 
 const TABS = [
   { id: "general", label: "General", icon: Box },
+  { id: "set-prices", label: "Set Prices", icon: DollarSign },
   { id: "suppliers", label: "Suppliers", icon: Truck },
   { id: "customers", label: "Customers", icon: Users },
   { id: "identifiers", label: "Identifiers", icon: Barcode },
@@ -83,7 +87,15 @@ type TabId = (typeof TABS)[number]["id"];
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabId>("general");
+  const sp = useSearchParams();
+  // Read `?tab=` so deep-links (e.g. from /items/new) land on the
+  // requested tab without an extra click.
+  const initialTab: TabId = useMemo(() => {
+    const requested = sp.get("tab");
+    return (TABS.some((t) => t.id === requested) ? requested : "general") as TabId;
+  }, [sp]);
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const { can } = useCan();
   const canItemsRead = can("inventory.items.read");
   const canItemsWrite = can("inventory.items.write");
@@ -186,6 +198,7 @@ export default function ItemDetailPage() {
       {/* Tab content */}
       <div className="flex-1 overflow-auto p-5">
         {activeTab === "general" && <GeneralTab item={item} />}
+        {activeTab === "set-prices" && <SetPricesTab itemId={id} />}
         {activeTab === "suppliers" && <SuppliersTab itemId={id} />}
         {activeTab === "customers" && <CustomersTab itemId={id} />}
         {activeTab === "identifiers" && <IdentifiersTab itemId={id} canWrite={canItemsWrite} />}
@@ -351,6 +364,237 @@ function AddIdentifierDialog({ open, onClose, itemId }: { open: boolean; onClose
         </div>
       </form>
     </Dialog>
+  );
+}
+
+// ── Set Prices Tab ────────────────────────────────────────
+// One matrix per side (cost from suppliers, sale to customers). Each
+// cell is a thickness × party slot. Pre-fills with the currently-active
+// rule for that combo; saving fans out one POST per changed cell which
+// inserts a new versioned row and auto-closes the prior. Empty / zero
+// cells are skipped so admins can fill prices incrementally.
+function SetPricesTab({ itemId }: { itemId: string }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { can } = useCan();
+  const canCosts  = can("inventory.party_costs.write");
+  const canPrices = can("inventory.party_prices.write");
+
+  const { data: partiesRes } = useQuery({
+    queryKey: ["parties"],
+    queryFn: () => partyService.list({ limit: 500 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const parties = partiesRes?.data ?? [];
+  const suppliers = parties.filter((p) => p.party_type === "supplier" || p.party_type === "vendor" || p.party_type === "both");
+  const customers = parties.filter((p) => p.party_type === "customer" || p.party_type === "both");
+
+  const { data: costRowsRes, isLoading: costsLoading } = useQuery({
+    queryKey: ["partyItemCosts", { item_id: itemId, active_only: true }],
+    queryFn: () => partyPricingService.costs.list({ item_id: itemId, active_only: true, limit: 200 }),
+  });
+  const { data: priceRowsRes, isLoading: pricesLoading } = useQuery({
+    queryKey: ["partyItemSalePrices", { item_id: itemId, active_only: true }],
+    queryFn: () => partyPricingService.prices.list({ item_id: itemId, active_only: true, limit: 200 }),
+  });
+
+  // Local edit state — keyed `${partyId}|${thickness_mm}` → string value.
+  // Two matrices: one for costs (supplier side), one for sale prices.
+  const [costGrid, setCostGrid] = useState<Record<string, string>>({});
+  const [priceGrid, setPriceGrid] = useState<Record<string, string>>({});
+  const [serverCost, setServerCost] = useState<Record<string, string>>({});
+  const [serverPrice, setServerPrice] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  // Seed editable grids from server on load (only once data arrives —
+  // re-pulls would clobber unsaved edits).
+  useEffect(() => {
+    if (!costRowsRes || costsLoading) return;
+    const next: Record<string, string> = {};
+    for (const r of costRowsRes.data ?? []) {
+      next[`${r.party_id}|${r.thickness_mm}`] = r.cost;
+    }
+    setCostGrid(next);
+    setServerCost(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costRowsRes?.data]);
+  useEffect(() => {
+    if (!priceRowsRes || pricesLoading) return;
+    const next: Record<string, string> = {};
+    for (const r of priceRowsRes.data ?? []) {
+      next[`${r.party_id}|${r.thickness_mm}`] = r.sale_price;
+    }
+    setPriceGrid(next);
+    setServerPrice(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceRowsRes?.data]);
+
+  const cellKey = (partyId: string, mm: number) => `${partyId}|${mm}`;
+
+  const onSave = async () => {
+    setSaving(true);
+    let created = 0;
+    try {
+      // Costs — POST each cell that's non-empty and changed from server.
+      if (canCosts) {
+        for (const supplier of suppliers) {
+          for (const mm of THICKNESSES_MM) {
+            const k = cellKey(supplier.id, mm);
+            const v = (costGrid[k] ?? "").trim();
+            if (!v || Number(v) <= 0) continue;
+            if (v === (serverCost[k] ?? "")) continue;
+            await partyPricingService.costs.create({
+              party_id: supplier.id, item_id: itemId, thickness_mm: mm,
+              cost: Number(v).toFixed(2),
+            });
+            created += 1;
+          }
+        }
+      }
+      // Sale prices — symmetric.
+      if (canPrices) {
+        for (const customer of customers) {
+          for (const mm of THICKNESSES_MM) {
+            const k = cellKey(customer.id, mm);
+            const v = (priceGrid[k] ?? "").trim();
+            if (!v || Number(v) <= 0) continue;
+            if (v === (serverPrice[k] ?? "")) continue;
+            await partyPricingService.prices.create({
+              party_id: customer.id, item_id: itemId, thickness_mm: mm,
+              sale_price: Number(v).toFixed(2),
+            });
+            created += 1;
+          }
+        }
+      }
+      qc.invalidateQueries({ queryKey: ["partyItemCosts"] });
+      qc.invalidateQueries({ queryKey: ["partyItemSalePrices"] });
+      if (created === 0) {
+        toast.success("No changes to save", "All cells matched the active server values.");
+      } else {
+        toast.success(`Saved ${created} price${created === 1 ? "" : "s"}`, "New versions written; prior rows auto-closed.");
+      }
+    } catch (e) {
+      toast.error(isApiError(e) ? e.message : "Could not save prices");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderMatrix = (
+    title: string,
+    description: string,
+    partyList: typeof parties,
+    grid: Record<string, string>,
+    setGrid: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+    serverBaseline: Record<string, string>,
+    disabled: boolean,
+  ) => (
+    <section className="rounded-md border border-hairline bg-white overflow-hidden">
+      <div className="px-4 py-3 border-b border-hairline">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="text-[11.5px] text-foreground-muted mt-0.5">{description}</p>
+      </div>
+      {partyList.length === 0 ? (
+        <div className="p-6 text-center text-sm text-foreground-muted">No matching parties yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead className="bg-bg-subtle text-text-tertiary text-[10.5px] uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-3 py-2 font-medium min-w-[180px]">Party</th>
+                {THICKNESSES_MM.map((mm) => (
+                  <th key={mm} className="text-right px-3 py-2 font-medium">{mm} mm</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {partyList.map((p) => (
+                <tr key={p.id} className="border-t border-hairline">
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-[10.5px] text-foreground-muted font-mono">{p.code}</div>
+                  </td>
+                  {THICKNESSES_MM.map((mm) => {
+                    const k = cellKey(p.id, mm);
+                    const v = grid[k] ?? "";
+                    const changed = v.trim() !== (serverBaseline[k] ?? "");
+                    return (
+                      <td key={mm} className="px-2 py-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={v}
+                          disabled={disabled || saving}
+                          onChange={(e) => setGrid((m) => ({ ...m, [k]: e.target.value }))}
+                          placeholder="—"
+                          className={cn(
+                            "w-full h-8 px-2 text-sm text-right tabular-nums bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20",
+                            changed ? "border-brand bg-brand/5" : "border-hairline",
+                          )}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+
+  const totalChanged =
+    Object.entries(costGrid).filter(([k, v]) => (v ?? "").trim() !== (serverCost[k] ?? "")).length +
+    Object.entries(priceGrid).filter(([k, v]) => (v ?? "").trim() !== (serverPrice[k] ?? "")).length;
+
+  if (costsLoading || pricesLoading) {
+    return <div className="flex justify-center py-10"><Spinner /></div>;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md bg-bg-subtle border border-hairline px-4 py-3 text-[12.5px] text-foreground-secondary">
+        Fill in the per-thickness prices for each party. Empty cells stay un-priced; filled cells become the new active price (the prior version gets auto-closed). One click of <span className="font-semibold">Save</span> commits every changed cell.
+      </div>
+
+      {renderMatrix(
+        "Cost from suppliers",
+        "What each supplier charges you per unit (₹, no GST shown). Drives the auto-fill on vendor bills.",
+        suppliers,
+        costGrid,
+        setCostGrid,
+        serverCost,
+        !canCosts,
+      )}
+
+      {renderMatrix(
+        "Sale price to customers (GST-inclusive)",
+        "Customer-visible per-unit price, including GST. Drives the auto-fill on estimates and invoices; the invoice reverse-calculates the taxable base from this.",
+        customers,
+        priceGrid,
+        setPriceGrid,
+        serverPrice,
+        !canPrices,
+      )}
+
+      <div className="flex items-center gap-2 sticky bottom-3">
+        <Button
+          kind="primary"
+          icon={<Save size={13} />}
+          onClick={onSave}
+          loading={saving}
+          disabled={saving || totalChanged === 0 || (!canCosts && !canPrices)}
+        >
+          Save {totalChanged > 0 ? `${totalChanged} change${totalChanged === 1 ? "" : "s"}` : "prices"}
+        </Button>
+        <span className="text-[11px] text-foreground-muted">
+          {totalChanged === 0 ? "No edits yet" : "Highlighted cells are pending save"}
+        </span>
+      </div>
+    </div>
   );
 }
 

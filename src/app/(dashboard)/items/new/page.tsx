@@ -118,8 +118,8 @@ export default function NewItemPage() {
         base_uom_id: data.base_uom_id || undefined,
         default_tax_rate_pct: data.default_tax_rate_pct || undefined,
       });
-      toast.success("Item created successfully");
-      router.push(`/items/${item.id}`);
+      toast.success("Item created", "Next: set its cost & sale prices for each vendor/customer.");
+      router.push(`/items/${item.id}?tab=set-prices`);
     } catch (err) {
       if (isApiError(err)) {
         if (err.code === "CONFLICT" || err.code === "CODE_EXISTS") {
