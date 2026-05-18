@@ -31,7 +31,7 @@ Importable entities (Phase 7 launch set):
 - `stock_balances` — opening qty_on_hand per item per location
 - `opening_balances` — carry-forward AR/AP per party
 
-Future imports (deferred): challans, invoices, payments,
+Future imports (deferred): estimates, invoices, payments,
 journal entries — none are blocking for go-live.
 
 ---

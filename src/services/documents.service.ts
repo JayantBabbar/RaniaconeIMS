@@ -46,7 +46,7 @@ export const documentService = {
     remarks?: string;
     /** Optional link to a parent document. On a GRN, this is the
      *  source PO (NULL for direct receipts). On an Invoice, this is
-     *  the source SO/Challan. */
+     *  the source SO/Estimate. */
     source_doc_id?: string | null;
   }) => api.post<DocumentHeader>(DOCUMENTS.LIST, data),
 

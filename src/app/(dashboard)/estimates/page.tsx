@@ -20,11 +20,11 @@ import {
 } from "@/components/ui/table-toolkit";
 import { useTableFilters, type ColumnDef } from "@/hooks";
 import { useToast } from "@/components/ui/toast";
-import { challanService, routeService } from "@/services/challans.service";
+import { estimateService, routeService } from "@/services/estimates.service";
 import { partyService } from "@/services/parties.service";
 import { isApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
-import type { Challan, ChallanStatus } from "@/types";
+import type { Estimate, EstimateStatus } from "@/types";
 import {
   Plus,
   ScrollText,
@@ -38,30 +38,30 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const STATUS_OPTIONS: { value: ChallanStatus; label: string }[] = [
+const STATUS_OPTIONS: { value: EstimateStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "posted", label: "Posted" },
   { value: "cancelled", label: "Cancelled" },
 ];
 
-export default function ChallansPage() {
+export default function EstimatesPage() {
   const toast = useToast();
   const qc = useQueryClient();
   const router = useRouter();
   const { can } = useCan();
 
-  const [deleteTarget, setDeleteTarget] = useState<Challan | null>(null);
-  const [postTarget, setPostTarget] = useState<Challan | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Challan | null>(null);
-  const [promoteTarget, setPromoteTarget] = useState<Challan | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Estimate | null>(null);
+  const [postTarget, setPostTarget] = useState<Estimate | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Estimate | null>(null);
+  const [promoteTarget, setPromoteTarget] = useState<Estimate | null>(null);
 
-  const { data: challans = [], isLoading } = useQuery({
-    queryKey: ["challans"],
-    queryFn: () => challanService.list({ limit: 200 }),
+  const { data: estimates = [], isLoading } = useQuery({
+    queryKey: ["estimates"],
+    queryFn: () => estimateService.list({ limit: 200 }),
   });
 
   const { data: partiesRaw } = useQuery({
-    queryKey: ["partiesForChallanList"],
+    queryKey: ["partiesForEstimateList"],
     queryFn: () => partyService.list({ limit: 200 }),
     staleTime: 5 * 60 * 1000,
   });
@@ -76,49 +76,49 @@ export default function ChallansPage() {
   const routeMap = useMemo(() => new Map(routes.map((r) => [r.id, r])), [routes]);
 
   const postMut = useMutation({
-    mutationFn: (id: string) => challanService.post(id),
+    mutationFn: (id: string) => estimateService.post(id),
     onSuccess: () => {
-      toast.success("Challan posted", "Stock OUT movements created. Goods are out for delivery.");
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      toast.success("Estimate posted", "Stock OUT movements created. Goods are out for delivery.");
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       setPostTarget(null);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not post challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not post estimate"),
   });
 
   const cancelMut = useMutation({
-    mutationFn: (target: Challan) => challanService.cancel(target.id, "Cancelled from challan list"),
+    mutationFn: (target: Estimate) => estimateService.cancel(target.id, "Cancelled from estimate list"),
     onSuccess: () => {
-      toast.success("Challan cancelled", "Reversal movements posted. Original kept for audit.");
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      toast.success("Estimate cancelled", "Reversal movements posted. Original kept for audit.");
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       setCancelTarget(null);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not cancel challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not cancel estimate"),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => challanService.delete(id),
+    mutationFn: (id: string) => estimateService.delete(id),
     onSuccess: () => {
-      toast.success("Challan deleted");
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      toast.success("Estimate deleted");
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       setDeleteTarget(null);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not delete challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not delete estimate"),
   });
 
   const promoteMut = useMutation({
-    mutationFn: (id: string) => challanService.promoteToInvoice(id),
+    mutationFn: (id: string) => estimateService.promoteToInvoice(id),
     onSuccess: ({ invoice }) => {
       toast.success("Invoice created", `Draft ${invoice.invoice_number} ready for review.`);
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       router.push(`/invoices/${invoice.id}`);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not promote challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not promote estimate"),
   });
 
-  const columns: ColumnDef<Challan>[] = [
-    { key: "challan_number", label: "Number", sortable: true, filterType: "text" },
-    { key: "challan_date", label: "Date", sortable: true },
+  const columns: ColumnDef<Estimate>[] = [
+    { key: "estimate_number", label: "Number", sortable: true, filterType: "text" },
+    { key: "estimate_date", label: "Date", sortable: true },
     {
       key: "party_id",
       label: "Customer",
@@ -160,7 +160,7 @@ export default function ChallansPage() {
     clearColumnFilter,
     clearAll,
     activeFilterCount,
-  } = useTableFilters({ data: challans, columns });
+  } = useTableFilters({ data: estimates, columns });
 
   const counts = useMemo(() => ({
     draft: rows.filter((r) => r.status === "draft").length,
@@ -170,14 +170,14 @@ export default function ChallansPage() {
   }), [rows]);
 
   return (
-    <RequireRead perm="inventory.challans.read" crumbs={["Billing", "Challans"]}>
+    <RequireRead perm="inventory.estimates.read" crumbs={["Billing", "Estimates"]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar
-        crumbs={["Billing", "Challans"]}
+        crumbs={["Billing", "Estimates"]}
         right={
-          <Can perm="inventory.challans.write">
-            <Link href="/challans/new">
-              <Button kind="primary" icon={<Plus size={13} />}>New Challan</Button>
+          <Can perm="inventory.estimates.write">
+            <Link href="/estimates/new">
+              <Button kind="primary" icon={<Plus size={13} />}>New Estimate</Button>
             </Link>
           </Can>
         }
@@ -185,12 +185,12 @@ export default function ChallansPage() {
 
       <div className="p-4 md:p-5 space-y-4">
         <PageHeader
-          title="Challans"
-          description="Delivery notes for outbound goods. Posting locks the challan and creates stock OUT movements. A challan is later promoted to a tax Invoice — that's where GST is added on top."
-          learnMore="Print mode toggles between two layouts: 'with remarks' shows amounts (admin / billing copy); 'no amount' hides prices (driver / customer copy). Pick a default per challan; override at print time."
+          title="Estimates"
+          description="Delivery notes for outbound goods. Posting locks the estimate and creates stock OUT movements. A estimate is later promoted to a tax Invoice — that's where GST is added on top."
+          learnMore="Print mode toggles between two layouts: 'with remarks' shows amounts (admin / billing copy); 'no amount' hides prices (driver / customer copy). Pick a default per estimate; override at print time."
           badge={
             <div className="flex items-center gap-1.5">
-              <Badge tone="neutral">{rows.length}{rows.length !== challans.length ? ` / ${challans.length}` : ""}</Badge>
+              <Badge tone="neutral">{rows.length}{rows.length !== estimates.length ? ` / ${estimates.length}` : ""}</Badge>
               <Badge tone="amber">{counts.draft} draft</Badge>
               <Badge tone="blue">{counts.pending} unbilled</Badge>
               <Badge tone="green">{counts.posted} posted</Badge>
@@ -231,17 +231,17 @@ export default function ChallansPage() {
           ) : rows.length === 0 ? (
             <EmptyState
               icon={<ScrollText size={22} />}
-              title={activeFilterCount > 0 ? "No challans match those filters" : "No challans yet"}
+              title={activeFilterCount > 0 ? "No estimates match those filters" : "No estimates yet"}
               description={
                 activeFilterCount > 0
                   ? "Loosen the filters or clear them to start over."
-                  : can("inventory.challans.write")
-                    ? "Create your first challan. Drafts are editable; posting creates the stock OUT movement."
-                    : "No challans have been issued yet."
+                  : can("inventory.estimates.write")
+                    ? "Create your first estimate. Drafts are editable; posting creates the stock OUT movement."
+                    : "No estimates have been issued yet."
               }
               action={
-                activeFilterCount === 0 && can("inventory.challans.write") ? (
-                  <Link href="/challans/new"><Button kind="primary" icon={<Plus size={13} />}>New Challan</Button></Link>
+                activeFilterCount === 0 && can("inventory.estimates.write") ? (
+                  <Link href="/estimates/new"><Button kind="primary" icon={<Plus size={13} />}>New Estimate</Button></Link>
                 ) : activeFilterCount > 0 ? (
                   <Button onClick={clearAll}>Clear all filters</Button>
                 ) : undefined
@@ -288,11 +288,11 @@ export default function ChallansPage() {
                   return (
                     <tr key={c.id} className="border-t border-hairline-light hover:bg-surface/50">
                       <td className="px-4 py-2.5">
-                        <Link href={`/challans/${c.id}`} className="font-mono text-xs font-bold text-brand hover:underline">
-                          {c.challan_number}
+                        <Link href={`/estimates/${c.id}`} className="font-mono text-xs font-bold text-brand hover:underline">
+                          {c.estimate_number}
                         </Link>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs">{formatDate(c.challan_date)}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs">{formatDate(c.estimate_date)}</td>
                       <td className="px-4 py-2.5">
                         {party ? (
                           <>
@@ -324,9 +324,9 @@ export default function ChallansPage() {
                       <td className="px-2 py-2.5 text-center">
                         <ActionMenu
                           items={buildRowActions(c, {
-                            canWrite: can("inventory.challans.write"),
-                            canPost: can("inventory.challans.post"),
-                            canCancel: can("inventory.challans.cancel"),
+                            canWrite: can("inventory.estimates.write"),
+                            canPost: can("inventory.estimates.post"),
+                            canCancel: can("inventory.estimates.cancel"),
                             canPromote: can("inventory.invoices.write"),
                             onPost: () => setPostTarget(c),
                             onCancel: () => setCancelTarget(c),
@@ -348,9 +348,9 @@ export default function ChallansPage() {
         open={!!postTarget}
         onClose={() => setPostTarget(null)}
         onConfirm={() => postTarget && postMut.mutate(postTarget.id)}
-        title={`Post ${postTarget?.challan_number}?`}
-        description="Posting locks the challan and creates stock OUT movements at the source location. Use Cancel later to reverse if dispatch fails."
-        confirmLabel="Post challan"
+        title={`Post ${postTarget?.estimate_number}?`}
+        description="Posting locks the estimate and creates stock OUT movements at the source location. Use Cancel later to reverse if dispatch fails."
+        confirmLabel="Post estimate"
         confirmKind="primary"
         loading={postMut.isPending}
       />
@@ -359,9 +359,9 @@ export default function ChallansPage() {
         open={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
         onConfirm={() => cancelTarget && cancelMut.mutate(cancelTarget)}
-        title={`Cancel ${cancelTarget?.challan_number}?`}
-        description="Cancellation creates reversal movements. Original stays in the audit trail. If this challan has been promoted to an invoice, cancel the invoice first."
-        confirmLabel="Cancel challan"
+        title={`Cancel ${cancelTarget?.estimate_number}?`}
+        description="Cancellation creates reversal movements. Original stays in the audit trail. If this estimate has been promoted to an invoice, cancel the invoice first."
+        confirmLabel="Cancel estimate"
         confirmKind="danger"
         loading={cancelMut.isPending}
       />
@@ -370,8 +370,8 @@ export default function ChallansPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
-        title={`Delete ${deleteTarget?.challan_number}?`}
-        description="Drafts are deletable — they never created a stock movement. Posted challans cannot be deleted; cancel them instead."
+        title={`Delete ${deleteTarget?.estimate_number}?`}
+        description="Drafts are deletable — they never created a stock movement. Posted estimates cannot be deleted; cancel them instead."
         confirmLabel="Delete draft"
         confirmKind="danger"
         loading={deleteMut.isPending}
@@ -381,8 +381,8 @@ export default function ChallansPage() {
         open={!!promoteTarget}
         onClose={() => setPromoteTarget(null)}
         onConfirm={() => promoteTarget && promoteMut.mutate(promoteTarget.id)}
-        title={`Promote ${promoteTarget?.challan_number} to invoice?`}
-        description="Creates a draft tax invoice with these lines, adding GST math from each item's default rate + customer place-of-supply. The challan flips to 'billed' and links to the new invoice. You can review and post the invoice on the next screen."
+        title={`Promote ${promoteTarget?.estimate_number} to invoice?`}
+        description="Creates a draft tax invoice with these lines, adding GST math from each item's default rate + customer place-of-supply. The estimate flips to 'billed' and links to the new invoice. You can review and post the invoice on the next screen."
         confirmLabel="Create invoice"
         confirmKind="primary"
         loading={promoteMut.isPending}
@@ -392,7 +392,7 @@ export default function ChallansPage() {
   );
 }
 
-function StatusBadge({ status }: { status: ChallanStatus }) {
+function StatusBadge({ status }: { status: EstimateStatus }) {
   const tone = status === "posted" ? "green" : status === "cancelled" ? "red" : "amber";
   const label = status === "posted" ? "Posted" : status === "cancelled" ? "Cancelled" : "Draft";
   return <Badge tone={tone}>{label}</Badge>;
@@ -409,17 +409,17 @@ interface RowActionDeps {
   onPromote: () => void;
 }
 
-function buildRowActions(c: Challan, deps: RowActionDeps) {
+function buildRowActions(c: Estimate, deps: RowActionDeps) {
   const items: Array<
     | { label: string; icon?: React.ReactNode; href?: string; onClick?: () => void; danger?: boolean }
     | { divider: true; label: "" }
   > = [
-    { label: "View", icon: <Eye size={12} />, href: `/challans/${c.id}` },
-    { label: "Print", icon: <Printer size={12} />, href: `/challans/${c.id}/print` },
+    { label: "View", icon: <Eye size={12} />, href: `/estimates/${c.id}` },
+    { label: "Print", icon: <Printer size={12} />, href: `/estimates/${c.id}/print` },
   ];
 
   if (c.status === "draft") {
-    if (deps.canWrite) items.push({ label: "Edit", icon: <Edit size={12} />, href: `/challans/${c.id}` });
+    if (deps.canWrite) items.push({ label: "Edit", icon: <Edit size={12} />, href: `/estimates/${c.id}` });
     if (deps.canPost)  items.push({ label: "Post", icon: <Lock size={12} />, onClick: deps.onPost });
     if (deps.canWrite) {
       items.push({ divider: true, label: "" });
@@ -432,7 +432,7 @@ function buildRowActions(c: Challan, deps: RowActionDeps) {
     }
     if (deps.canCancel) {
       items.push({ divider: true, label: "" });
-      items.push({ label: "Cancel challan", icon: <XIcon size={12} />, danger: true, onClick: deps.onCancel });
+      items.push({ label: "Cancel estimate", icon: <XIcon size={12} />, danger: true, onClick: deps.onCancel });
     }
   }
 

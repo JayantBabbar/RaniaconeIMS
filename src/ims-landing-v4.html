@@ -560,7 +560,7 @@ nav.site.scrolled {
 .cap-grid .tile-po        { grid-column: span 3; grid-row: span 1; }
 .cap-grid .tile-so        { grid-column: span 3; grid-row: span 1; }
 .cap-grid .tile-invoice   { grid-column: span 4; grid-row: span 2; }
-.cap-grid .tile-challan   { grid-column: span 2; grid-row: span 1; }
+.cap-grid .tile-estimate   { grid-column: span 2; grid-row: span 1; }
 .cap-grid .tile-stock     { grid-column: span 2; grid-row: span 1; }
 .cap-grid .tile-tracking  { grid-column: span 6; grid-row: span 1; }
 
@@ -991,15 +991,15 @@ nav.site.scrolled {
   margin-top: var(--s-2);
 }
 
-/* Challan */
-.ui-challan .vehicle-row {
+/* Estimate */
+.ui-estimate .vehicle-row {
   display: flex; align-items: center; gap: var(--s-3);
   padding: var(--s-3);
   background: var(--surface-deep);
   color: oklch(0.96 0 0);
   border-radius: var(--r-sm);
 }
-.ui-challan .vehicle-plate {
+.ui-estimate .vehicle-plate {
   font-family: var(--ff-mono);
   font-weight: 700;
   font-size: 12px;
@@ -1010,16 +1010,16 @@ nav.site.scrolled {
   letter-spacing: 0.05em;
   border: 1.5px solid oklch(0.18 0.020 50);
 }
-.ui-challan .vehicle-row .driver { font-size: 11px; line-height: 1.3; }
-.ui-challan .vehicle-row .driver .nm { color: oklch(0.96 0 0); font-weight: 600; }
-.ui-challan .vehicle-row .driver .ph { font-family: var(--ff-mono); font-size: 10px; color: oklch(0.85 0 0); }
-.ui-challan .route {
+.ui-estimate .vehicle-row .driver { font-size: 11px; line-height: 1.3; }
+.ui-estimate .vehicle-row .driver .nm { color: oklch(0.96 0 0); font-weight: 600; }
+.ui-estimate .vehicle-row .driver .ph { font-family: var(--ff-mono); font-size: 10px; color: oklch(0.85 0 0); }
+.ui-estimate .route {
   display: flex; align-items: center; gap: var(--s-2);
   font-family: var(--ff-mono);
   font-size: 10.5px;
   color: var(--ink-2);
 }
-.ui-challan .route .arrow { color: var(--ink-faint); }
+.ui-estimate .route .arrow { color: var(--ink-faint); }
 
 /* Tracking */
 .ui-tracking { padding: var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); flex: 1; }
@@ -1518,7 +1518,7 @@ footer .footer-bottom {
   .cap-grid .tile-po,
   .cap-grid .tile-so       { grid-column: span 2; }
   .cap-grid .tile-invoice  { grid-column: span 4; grid-row: span 2; }
-  .cap-grid .tile-challan,
+  .cap-grid .tile-estimate,
   .cap-grid .tile-stock    { grid-column: span 2; }
   .cap-grid .tile-tracking { grid-column: span 4; }
   #facts .row { grid-template-columns: repeat(3, 1fr); gap: var(--s-6); }
@@ -1617,7 +1617,7 @@ footer .footer-bottom {
         <span class="india">Built for India.</span>
       </h1>
       <p class="lead">
-        Purchase orders, GST invoices, delivery challans, live shipment
+        Purchase orders, GST invoices, delivery estimates, live shipment
         tracking &mdash; plus an AI that writes your reports. One
         platform that knows the difference between CGST and IGST.
       </p>
@@ -1937,21 +1937,21 @@ footer .footer-bottom {
       </div>
     </article>
 
-    <!-- Challan -->
-    <article class="tile tile-challan" data-tile>
+    <!-- Estimate -->
+    <article class="tile tile-estimate" data-tile>
       <div class="tile-intro">
-        <span class="tag">Delivery challan</span>
+        <span class="tag">Delivery estimate</span>
         <h3>Send goods. Document everything.</h3>
         <p>Vehicle, driver, route &mdash; captured before the truck rolls.</p>
       </div>
       <div class="window">
         <header class="window-chrome">
           <div class="dots"><i></i><i></i><i></i></div>
-          <div class="url"><span class="lock">⌁</span>app.raniacone.in / challans / DC-2026-0891</div>
+          <div class="url"><span class="lock">⌁</span>app.raniacone.in / estimates / DC-2026-0891</div>
           <div class="placeholder"></div>
         </header>
         <div class="window-body">
-          <div class="ui ui-challan">
+          <div class="ui ui-estimate">
             <div class="doc-head">
               <span class="doc-num">DC-2026-0891</span>
               <span class="pill brand"><span class="dot"></span>Dispatched</span>
@@ -2157,7 +2157,7 @@ footer .footer-bottom {
     <div class="item">
       <div class="label">Documents</div>
       <div class="num"><em>6</em> Out-of-the-box</div>
-      <div class="desc">PO, SO, Tax Invoice, Delivery Challan, Credit Note, e-Way Bill — pre-numbered, validated.</div>
+      <div class="desc">PO, SO, Tax Invoice, Delivery Estimate, Credit Note, e-Way Bill — pre-numbered, validated.</div>
     </div>
     <div class="item">
       <div class="label">Latency</div>

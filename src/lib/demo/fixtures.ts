@@ -144,8 +144,6 @@ const permDefs: Array<[string, string, string]> = [
   ["inventory.parties.read", "View parties", "inventory"],
   ["inventory.parties.write", "Edit parties", "inventory"],
   ["inventory.balances.read", "View balances", "inventory"],
-  ["inventory.movements.read", "View movements", "inventory"],
-  ["inventory.movements.write", "Post movements", "inventory"],
   ["inventory.reservations.read", "View reservations", "inventory"],
   ["inventory.reservations.write", "Manage reservations", "inventory"],
   ["inventory.documents.read", "View documents", "inventory"],
@@ -182,14 +180,23 @@ const permDefs: Array<[string, string, string]> = [
   ["inventory.invoices.post",   "Post (lock) invoices",   "inventory"],
   ["inventory.invoices.cancel", "Cancel posted invoices", "inventory"],
 
-  // Challans — delivery notes for outbound goods. Distinct from
-  // invoices because challans are dispatch artefacts (route, vehicle,
+  // Estimates — delivery notes for outbound goods. Distinct from
+  // invoices because estimates are dispatch artefacts (route, vehicle,
   // driver, Bill/NoBill toggle, two print modes), not tax documents.
   // Same 4-action split so role design can mirror invoices.
-  ["inventory.challans.read",   "View challans",          "inventory"],
-  ["inventory.challans.write",  "Create/edit challans",   "inventory"],
-  ["inventory.challans.post",   "Post (dispatch) challans", "inventory"],
-  ["inventory.challans.cancel", "Cancel posted challans", "inventory"],
+  ["inventory.estimates.read",   "View estimates",          "inventory"],
+  ["inventory.estimates.write",  "Create/edit estimates",   "inventory"],
+  ["inventory.estimates.post",   "Post (dispatch) estimates", "inventory"],
+  ["inventory.estimates.cancel", "Cancel posted estimates", "inventory"],
+
+  // Per-party pricing (Phase 14) — supplier-side cost lists and
+  // customer-side sale-price agreements. Each (party, item) row is
+  // versioned via valid_from/valid_until. Sensitive: costs feed P&L,
+  // sale prices feed receivable AR — separate from the catalog itself.
+  ["inventory.party_costs.read",   "View supplier item costs",  "inventory"],
+  ["inventory.party_costs.write",  "Edit supplier item costs",  "inventory"],
+  ["inventory.party_prices.read",  "View customer item prices", "inventory"],
+  ["inventory.party_prices.write", "Edit customer item prices", "inventory"],
 
   // Routes — sales-territory master data (Phase 1 prereq). Read-only
   // for ops; write for admin.
@@ -268,8 +275,7 @@ const permDefs: Array<[string, string, string]> = [
   //
   //   inventory.cost.read       — gates: unit_cost field on bills, line_total
   //                               column on PO/GRN tables, "Value" column on
-  //                               /balances, /valuation page, /movements
-  //                               unit_cost/total_cost columns, vendor bills
+  //                               /balances, /valuation page, vendor bills
   //                               module entirely, COGS line on P&L,
   //                               purchase register cost totals
   //   inventory.financials.read — gates: /money/* (payments, ledger, accounts,
@@ -312,9 +318,8 @@ const ALL_READ_PERMS = PERMISSIONS.filter((p) => p.code.endsWith(".read")).map(
 // stage which belongs to Admin, not Operator.
 const INVENTORY_OPS_WRITE = PERMISSIONS.filter((p) =>
   [
-    "inventory.movements.write",
     "inventory.documents.write",  "inventory.documents.post",  "inventory.documents.cancel",
-    "inventory.challans.write",   "inventory.challans.post",   "inventory.challans.cancel",
+    "inventory.estimates.write",   "inventory.estimates.post",   "inventory.estimates.cancel",
     "inventory.counts.write",     "inventory.counts.apply",
     "inventory.reservations.write",
     "inventory.lots.write",       "inventory.serials.write",
@@ -369,6 +374,10 @@ const COST_AND_FINANCIAL_READS = new Set([
   "inventory.period_close.read",
   "inventory.audit_log.read",
   "inventory.parties.write_balance",
+  // Per-party costs reveal supplier pricing — same sensitivity tier as
+  // bills/cost reads. Customer sale prices stay open so operators can
+  // fill estimates from the customer's own pricelist.
+  "inventory.party_costs.read",
   // Master Data is admin-managed; Operator can't see the Master Data
   // sidebar group, but underlying read perms (brands/categories/uoms
   // etc.) stay granted so /items can render brand + category names.
@@ -554,13 +563,14 @@ export const CATEGORIES = [
   // Nova Bond ACP collections — each NB-* product code maps to exactly
   // one collection (the marketing/finish bucket). Pricing tier roughly
   // tracks the collection: Solid/Gloss low → Premium/Neo Bond high.
-  { id: "cat-nb-wooden",    tenant_id: TENANTS[0].id, code: "NB-WOOD",   name: "Wooden Collection",      created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-stone",     tenant_id: TENANTS[0].id, code: "NB-STONE",  name: "Stone Collection",       created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-premium",   tenant_id: TENANTS[0].id, code: "NB-PREM",   name: "Premium Collection",     created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-metallic",  tenant_id: TENANTS[0].id, code: "NB-METAL",  name: "Metallic Collection",    created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-solid",     tenant_id: TENANTS[0].id, code: "NB-SOLID",  name: "Solid Color Collection", created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-gloss",     tenant_id: TENANTS[0].id, code: "NB-GLOSS",  name: "High Gloss Collection",  created_at: iso(120), updated_at: iso(120) },
-  { id: "cat-nb-neo",       tenant_id: TENANTS[0].id, code: "NB-NEO",    name: "Neo Bond Collection",    created_at: iso(120), updated_at: iso(120) },
+  // GST rate defaults to 18% for all categories (Arpit's tenant policy).
+  { id: "cat-nb-wooden",    tenant_id: TENANTS[0].id, code: "NB-WOOD",   name: "Wooden Collection",      gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-stone",     tenant_id: TENANTS[0].id, code: "NB-STONE",  name: "Stone Collection",       gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-premium",   tenant_id: TENANTS[0].id, code: "NB-PREM",   name: "Premium Collection",     gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-metallic",  tenant_id: TENANTS[0].id, code: "NB-METAL",  name: "Metallic Collection",    gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-solid",     tenant_id: TENANTS[0].id, code: "NB-SOLID",  name: "Solid Color Collection", gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-gloss",     tenant_id: TENANTS[0].id, code: "NB-GLOSS",  name: "High Gloss Collection",  gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
+  { id: "cat-nb-neo",       tenant_id: TENANTS[0].id, code: "NB-NEO",    name: "Neo Bond Collection",    gst_rate_pct: "18", created_at: iso(120), updated_at: iso(120) },
 ];
 
 export const STATUS_MASTER = [
@@ -570,34 +580,28 @@ export const STATUS_MASTER = [
   { id: "stat-cancelled", tenant_id: TENANTS[0].id, code: "cancelled", label: "Cancelled", category: "document", entity: "document", created_at: iso(100), updated_at: iso(100) },
 ];
 
-export const NUMBER_SERIES = [
-  { id: "ns-po",  tenant_id: TENANTS[0].id, code: "PO",  entity: "purchase_order", prefix: "PO-", suffix: "", padding: 5, current_value: 12, start_value: 1, created_at: iso(100), updated_at: iso(100) },
-  { id: "ns-so",  tenant_id: TENANTS[0].id, code: "SO",  entity: "sales_order",    prefix: "SO-", suffix: "", padding: 5, current_value: 8,  start_value: 1, created_at: iso(100), updated_at: iso(100) },
-  { id: "ns-trn", tenant_id: TENANTS[0].id, code: "TRN", entity: "transfer",       prefix: "TR-", suffix: "", padding: 5, current_value: 3,  start_value: 1, created_at: iso(100), updated_at: iso(100) },
-];
+// Number series — PO/SO removed 2026-05-18. GRN allocates via the
+// document-create path, not a tracked series.
+export const NUMBER_SERIES: Array<{
+  id: string; tenant_id: string; code: string; entity: string;
+  prefix: string; suffix: string; padding: number;
+  current_value: number; start_value: number;
+  created_at: string; updated_at: string;
+}> = [];
 
 export const DOCUMENT_TYPES = [
-  { id: "dt-po",     tenant_id: TENANTS[0].id, code: "PO",       name: "Purchase Order", direction: "in",       module: "inventory", affects_stock: true,  created_at: iso(100), updated_at: iso(100) },
-  { id: "dt-so",     tenant_id: TENANTS[0].id, code: "SO",       name: "Sales Order",    direction: "out",      module: "inventory", affects_stock: true,  created_at: iso(100), updated_at: iso(100) },
-  { id: "dt-trn",    tenant_id: TENANTS[0].id, code: "TRN",      name: "Transfer",        direction: "transfer", module: "inventory", affects_stock: true,  created_at: iso(100), updated_at: iso(100) },
   { id: "dt-grn",    tenant_id: TENANTS[0].id, code: "GRN",      name: "Goods Receipt",   direction: "in",       module: "inventory", affects_stock: true,  created_at: iso(100), updated_at: iso(100) },
 ];
 
 // ── Locations ──────────────────────────────────────────────────
 
+// Single-warehouse setup (Arpit's tenant). Add more rows here when a
+// second warehouse goes live. Bins are unused for now.
 export const LOCATIONS: Array<any> = [
   { id: "loc-main",    tenant_id: TENANTS[0].id, code: "WH-MAIN",  name: "Main Warehouse", location_type: "warehouse", parent_id: null, is_active: true, created_at: iso(100), updated_at: iso(100) },
-  { id: "loc-branch",  tenant_id: TENANTS[0].id, code: "WH-BRCH",  name: "Branch Warehouse", location_type: "warehouse", parent_id: null, is_active: true, created_at: iso(100), updated_at: iso(100) },
-  { id: "loc-zone-a",  tenant_id: TENANTS[0].id, code: "A",        name: "Zone A", location_type: "zone", parent_id: "loc-main", is_active: true, created_at: iso(100), updated_at: iso(100) },
-  { id: "loc-zone-b",  tenant_id: TENANTS[0].id, code: "B",        name: "Zone B", location_type: "zone", parent_id: "loc-main", is_active: true, created_at: iso(100), updated_at: iso(100) },
 ];
 
-export const BINS: Record<string, any[]> = {
-  "loc-zone-a": [
-    { id: "bin-a1", tenant_id: TENANTS[0].id, location_id: "loc-zone-a", code: "A-01", name: "Aisle 1", is_active: true, created_at: iso(100), updated_at: iso(100) },
-    { id: "bin-a2", tenant_id: TENANTS[0].id, location_id: "loc-zone-a", code: "A-02", name: "Aisle 2", is_active: true, created_at: iso(100), updated_at: iso(100) },
-  ],
-};
+export const BINS: Record<string, any[]> = {};
 
 // ── Parties ─────────────────────────────────────────────────────
 
@@ -752,16 +756,6 @@ export const BALANCES = [
   { id: "bal-nb-106",  tenant_id: TENANTS[0].id, item_id: "item-nb-106",  location_id: "loc-main", bin_id: null, lot_id: null, qty_on_hand: "26",  qty_reserved: "0",  qty_available: "26",  value: "182000.00", last_movement_id: null, version: 0, updated_at: iso(120) },
 ];
 
-// ── Movements (recent ledger) ────────────────────────────────
-
-export const MOVEMENTS = [
-  { id: "mv-1", tenant_id: TENANTS[0].id, document_id: "doc-po-1", item_id: "item-nb-1502", location_id: "loc-main", bin_id: null, lot_id: null, serial_id: null, direction: "in",  quantity: "50", uom_id: "uom-sheet", base_quantity: "50", unit_cost: "850",  total_cost: "42500", posting_date: iso(30), reference_movement_id: null, source: "PO-00001", created_at: iso(30) },
-  { id: "mv-2", tenant_id: TENANTS[0].id, document_id: "doc-po-2", item_id: "item-nb-1101", location_id: "loc-main", bin_id: null, lot_id: null, serial_id: null, direction: "in",  quantity: "200", uom_id: "uom-sheet", base_quantity: "200", unit_cost: "120",  total_cost: "24000", posting_date: iso(25), reference_movement_id: null, source: "PO-00002", created_at: iso(25) },
-  { id: "mv-3", tenant_id: TENANTS[0].id, document_id: "doc-so-1", item_id: "item-nb-1101", location_id: "loc-main", bin_id: null, lot_id: null, serial_id: null, direction: "out", quantity: "72", uom_id: "uom-sheet", base_quantity: "72", unit_cost: "120",  total_cost: "8640",  posting_date: iso(5),  reference_movement_id: null, source: "SO-00003", created_at: iso(5) },
-  { id: "mv-4", tenant_id: TENANTS[0].id, document_id: "doc-trn-1", item_id: "item-nb-1502", location_id: "loc-main",   bin_id: null, lot_id: null, serial_id: null, direction: "out", quantity: "8", uom_id: "uom-sheet", base_quantity: "8", unit_cost: "850",  total_cost: "6800", posting_date: iso(10), reference_movement_id: null, source: "TR-00001", created_at: iso(10) },
-  { id: "mv-5", tenant_id: TENANTS[0].id, document_id: "doc-trn-1", item_id: "item-nb-1502", location_id: "loc-branch", bin_id: null, lot_id: null, serial_id: null, direction: "in",  quantity: "8", uom_id: "uom-sheet", base_quantity: "8", unit_cost: "850",  total_cost: "6800", posting_date: iso(10), reference_movement_id: "mv-4", source: "TR-00001", created_at: iso(10) },
-];
-
 // ── Valuation layers ────────────────────────────────────────
 
 export const VALUATION_LAYERS = [
@@ -779,35 +773,12 @@ export const RESERVATIONS = [
 ];
 
 // ── Documents ──────────────────────────────────────────────
+// PO + SO removed 2026-05-18. GRN documents are created at runtime
+// when admin records a receipt.
 
-export const DOCUMENT_HEADERS: Array<any> = [
-  { id: "doc-po-1",  tenant_id: TENANTS[0].id, document_type_id: "dt-po",  document_number: "PO-00001", document_date: "2026-03-01", posting_date: iso(30), party_id: "party-1",   source_location_id: null, destination_location_id: "loc-main", currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-posted", remarks: "Initial stock buy", version: 1, created_at: iso(35), updated_at: iso(30) },
-  { id: "doc-po-2",  tenant_id: TENANTS[0].id, document_type_id: "dt-po",  document_number: "PO-00002", document_date: "2026-03-10", posting_date: iso(25), party_id: "party-2",   source_location_id: null, destination_location_id: "loc-main", currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-posted", remarks: "",                version: 1, created_at: iso(28), updated_at: iso(25) },
-  { id: "doc-po-3",  tenant_id: TENANTS[0].id, document_type_id: "dt-po",  document_number: "PO-00003", document_date: "2026-04-20", posting_date: null,     party_id: "party-1",   source_location_id: null, destination_location_id: "loc-main", currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-draft",  remarks: "Awaiting approval", version: 0, created_at: iso(4),  updated_at: iso(4) },
-  { id: "doc-so-1",  tenant_id: TENANTS[0].id, document_type_id: "dt-so",  document_number: "SO-00001", document_date: "2026-04-18", posting_date: iso(5),   party_id: "party-3",   source_location_id: "loc-main", destination_location_id: null, currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-posted", remarks: "",                version: 1, created_at: iso(6),  updated_at: iso(5) },
-  { id: "doc-so-2",  tenant_id: TENANTS[0].id, document_type_id: "dt-so",  document_number: "SO-00002", document_date: "2026-04-22", posting_date: null,     party_id: "party-4",   source_location_id: "loc-main", destination_location_id: null, currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-draft",  remarks: "",                version: 0, created_at: iso(2),  updated_at: iso(2) },
-  { id: "doc-trn-1", tenant_id: TENANTS[0].id, document_type_id: "dt-trn", document_number: "TR-00001", document_date: "2026-04-14", posting_date: iso(10), party_id: null,        source_location_id: "loc-main", destination_location_id: "loc-branch", currency_id: "cur-usd", exchange_rate: "1", status_id: "stat-posted", remarks: "Rebalance",        version: 1, created_at: iso(12), updated_at: iso(10) },
-];
+export const DOCUMENT_HEADERS: Array<any> = [];
 
-export const DOCUMENT_LINES: Record<string, any[]> = {
-  // All lines reference NB-* items only.
-  "doc-po-1": [
-    { id: "dl-1a", document_id: "doc-po-1", line_number: 1, item_id: "item-nb-1502", uom_id: "uom-sheet", quantity: "50", unit_price: "850", discount_pct: "0", tax_amount: "0", line_total: "42500", lot_id: null, serial_id: null, bin_id: null, remarks: "Substrate for NB-1502 Mirror Gold line" },
-  ],
-  "doc-po-2": [
-    { id: "dl-2a", document_id: "doc-po-2", line_number: 1, item_id: "item-nb-1101", uom_id: "uom-sheet", quantity: "200", unit_price: "120", discount_pct: "0", tax_amount: "0", line_total: "24000", lot_id: null, serial_id: null, bin_id: null, remarks: "Substrate for NB-1101 Bright Silver line" },
-  ],
-  "doc-po-3": [
-    { id: "dl-3a", document_id: "doc-po-3", line_number: 1, item_id: "item-nb-1213", uom_id: "uom-sheet", quantity: "100", unit_price: "20",  discount_pct: "0", tax_amount: "0", line_total: "2000", lot_id: null, serial_id: null, bin_id: null, remarks: "Substrate for NB-1213 Samsung Blue line" },
-    { id: "dl-3b", document_id: "doc-po-3", line_number: 2, item_id: "item-nb-1205", uom_id: "uom-sheet", quantity: "500", unit_price: "18",  discount_pct: "0", tax_amount: "0", line_total: "9000", lot_id: null, serial_id: null, bin_id: null, remarks: "Substrate for NB-1205 Black line" },
-  ],
-  "doc-so-1": [
-    { id: "dl-so1a", document_id: "doc-so-1", line_number: 1, item_id: "item-nb-1101", uom_id: "uom-sheet", quantity: "72", unit_price: "180", discount_pct: "0", tax_amount: "0", line_total: "12960", lot_id: null, serial_id: null, bin_id: null, remarks: "" },
-  ],
-  "doc-trn-1": [
-    { id: "dl-tr1a", document_id: "doc-trn-1", line_number: 1, item_id: "item-nb-1502", uom_id: "uom-sheet", quantity: "8", unit_price: "0", discount_pct: "0", tax_amount: "0", line_total: "0", lot_id: null, serial_id: null, bin_id: null, remarks: "Inter-warehouse rebalance" },
-  ],
-};
+export const DOCUMENT_LINES: Record<string, any[]> = {};
 
 // ── Invoices ────────────────────────────────────────────
 //
@@ -831,7 +802,7 @@ export const INVOICES = [
     party_id: "party-3",          // Greenfield Retail (MH 27)
     place_of_supply: "27",
     status: "draft",
-    challan_id: null,
+    estimate_id: null,
     irn: null,
     qr_code_data: null,
     subtotal: "1100.00",
@@ -857,7 +828,7 @@ export const INVOICES = [
     party_id: "party-4",          // Metro Chain (DL 07) — inter-state
     place_of_supply: "07",
     status: "posted",
-    challan_id: null,
+    estimate_id: null,
     irn: null,
     qr_code_data: null,
     subtotal: "1700.00",
@@ -883,7 +854,7 @@ export const INVOICES = [
     party_id: "party-3",
     place_of_supply: "27",
     status: "cancelled",
-    challan_id: null,
+    estimate_id: null,
     irn: null,
     qr_code_data: null,
     subtotal: "270.00",
@@ -926,7 +897,7 @@ export const INVOICE_LINES: Record<string, unknown[]> = {
 //
 // Demo sales territories — five common Indian distribution routes.
 // Tenants in production add their own. Routes drive cascading
-// customer pickers on Challan/SO/Invoice forms (Phase 1 polish).
+// customer pickers on Estimate/SO/Invoice forms (Phase 1 polish).
 
 export const ROUTES = [
   { id: "route-mum-n", tenant_id: TENANTS[0].id, code: "MUM-N",   name: "Mumbai North",     is_active: true,  created_at: iso(120), updated_at: iso(120) },
@@ -936,23 +907,23 @@ export const ROUTES = [
   { id: "route-del-n", tenant_id: TENANTS[0].id, code: "DEL-N",   name: "Delhi NCR (north)", is_active: true, created_at: iso(120), updated_at: iso(120) },
 ];
 
-// ── Challans ────────────────────────────────────────────
+// ── Estimates ────────────────────────────────────────────
 //
-// Three demo challans showing the full state machine:
+// Three demo estimates showing the full state machine:
 //   ch-1  draft, no route assigned yet                    (editable)
 //   ch-2  posted, with route + vehicle + driver           (in-flight)
 //   ch-3  posted + billed (linked to invoice inv-2)       (closed)
 //
-// is_billed flips when the user picks the challan in the Source-
-// Challan dropdown on a new Invoice. The link is bi-directional:
-// challan.invoice_id <-> invoice.challan_id.
+// is_billed flips when the user picks the estimate in the Source-
+// Estimate dropdown on a new Invoice. The link is bi-directional:
+// estimate.invoice_id <-> invoice.estimate_id.
 
-export const CHALLANS = [
+export const ESTIMATES = [
   {
     id: "ch-1",
     tenant_id: TENANTS[0].id,
-    challan_number: "DC/2026-04/0011",
-    challan_date: "2026-04-25",
+    estimate_number: "DC/2026-04/0011",
+    estimate_date: "2026-04-25",
     party_id: "party-3",                  // Greenfield Retail (MH)
     route_id: null,
     source_location_id: "loc-main",
@@ -980,8 +951,8 @@ export const CHALLANS = [
   {
     id: "ch-2",
     tenant_id: TENANTS[0].id,
-    challan_number: "DC/2026-04/0009",
-    challan_date: "2026-04-22",
+    estimate_number: "DC/2026-04/0009",
+    estimate_date: "2026-04-22",
     party_id: "party-3",
     route_id: "route-mum-n",
     source_location_id: "loc-main",
@@ -1009,8 +980,8 @@ export const CHALLANS = [
   {
     id: "ch-3",
     tenant_id: TENANTS[0].id,
-    challan_number: "DC/2026-04/0006",
-    challan_date: "2026-04-14",
+    estimate_number: "DC/2026-04/0006",
+    estimate_date: "2026-04-14",
     party_id: "party-4",                   // Metro Chain (Delhi — inter-state)
     route_id: "route-del-n",
     source_location_id: "loc-main",
@@ -1037,16 +1008,16 @@ export const CHALLANS = [
   },
 ];
 
-export const CHALLAN_LINES: Record<string, unknown[]> = {
+export const ESTIMATE_LINES: Record<string, unknown[]> = {
   "ch-1": [
-    { id: "cl-1a", challan_id: "ch-1", line_number: 1, item_id: "item-nb-1101", description: "NB-1101 Bright Silver — Metallic Collection · 2mm sample sheet", uom_id: "uom-sheet", quantity:  "5", unit_price: "180", discount_pct: "0", line_total:  "900.00", lot_id: null, serial_id: null, remarks: "" },
-    { id: "cl-1b", challan_id: "ch-1", line_number: 2, item_id: "item-nb-1205", description: "NB-1205 Black — Solid Color Collection · 2mm clearance",          uom_id: "uom-sheet", quantity: "10", unit_price:  "20", discount_pct: "0", line_total:  "200.00", lot_id: null, serial_id: null, remarks: "" },
+    { id: "cl-1a", estimate_id: "ch-1", line_number: 1, item_id: "item-nb-1101", description: "NB-1101 Bright Silver — Metallic Collection · 2mm sample sheet", uom_id: "uom-sheet", quantity:  "5", unit_price: "180", discount_pct: "0", line_total:  "900.00", lot_id: null, serial_id: null, remarks: "" },
+    { id: "cl-1b", estimate_id: "ch-1", line_number: 2, item_id: "item-nb-1205", description: "NB-1205 Black — Solid Color Collection · 2mm clearance",          uom_id: "uom-sheet", quantity: "10", unit_price:  "20", discount_pct: "0", line_total:  "200.00", lot_id: null, serial_id: null, remarks: "" },
   ],
   "ch-2": [
-    { id: "cl-2a", challan_id: "ch-2", line_number: 1, item_id: "item-nb-1101", description: "NB-1101 Bright Silver — Metallic Collection · 2mm sample sheet", uom_id: "uom-sheet", quantity:  "5", unit_price: "180", discount_pct: "0", line_total:  "900.00", lot_id: null, serial_id: null, remarks: "" },
+    { id: "cl-2a", estimate_id: "ch-2", line_number: 1, item_id: "item-nb-1101", description: "NB-1101 Bright Silver — Metallic Collection · 2mm sample sheet", uom_id: "uom-sheet", quantity:  "5", unit_price: "180", discount_pct: "0", line_total:  "900.00", lot_id: null, serial_id: null, remarks: "" },
   ],
   "ch-3": [
-    { id: "cl-3a", challan_id: "ch-3", line_number: 1, item_id: "item-nb-1502", description: "NB-1502 Mirror Gold — Premium Collection · 4mm",                  uom_id: "uom-sheet", quantity:  "2", unit_price: "850", discount_pct: "0", line_total: "1700.00", lot_id: null, serial_id: null, remarks: "" },
+    { id: "cl-3a", estimate_id: "ch-3", line_number: 1, item_id: "item-nb-1502", description: "NB-1502 Mirror Gold — Premium Collection · 4mm",                  uom_id: "uom-sheet", quantity:  "2", unit_price: "850", discount_pct: "0", line_total: "1700.00", lot_id: null, serial_id: null, remarks: "" },
   ],
 };
 
@@ -1054,7 +1025,7 @@ export const CHALLAN_LINES: Record<string, unknown[]> = {
 
 export const COUNTS = [
   { id: "cnt-1", tenant_id: TENANTS[0].id, count_number: "CNT-001", count_date: "2026-04-10", location_id: "loc-main", remarks: "Quarterly count", created_at: iso(14), updated_at: iso(14) },
-  { id: "cnt-2", tenant_id: TENANTS[0].id, count_number: "CNT-002", count_date: "2026-04-22", location_id: "loc-branch", remarks: "", created_at: iso(2),  updated_at: iso(2) },
+  { id: "cnt-2", tenant_id: TENANTS[0].id, count_number: "CNT-002", count_date: "2026-04-22", location_id: "loc-main", remarks: "", created_at: iso(2),  updated_at: iso(2) },
 ];
 
 export const COUNT_LINES: Record<string, any[]> = {
@@ -1197,6 +1168,103 @@ export const ITEM_PRICING_RULES: Array<any> = [
   { id: "pr-1502-4-3050", tenant_id: TENANTS[0].id, item_id: "item-nb-1502", thickness_mm: 4, size_code: "1220x3050", sale_price: "14375.00", valid_from: "2026-03-03", valid_until: null, notes: "Q4 list price",              created_at: iso(60), created_by: "user-admin" },
   { id: "pr-1502-4-3660", tenant_id: TENANTS[0].id, item_id: "item-nb-1502", thickness_mm: 4, size_code: "1220x3660", sale_price: "17250.00", valid_from: "2026-03-03", valid_until: null, notes: "Q4 list price",              created_at: iso(60), created_by: "user-admin" },
 ];
+
+// ── Per-party pricing (Phase 14) ──────────────────────────
+//
+// Two parallel tables: supplier costs and customer sale prices.
+// Same valid_from/valid_until version mechanic as ITEM_PRICING_RULES.
+//
+// Comprehensive FY2026 seed: every item × every thickness × every party.
+// `Item.default_sale_price` is treated as the 4mm baseline; per-thickness
+// multipliers shape the per-mm curve, then party multipliers apply.
+// The UI's "Add / update price" flow inserts a new row with today's date
+// and auto-closes whichever FY row was active for that (party, item, mm).
+//
+//   Per-thickness multiplier (mm → multiplier of 4mm base):
+//     2mm  0.50    3mm  0.75    4mm  1.00    5mm  1.25    8mm  1.80
+//
+//   Supplier party multipliers (cost = base × thicknessMult × partyMult):
+//     party-1 Kaizen Imports       0.60  ← primary, best cost
+//     party-2 Horizon Traders      0.62  ← secondary
+//     party-5 Unity Distributors   0.65  ← backup
+//
+//   Customer party multipliers (sale = base × thicknessMult × partyMult, GST-inclusive):
+//     party-3 Greenfield Retail    0.95  ← bulk retail, best terms
+//     party-4 Metro Chain Stores   1.00  ← standard list
+//     party-5 Unity Distributors   1.02  ← smaller customer, slight premium
+function __buildPartyPricing() {
+  const customerMult: Record<string, number> = {
+    "party-3": 0.95,
+    "party-4": 1.00,
+    "party-5": 1.02,
+  };
+  const supplierMult: Record<string, number> = {
+    "party-1": 0.60,
+    "party-2": 0.62,
+    "party-5": 0.65,
+  };
+  // Inlined to avoid import order issues — same values as
+  // src/lib/constants.ts THICKNESSES_MM / THICKNESS_PRICE_MULTIPLIER.
+  const thicknesses: ReadonlyArray<number> = [2, 3, 4, 5, 8];
+  const thicknessMult: Record<number, number> = {
+    2: 0.50, 3: 0.75, 4: 1.00, 5: 1.25, 8: 1.80,
+  };
+  const prices: Array<{
+    id: string; tenant_id: string; party_id: string; item_id: string;
+    thickness_mm: number; sale_price: string;
+    valid_from: string; valid_until: string | null;
+    notes: string; created_at: string; created_by: string;
+  }> = [];
+  const costs: Array<{
+    id: string; tenant_id: string; party_id: string; item_id: string;
+    thickness_mm: number; cost: string;
+    valid_from: string; valid_until: string | null;
+    notes: string; created_at: string; created_by: string;
+  }> = [];
+  let p = 1, c = 1;
+  for (const item of ITEMS) {
+    const base = Number(item.default_sale_price);
+    if (!Number.isFinite(base) || base <= 0) continue;
+    for (const mm of thicknesses) {
+      const tMult = thicknessMult[mm] ?? 1;
+      for (const [partyId, partyM] of Object.entries(customerMult)) {
+        prices.push({
+          id: `pis-${p++}`,
+          tenant_id: TENANTS[0].id,
+          party_id: partyId,
+          item_id: item.id,
+          thickness_mm: mm,
+          sale_price: Math.round(base * tMult * partyM).toFixed(2),
+          valid_from: "2026-04-01",
+          valid_until: null,
+          notes: `FY2026 pricelist · ${mm}mm`,
+          created_at: iso(48),
+          created_by: "user-admin",
+        });
+      }
+      for (const [partyId, partyM] of Object.entries(supplierMult)) {
+        costs.push({
+          id: `pic-${c++}`,
+          tenant_id: TENANTS[0].id,
+          party_id: partyId,
+          item_id: item.id,
+          thickness_mm: mm,
+          cost: Math.round(base * tMult * partyM).toFixed(2),
+          valid_from: "2026-04-01",
+          valid_until: null,
+          notes: `FY2026 contract · ${mm}mm`,
+          created_at: iso(48),
+          created_by: "user-admin",
+        });
+      }
+    }
+  }
+  return { prices, costs };
+}
+
+const __partyPricing = __buildPartyPricing();
+export const PARTY_ITEM_COSTS: Array<any> = __partyPricing.costs;
+export const PARTY_ITEM_SALE_PRICES: Array<any> = __partyPricing.prices;
 
 // ── Audit log (Phase 9) ───────────────────────────────────
 //
@@ -1349,12 +1417,12 @@ export const FINANCIAL_ACCOUNTS: Array<any> = [
 // /money/expenses/categories. Each category's `expense_account_id`
 // points at its dedicated ledger so reports can roll up cleanly.
 export const EXPENSE_CATEGORIES: Array<any> = [
-  { id: "ecat-food",    tenant_id: TENANTS[0].id, code: "FOOD",    name: "Food & refreshments",  is_capital: false, is_active: true, expense_account_id: "acc-exp-food",    created_at: iso(280), updated_at: iso(280) },
-  { id: "ecat-petrol",  tenant_id: TENANTS[0].id, code: "PETROL",  name: "Petrol",               is_capital: false, is_active: true, expense_account_id: "acc-exp-petrol",  created_at: iso(280), updated_at: iso(280) },
-  { id: "ecat-diesel",  tenant_id: TENANTS[0].id, code: "DIESEL",  name: "Diesel",               is_capital: false, is_active: true, expense_account_id: "acc-exp-diesel",  created_at: iso(280), updated_at: iso(280) },
-  { id: "ecat-labour",  tenant_id: TENANTS[0].id, code: "LABOUR",  name: "Daily wages / Labour", is_capital: false, is_active: true, expense_account_id: "acc-exp-labour",  created_at: iso(280), updated_at: iso(280) },
-  { id: "ecat-capital", tenant_id: TENANTS[0].id, code: "CAPITAL", name: "Capital expenditure",  is_capital: true,  is_active: true, expense_account_id: "acc-exp-capital", created_at: iso(280), updated_at: iso(280) },
-  { id: "ecat-travel",  tenant_id: TENANTS[0].id, code: "TRAVEL",  name: "Travel & lodging",     is_capital: false, is_active: true, expense_account_id: "acc-exp-travel",  created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-food",    tenant_id: TENANTS[0].id, code: "FOOD",    name: "Food & refreshments",  is_capital: false, is_fuel: false, is_active: true, expense_account_id: "acc-exp-food",    created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-petrol",  tenant_id: TENANTS[0].id, code: "PETROL",  name: "Petrol",               is_capital: false, is_fuel: true,  is_active: true, expense_account_id: "acc-exp-petrol",  created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-diesel",  tenant_id: TENANTS[0].id, code: "DIESEL",  name: "Diesel",               is_capital: false, is_fuel: true,  is_active: true, expense_account_id: "acc-exp-diesel",  created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-labour",  tenant_id: TENANTS[0].id, code: "LABOUR",  name: "Daily wages / Labour", is_capital: false, is_fuel: false, is_active: true, expense_account_id: "acc-exp-labour",  created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-capital", tenant_id: TENANTS[0].id, code: "CAPITAL", name: "Capital expenditure",  is_capital: true,  is_fuel: false, is_active: true, expense_account_id: "acc-exp-capital", created_at: iso(280), updated_at: iso(280) },
+  { id: "ecat-travel",  tenant_id: TENANTS[0].id, code: "TRAVEL",  name: "Travel & lodging",     is_capital: false, is_fuel: false, is_active: true, expense_account_id: "acc-exp-travel",  created_at: iso(280), updated_at: iso(280) },
 ];
 
 // ── Vendor Bills ───────────────────────────────────────────
@@ -1404,6 +1472,7 @@ export const EXPENSES_FX: Array<any> = [
     vendor_id: null,
     description: "Vehicle fuel — MUM-N route, week of Apr 22",
     attachment_id: null,
+    vehicle_number: "MH-12-AB-3491",
     status: "posted",
     posting_date: iso(2),
     cancelled_at: null, cancellation_reason: null,
@@ -1603,11 +1672,11 @@ export const PAYMENTS: Array<any> = [
 // so 1175 is "on account" (over-payment). UI treats negative
 // outstanding as customer credit.
 export const PAYMENT_ALLOCATIONS: Array<any> = [
-  { id: "alloc-1", payment_id: "pay-1", invoice_id: "inv-2", challan_id: null, amount: "12500.00" },
-  { id: "alloc-2", payment_id: "pay-2", invoice_id: "inv-2", challan_id: null, amount: "50000.00" },
-  { id: "alloc-3", payment_id: "pay-3", invoice_id: "inv-2", challan_id: null, amount: "8750.00" },
-  { id: "alloc-4", payment_id: "pay-4", invoice_id: "inv-2", challan_id: null, amount: "5500.00" },
-  { id: "alloc-5", payment_id: "pay-5", invoice_id: "inv-2", challan_id: null, amount: "7325.00" },
+  { id: "alloc-1", payment_id: "pay-1", invoice_id: "inv-2", estimate_id: null, amount: "12500.00" },
+  { id: "alloc-2", payment_id: "pay-2", invoice_id: "inv-2", estimate_id: null, amount: "50000.00" },
+  { id: "alloc-3", payment_id: "pay-3", invoice_id: "inv-2", estimate_id: null, amount: "8750.00" },
+  { id: "alloc-4", payment_id: "pay-4", invoice_id: "inv-2", estimate_id: null, amount: "5500.00" },
+  { id: "alloc-5", payment_id: "pay-5", invoice_id: "inv-2", estimate_id: null, amount: "7325.00" },
   // pay-5 is over-applied above to keep numbers clean; remainder
   // 1175.00 is "unallocated" — see allocated_amount on pay-5.
 ];

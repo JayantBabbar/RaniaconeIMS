@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/shared";
 import { useAuth } from "@/providers/auth-provider";
-import { balanceService, movementService } from "@/services/stock.service";
+import { balanceService } from "@/services/stock.service";
 import { documentService } from "@/services/documents.service";
 import { countService } from "@/services/counts.service";
 import { itemService } from "@/services/items.service";
@@ -18,7 +18,7 @@ import { documentTypeService } from "@/services/master-data.service";
 import { useCanSeeCost } from "@/components/ui/cost-mask";
 import {
   DollarSign, Box, FileText, ClipboardList, FileWarning,
-  ArrowDownToLine, ArrowUpFromLine, ArrowRight,
+  ArrowRight,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -29,10 +29,6 @@ export default function DashboardPage() {
   const { data: balancesRaw, isLoading: balancesLoading } = useQuery({
     queryKey: ["dashboard-balances"],
     queryFn: () => balanceService.list({ limit: 200, only_nonzero: true }),
-  });
-  const { data: movementsRaw } = useQuery({
-    queryKey: ["dashboard-movements"],
-    queryFn: () => movementService.list({ limit: 10 }),
   });
   const { data: docsRaw } = useQuery({
     queryKey: ["dashboard-docs"],
@@ -88,14 +84,13 @@ export default function DashboardPage() {
   }, [canSeeCost, grnTypeId, docsRaw, billsRaw]);
 
   const balances = balancesRaw ?? [];
-  const movements = movementsRaw ?? [];
   const docs = docsRaw || [];
   const counts = countsRaw || [];
   const items = itemsRaw?.data || [];
   const locations = locsRaw?.data || [];
 
   const itemMap = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const locMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
+  void locations;
 
   // KPIs
   const totalValue = useMemo(
@@ -169,50 +164,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Two column: recent movements + recent documents */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Recent movements */}
-          <div className="bg-white border border-hairline rounded-md overflow-hidden">
-            <div className="px-4 md:px-5 py-3 border-b border-hairline-light flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Recent movements</h2>
-              <Link href="/movements" className="text-xs text-brand font-medium hover:underline flex items-center gap-1">
-                View all <ArrowRight size={11} />
-              </Link>
-            </div>
-            {movements.length === 0 ? (
-              <div className="py-10 text-center text-sm text-foreground-muted">
-                {balancesLoading ? <Spinner size={18} /> : "No movements yet"}
-              </div>
-            ) : (
-              <div className="divide-y divide-hairline-light">
-                {movements.slice(0, 8).map((m) => {
-                  const item = itemMap.get(m.item_id);
-                  const loc = locMap.get(m.location_id);
-                  return (
-                    <div key={m.id} className="flex items-center gap-3 px-4 md:px-5 py-2.5">
-                      <div className="flex-shrink-0">
-                        {m.direction === "in"
-                          ? <ArrowDownToLine size={14} className="text-status-green-text" />
-                          : <ArrowUpFromLine size={14} className="text-status-red-text" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{item?.name || "—"}</div>
-                        <div className="text-[11px] text-foreground-muted font-mono truncate">
-                          {item?.item_code} · {loc?.code}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-sm tabular-nums font-medium">{m.quantity}</div>
-                        <div className="text-[11px] text-foreground-muted">{formatDate(m.posting_date)}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Recent documents */}
+        {/* Recent documents */}
+        <div className="grid grid-cols-1 gap-4">
           <div className="bg-white border border-hairline rounded-md overflow-hidden">
             <div className="px-4 md:px-5 py-3 border-b border-hairline-light flex items-center justify-between">
               <h2 className="text-sm font-semibold">Recent documents</h2>
@@ -252,8 +205,8 @@ export default function DashboardPage() {
         <div className="bg-white border border-hairline rounded-md p-5">
           <h2 className="text-sm font-semibold mb-3">Quick actions</h2>
           <div className="flex flex-wrap gap-2">
-            <Link href="/documents/purchase-orders/new"><Button kind="primary">New purchase order</Button></Link>
-            <Link href="/documents/sales-orders/new"><Button>New sales order</Button></Link>
+            <Link href="/estimates/new"><Button kind="primary">New estimate</Button></Link>
+            <Link href="/documents/goods-receipts/new"><Button>New goods receipt</Button></Link>
             <Link href="/counts"><Button>Start stock count</Button></Link>
             <Link href="/items"><Button>Add item</Button></Link>
           </div>

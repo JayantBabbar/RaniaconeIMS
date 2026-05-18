@@ -1,5 +1,8 @@
 import type { AxiosAdapter, AxiosResponse } from "axios";
 import * as F from "./fixtures";
+import { buildInvoiceLinesFromEstimate } from "@/lib/estimate-to-invoice";
+import { computeGstLine, aggregateInvoiceTotals } from "@/lib/gst";
+import type { Estimate, EstimateLine, Item } from "@/types";
 
 // ═══════════════════════════════════════════════════════════════════
 // Demo axios adapter — routes every request to an in-memory handler
@@ -150,6 +153,18 @@ function queryParams(url: string): Record<string, string> {
 export const demoAdapter: AxiosAdapter = async (config) => {
   const method = (config.method || "get").toUpperCase();
   const url = new URL(config.url || "", config.baseURL || "http://localhost");
+  // axios passes query params as a separate `config.params` object; the
+  // default xhr/http adapters merge them into the URL internally, but a
+  // custom adapter has to do it manually. Without this step, every
+  // `queryParams(url.search)` call sees an empty object — fine for
+  // endpoints whose filters are optional, fatal for the few that throw
+  // on missing required params (e.g. /party-item-sale-prices/lookup).
+  if (config.params && typeof config.params === "object") {
+    for (const [k, v] of Object.entries(config.params as Record<string, unknown>)) {
+      if (v === undefined || v === null) continue;
+      url.searchParams.set(k, String(v));
+    }
+  }
   const path = url.pathname.replace(/^\/api\/v1/, "");
   const body =
     typeof config.data === "string"
@@ -448,7 +463,6 @@ export const demoAdapter: AxiosAdapter = async (config) => {
 
   // ─── Stock ────────────────────────────
   if (method === "GET" && path === "/balances")        return delay(ok(listFor(F.BALANCES)));
-  if (method === "GET" && path === "/movements")       return delay(ok(listFor(F.MOVEMENTS)));
   if (method === "GET" && path === "/valuation-layers") return delay(ok(listFor(F.VALUATION_LAYERS)));
   if (method === "GET" && path === "/reservations")    return delay(ok(listFor(F.RESERVATIONS)));
 
@@ -699,29 +713,29 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     }));
   }
 
-  // ─── Challans ──────────────────────────
-  if (method === "GET" && path === "/challans") {
+  // ─── Estimates ──────────────────────────
+  if (method === "GET" && path === "/estimates") {
     const q = queryParams(url.search);
-    let rows = listFor(F.CHALLANS);
+    let rows = listFor(F.ESTIMATES);
     if (q.party_id)   rows = rows.filter((r) => r.party_id === q.party_id);
     if (q.status)     rows = rows.filter((r) => r.status === q.status);
     if (q.is_billed)  rows = rows.filter((r) => String(r.is_billed) === q.is_billed);
     return delay(ok(rows));
   }
-  const chm = match(path, "/challans/:id");
+  const chm = match(path, "/estimates/:id");
   if (method === "GET" && chm) {
-    const c = F.CHALLANS.find((x) => x.id === chm.id);
-    return c ? delay(ok(c)) : (() => { throw fail(404, "CHALLAN_NOT_FOUND", "Challan not found"); })();
+    const c = F.ESTIMATES.find((x) => x.id === chm.id);
+    return c ? delay(ok(c)) : (() => { throw fail(404, "ESTIMATE_NOT_FOUND", "Estimate not found"); })();
   }
-  const chlm = match(path, "/challans/:id/lines");
+  const chlm = match(path, "/estimates/:id/lines");
   if (method === "GET" && chlm) {
-    return delay(ok(F.CHALLAN_LINES[chlm.id] ?? []));
+    return delay(ok(F.ESTIMATE_LINES[chlm.id] ?? []));
   }
-  const chpm = match(path, "/challans/:id/post");
+  const chpm = match(path, "/estimates/:id/post");
   if (method === "POST" && chpm) {
-    const c = F.CHALLANS.find((x) => x.id === chpm.id);
-    if (!c) throw fail(404, "CHALLAN_NOT_FOUND", "Challan not found");
-    if (c.status !== "draft") throw fail(409, "CHALLAN_NOT_DRAFT", `Challan is ${c.status}`);
+    const c = F.ESTIMATES.find((x) => x.id === chpm.id);
+    if (!c) throw fail(404, "ESTIMATE_NOT_FOUND", "Estimate not found");
+    if (c.status !== "draft") throw fail(409, "ESTIMATE_NOT_DRAFT", `Estimate is ${c.status}`);
     return delay(ok({
       ...c,
       status: "posted" as const,
@@ -730,11 +744,11 @@ export const demoAdapter: AxiosAdapter = async (config) => {
       updated_at: new Date().toISOString(),
     }));
   }
-  const chcm = match(path, "/challans/:id/cancel");
+  const chcm = match(path, "/estimates/:id/cancel");
   if (method === "POST" && chcm) {
-    const c = F.CHALLANS.find((x) => x.id === chcm.id);
-    if (!c) throw fail(404, "CHALLAN_NOT_FOUND", "Challan not found");
-    if (c.status !== "posted") throw fail(409, "CHALLAN_NOT_POSTED", `Challan is ${c.status}`);
+    const c = F.ESTIMATES.find((x) => x.id === chcm.id);
+    if (!c) throw fail(404, "ESTIMATE_NOT_FOUND", "Estimate not found");
+    if (c.status !== "posted") throw fail(409, "ESTIMATE_NOT_POSTED", `Estimate is ${c.status}`);
     const reason = (body && typeof body === "object" && "reason" in body)
       ? String((body as { reason?: unknown }).reason ?? "") : "";
     return delay(ok({
@@ -746,28 +760,102 @@ export const demoAdapter: AxiosAdapter = async (config) => {
       updated_at: new Date().toISOString(),
     }));
   }
-  const chprom = match(path, "/challans/:id/promote-to-invoice");
+  const chprom = match(path, "/estimates/:id/promote-to-invoice");
   if (method === "POST" && chprom) {
-    // Promote — server-side this would create a real Invoice. For
-    // the demo we just return a synthetic invoice stub the FE can
-    // route to. The challan flips to is_billed=true with a fake
-    // invoice_id so subsequent reads reflect the link.
-    const c = F.CHALLANS.find((x) => x.id === chprom.id);
-    if (!c) throw fail(404, "CHALLAN_NOT_FOUND", "Challan not found");
-    if (c.status !== "posted") throw fail(409, "CHALLAN_NOT_POSTED", "Only posted challans can be promoted");
-    if (c.is_billed) throw fail(409, "CHALLAN_ALREADY_BILLED", "This challan is already linked to an invoice");
+    // Promote estimate → invoice. Business rule: quantity doubles and
+    // unit_price is reverse-GST'd so the customer-visible per-unit price
+    // matches the estimate's. Stock is NOT moved again — estimate's
+    // post already drained inventory; backend will skip the OUT
+    // movement on invoice-post when estimate_id is set.
+    const est = F.ESTIMATES.find((x) => x.id === chprom.id);
+    if (!est) throw fail(404, "ESTIMATE_NOT_FOUND", "Estimate not found");
+    if (est.status !== "posted") throw fail(409, "ESTIMATE_NOT_POSTED", "Only posted estimates can be promoted");
+    if (est.is_billed) throw fail(409, "ESTIMATE_ALREADY_BILLED", "This estimate is already linked to an invoice");
+
+    const estLines = (F.ESTIMATE_LINES[est.id] ?? []) as unknown as EstimateLine[];
+    const itemById = new Map((F.ITEMS as unknown as Item[]).map((it) => [it.id, it]));
+    const drafts = buildInvoiceLinesFromEstimate(est as unknown as Estimate, estLines, itemById);
+
+    const customer = (F.PARTIES as Array<{ id: string; state_code?: string }>).find((p) => p.id === est.party_id);
+    const tenant = (F.TENANTS as Array<{ id: string; state_code?: string }>).find((t) => t.id === tid);
+    const sellerStateCode = tenant?.state_code ?? "27";
+    const placeOfSupply = customer?.state_code ?? sellerStateCode;
+
     const newInvId = F.uid("inv");
-    return delay(ok({
-      challan: { ...c, is_billed: true, invoice_id: newInvId, version: c.version + 1, updated_at: new Date().toISOString() },
-      invoice: {
-        id: newInvId,
-        invoice_number: `INV/PROMO-${Date.now().toString().slice(-5)}`,
-        challan_id: c.id,
-        status: "draft",
-        party_id: c.party_id,
-        invoice_date: new Date().toISOString().slice(0, 10),
-      },
+    const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+    const existingNumbers = (F.INVOICES as Array<{ invoice_number: string }>)
+      .map((i) => Number(i.invoice_number.split("/").pop()) || 0);
+    const nextSeq = (existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1;
+    const invoiceNumber = `INV/${yearMonth}/${String(nextSeq).padStart(4, "0")}`;
+
+    const lineComputations = drafts.map((d) =>
+      computeGstLine({
+        unit_price: d.unit_price,
+        quantity: d.quantity,
+        discount_pct: d.discount_pct,
+        rate_pct: d.rate_pct,
+        cess_pct: d.cess_pct,
+        seller_state_code: sellerStateCode,
+        place_of_supply: placeOfSupply,
+      }),
+    );
+    const totals = aggregateInvoiceTotals(lineComputations);
+
+    const newLines = drafts.map((d, idx) => ({
+      id: F.uid("il"),
+      invoice_id: newInvId,
+      line_number: idx + 1,
+      item_id: d.item_id,
+      hsn_code: d.hsn_code,
+      description: d.description,
+      uom_id: d.uom_id,
+      quantity: d.quantity,
+      unit_price: d.unit_price,
+      discount_pct: d.discount_pct,
+      rate_pct: d.rate_pct,
+      taxable_value: lineComputations[idx].taxable_value,
+      cgst_amount: lineComputations[idx].cgst_amount,
+      sgst_amount: lineComputations[idx].sgst_amount,
+      igst_amount: lineComputations[idx].igst_amount,
+      cess_amount: lineComputations[idx].cess_amount,
+      line_total: lineComputations[idx].line_total,
+      lot_id: null, serial_id: null, remarks: "",
+      thickness_mm: d.thickness_mm,
+      size_code: d.size_code,
     }));
+
+    const newInvoice = {
+      id: newInvId,
+      tenant_id: tid as string,
+      invoice_number: invoiceNumber,
+      invoice_date: new Date().toISOString().slice(0, 10),
+      due_date: null,
+      party_id: est.party_id,
+      place_of_supply: placeOfSupply,
+      status: "draft" as const,
+      estimate_id: est.id,
+      irn: null, qr_code_data: null,
+      subtotal: totals.subtotal,
+      tax_total: totals.tax_total,
+      round_off: totals.round_off,
+      grand_total: totals.grand_total,
+      amount_in_words: "",
+      remarks: `Auto-promoted from estimate ${est.estimate_number ?? est.id}`,
+      posting_date: null, cancelled_at: null, cancellation_reason: null,
+      version: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    (F.INVOICES as Array<unknown>).push(newInvoice);
+    if (!F.INVOICE_LINES[newInvId]) F.INVOICE_LINES[newInvId] = [];
+    (F.INVOICE_LINES[newInvId] as Array<unknown>).push(...newLines);
+
+    const updatedEstimate = { ...est, is_billed: true, invoice_id: newInvId, version: est.version + 1, updated_at: new Date().toISOString() };
+    const estIdx = F.ESTIMATES.findIndex((x) => x.id === est.id);
+    if (estIdx >= 0) (F.ESTIMATES as Array<unknown>)[estIdx] = updatedEstimate;
+
+    return delay(ok({ estimate: updatedEstimate, invoice: newInvoice }));
   }
 
   // ─── Routes ───────────────────────────
@@ -987,6 +1075,54 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     return c ? delay(ok(c)) : (() => { throw fail(404, "EXPENSE_CATEGORY_NOT_FOUND", "Category not found"); })();
   }
 
+  if (method === "POST" && path === "/expenses") {
+    const reqBody = (typeof body === "object" && body) ? body as {
+      expense_date?: string; category_id?: string; amount?: string;
+      paid_from_account_id?: string; vendor_id?: string;
+      description?: string; attachment_id?: string;
+      vehicle_number?: string;
+    } : {};
+    if (!reqBody.category_id || !reqBody.amount || !reqBody.paid_from_account_id || !reqBody.description) {
+      throw fail(400, "BAD_REQUEST", "category_id, amount, paid_from_account_id, description are required");
+    }
+    // Fuel categories require a vehicle plate so admin can audit
+    // per-vehicle running cost. Mirrors the FE form's gate.
+    const cat = (F.EXPENSE_CATEGORIES as Array<{ id: string; is_fuel?: boolean }>)
+      .find((c) => c.id === reqBody.category_id);
+    if (cat?.is_fuel && !(reqBody.vehicle_number ?? "").trim()) {
+      throw fail(422, "VEHICLE_NUMBER_REQUIRED", "Vehicle number is required for fuel expenses",
+        { vehicle_number: "Vehicle number is required for fuel expenses" });
+    }
+    const yearMonth = new Date(reqBody.expense_date ?? new Date().toISOString().slice(0, 10))
+      .toISOString().slice(0, 7).replace("-", "");
+    const existing = (F.EXPENSES_FX as Array<{ expense_number: string }>)
+      .map((e) => Number(e.expense_number.split("/").pop()) || 0);
+    const nextSeq = (existing.length ? Math.max(...existing) : 0) + 1;
+    const newRow = {
+      id: F.uid("expense"),
+      tenant_id: tid as string,
+      expense_number: `XV/${yearMonth}/${String(nextSeq).padStart(4, "0")}`,
+      expense_date: reqBody.expense_date ?? new Date().toISOString().slice(0, 10),
+      category_id: reqBody.category_id,
+      amount: reqBody.amount,
+      paid_from_account_id: reqBody.paid_from_account_id,
+      vendor_id: reqBody.vendor_id ?? null,
+      description: reqBody.description,
+      attachment_id: reqBody.attachment_id ?? null,
+      vehicle_number: cat?.is_fuel ? (reqBody.vehicle_number ?? "").trim() : null,
+      status: "draft" as const,
+      posting_date: null,
+      cancelled_at: null,
+      cancellation_reason: null,
+      version: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: user?.email ?? null,
+      updated_by: null,
+    };
+    (F.EXPENSES_FX as Array<unknown>).push(newRow);
+    return delay(ok(newRow, 201));
+  }
   if (method === "GET" && path === "/expenses") {
     let rows = F.EXPENSES_FX;
     if (query.category_id) rows = rows.filter((e) => e.category_id === query.category_id);
@@ -1482,6 +1618,157 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     return delay(ok({}, 204));
   }
 
+  // ── Phase 14 — Per-party item costs (supplier-side) ──
+  if (method === "GET" && path === "/party-item-costs") {
+    let rows = listFor(F.PARTY_ITEM_COSTS) as Array<{
+      party_id: string; item_id: string; thickness_mm: number; valid_until: string | null;
+    }>;
+    if (query.party_id)     rows = rows.filter((r) => r.party_id === query.party_id);
+    if (query.item_id)      rows = rows.filter((r) => r.item_id === query.item_id);
+    if (query.thickness_mm) rows = rows.filter((r) => r.thickness_mm === Number(query.thickness_mm));
+    if (query.active_only === "true") {
+      rows = rows.filter((r) => r.valid_until === null);
+    }
+    return delay(ok({ data: rows, pagination: { limit: 200, next_cursor: null, has_more: false } }));
+  }
+  if (method === "GET" && path === "/party-item-costs/lookup") {
+    const partyId     = query.party_id as string | undefined;
+    const itemId      = query.item_id  as string | undefined;
+    const thicknessMm = query.thickness_mm != null ? Number(query.thickness_mm) : undefined;
+    const asOf        = (query.as_of as string | undefined) ?? new Date().toISOString().slice(0, 10);
+    if (!partyId || !itemId || !thicknessMm) {
+      throw fail(400, "BAD_REQUEST", "party_id, item_id, thickness_mm are required");
+    }
+    const tenantRows = listFor(F.PARTY_ITEM_COSTS) as Array<{
+      party_id: string; item_id: string; thickness_mm: number;
+      valid_from: string; valid_until: string | null;
+    }>;
+    const rule = tenantRows.find((r) =>
+      r.party_id === partyId &&
+      r.item_id === itemId &&
+      r.thickness_mm === thicknessMm &&
+      r.valid_from <= asOf &&
+      (r.valid_until === null || r.valid_until >= asOf),
+    ) ?? null;
+    return delay(ok({ rule }));
+  }
+  if (method === "POST" && path === "/party-item-costs") {
+    const reqBody = (typeof body === "object" && body) ? body as {
+      party_id?: string; item_id?: string; thickness_mm?: number | string;
+      cost?: string; valid_from?: string; notes?: string;
+    } : {};
+    const thicknessMm = reqBody.thickness_mm != null ? Number(reqBody.thickness_mm) : NaN;
+    if (!reqBody.party_id || !reqBody.item_id || !reqBody.cost || !Number.isFinite(thicknessMm)) {
+      throw fail(400, "BAD_REQUEST", "party_id, item_id, thickness_mm, cost are required");
+    }
+    const validFrom = reqBody.valid_from ?? new Date().toISOString().slice(0, 10);
+    // Auto-close prior active rule for the same (party, item, thickness) trio.
+    const priorIdx = (F.PARTY_ITEM_COSTS as Array<{
+      party_id: string; item_id: string; thickness_mm: number; valid_until: string | null;
+    }>).findIndex((r) =>
+      r.party_id === reqBody.party_id &&
+      r.item_id === reqBody.item_id &&
+      r.thickness_mm === thicknessMm &&
+      r.valid_until === null,
+    );
+    if (priorIdx >= 0) {
+      const d = new Date(validFrom);
+      d.setDate(d.getDate() - 1);
+      (F.PARTY_ITEM_COSTS[priorIdx] as { valid_until: string }).valid_until =
+        d.toISOString().slice(0, 10);
+    }
+    const newRow = {
+      id: F.uid("pic"),
+      tenant_id: tid as string,
+      party_id: reqBody.party_id,
+      item_id: reqBody.item_id,
+      thickness_mm: thicknessMm,
+      cost: reqBody.cost,
+      valid_from: validFrom,
+      valid_until: null,
+      notes: reqBody.notes ?? null,
+      created_at: new Date().toISOString(),
+      created_by: user?.email ?? null,
+    };
+    (F.PARTY_ITEM_COSTS as Array<unknown>).push(newRow);
+    return delay(ok(newRow, 201));
+  }
+
+  // ── Phase 14 — Per-party sale prices (customer-side) ──
+  if (method === "GET" && path === "/party-item-sale-prices") {
+    let rows = listFor(F.PARTY_ITEM_SALE_PRICES) as Array<{
+      party_id: string; item_id: string; thickness_mm: number; valid_until: string | null;
+    }>;
+    if (query.party_id)     rows = rows.filter((r) => r.party_id === query.party_id);
+    if (query.item_id)      rows = rows.filter((r) => r.item_id === query.item_id);
+    if (query.thickness_mm) rows = rows.filter((r) => r.thickness_mm === Number(query.thickness_mm));
+    if (query.active_only === "true") {
+      rows = rows.filter((r) => r.valid_until === null);
+    }
+    return delay(ok({ data: rows, pagination: { limit: 200, next_cursor: null, has_more: false } }));
+  }
+  if (method === "GET" && path === "/party-item-sale-prices/lookup") {
+    const partyId     = query.party_id as string | undefined;
+    const itemId      = query.item_id  as string | undefined;
+    const thicknessMm = query.thickness_mm != null ? Number(query.thickness_mm) : undefined;
+    const asOf        = (query.as_of as string | undefined) ?? new Date().toISOString().slice(0, 10);
+    if (!partyId || !itemId || !thicknessMm) {
+      throw fail(400, "BAD_REQUEST", "party_id, item_id, thickness_mm are required");
+    }
+    const tenantRows = listFor(F.PARTY_ITEM_SALE_PRICES) as Array<{
+      party_id: string; item_id: string; thickness_mm: number;
+      valid_from: string; valid_until: string | null;
+    }>;
+    const rule = tenantRows.find((r) =>
+      r.party_id === partyId &&
+      r.item_id === itemId &&
+      r.thickness_mm === thicknessMm &&
+      r.valid_from <= asOf &&
+      (r.valid_until === null || r.valid_until >= asOf),
+    ) ?? null;
+    return delay(ok({ rule }));
+  }
+  if (method === "POST" && path === "/party-item-sale-prices") {
+    const reqBody = (typeof body === "object" && body) ? body as {
+      party_id?: string; item_id?: string; thickness_mm?: number | string;
+      sale_price?: string; valid_from?: string; notes?: string;
+    } : {};
+    const thicknessMm = reqBody.thickness_mm != null ? Number(reqBody.thickness_mm) : NaN;
+    if (!reqBody.party_id || !reqBody.item_id || !reqBody.sale_price || !Number.isFinite(thicknessMm)) {
+      throw fail(400, "BAD_REQUEST", "party_id, item_id, thickness_mm, sale_price are required");
+    }
+    const validFrom = reqBody.valid_from ?? new Date().toISOString().slice(0, 10);
+    const priorIdx = (F.PARTY_ITEM_SALE_PRICES as Array<{
+      party_id: string; item_id: string; thickness_mm: number; valid_until: string | null;
+    }>).findIndex((r) =>
+      r.party_id === reqBody.party_id &&
+      r.item_id === reqBody.item_id &&
+      r.thickness_mm === thicknessMm &&
+      r.valid_until === null,
+    );
+    if (priorIdx >= 0) {
+      const d = new Date(validFrom);
+      d.setDate(d.getDate() - 1);
+      (F.PARTY_ITEM_SALE_PRICES[priorIdx] as { valid_until: string }).valid_until =
+        d.toISOString().slice(0, 10);
+    }
+    const newRow = {
+      id: F.uid("pis"),
+      tenant_id: tid as string,
+      party_id: reqBody.party_id,
+      item_id: reqBody.item_id,
+      thickness_mm: thicknessMm,
+      sale_price: reqBody.sale_price,
+      valid_from: validFrom,
+      valid_until: null,
+      notes: reqBody.notes ?? null,
+      created_at: new Date().toISOString(),
+      created_by: user?.email ?? null,
+    };
+    (F.PARTY_ITEM_SALE_PRICES as Array<unknown>).push(newRow);
+    return delay(ok(newRow, 201));
+  }
+
   // ── Phase 8 — Cash flow statement ──
   if (method === "GET" && path === "/reports/cash-flow") {
     const start = (query.start_date as string | undefined) ?? "1900-01-01";
@@ -1590,120 +1877,9 @@ export const demoAdapter: AxiosAdapter = async (config) => {
     }));
   }
 
-  // ── Phase 10 — Sales order → Invoice promotion ──
-  const sopromm = match(path, "/documents/:id/promote-to-invoice");
-  if (method === "POST" && sopromm) {
-    const doc = (F.DOCUMENT_HEADERS as Array<{
-      id: string; document_number: string; document_type_id: string;
-      party_id?: string; document_date: string; status: string;
-      posting_date?: string;
-    }>).find((d) => d.id === sopromm.id);
-    if (!doc) throw fail(404, "DOCUMENT_NOT_FOUND", "Document not found");
-
-    const docType = (F.DOCUMENT_TYPES as Array<{ id: string; code: string }>)
-      .find((t) => t.id === doc.document_type_id);
-    if (docType?.code !== "SO") {
-      throw fail(409, "NOT_A_SALES_ORDER", "Only sales orders can be promoted to invoices");
-    }
-    if (!doc.posting_date) {
-      throw fail(409, "DOCUMENT_NOT_POSTED", "Sales order must be posted before promotion");
-    }
-    if ((doc as { is_promoted?: boolean }).is_promoted) {
-      throw fail(409, "ALREADY_PROMOTED", "This sales order has already been promoted to an invoice");
-    }
-
-    // Generate the invoice number from the next available sequence.
-    const yearMonth = new Date().toISOString().slice(0, 7);
-    const existingNumbers = (F.INVOICES as Array<{ invoice_number: string }>)
-      .map((i) => Number(i.invoice_number.split("/").pop()) || 0);
-    const nextSeq = (existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1;
-    const invoiceNumber = `INV/${yearMonth}/${String(nextSeq).padStart(4, "0")}`;
-    const invoiceId = F.uid("inv");
-
-    // Pull lines + compute GST splits per line based on the customer's state code.
-    const docLines = (F.DOCUMENT_LINES?.[doc.id] ?? []) as Array<{
-      item_id: string; uom_id: string; quantity: string; unit_price: string;
-      line_number?: number; discount_pct?: string; remarks?: string;
-    }>;
-    const customer = doc.party_id
-      ? (F.PARTIES as Array<{ id: string; state_code?: string }>).find((p) => p.id === doc.party_id)
-      : null;
-    const tenant = (F.TENANTS as Array<{ id: string; state_code?: string }>).find((t) => t.id === tid);
-    const placeOfSupply = customer?.state_code ?? tenant?.state_code ?? "27";
-    const isInterState = placeOfSupply !== (tenant?.state_code ?? "27");
-
-    const itemById = (id: string) =>
-      (F.ITEMS as Array<{ id: string; default_tax_rate_pct?: string; hsn_code?: string; name: string }>).find((it) => it.id === id);
-
-    let subtotal = 0, taxTotal = 0;
-    const newLines: unknown[] = [];
-    docLines.forEach((dl, idx) => {
-      const item = itemById(dl.item_id);
-      const ratePct = Number(item?.default_tax_rate_pct ?? 0);
-      const taxableValue = Number(dl.quantity) * Number(dl.unit_price)
-        * (1 - Number(dl.discount_pct ?? 0) / 100);
-      const totalTax = taxableValue * ratePct / 100;
-      const cgst = isInterState ? 0 : totalTax / 2;
-      const sgst = isInterState ? 0 : totalTax / 2;
-      const igst = isInterState ? totalTax : 0;
-      subtotal += taxableValue;
-      taxTotal += totalTax;
-      newLines.push({
-        id: F.uid("il"),
-        invoice_id: invoiceId,
-        line_number: dl.line_number ?? idx + 1,
-        item_id: dl.item_id,
-        hsn_code: item?.hsn_code ?? "",
-        description: item?.name ?? "",
-        uom_id: dl.uom_id,
-        quantity: dl.quantity,
-        unit_price: dl.unit_price,
-        discount_pct: dl.discount_pct ?? "0",
-        rate_pct: String(ratePct),
-        taxable_value: taxableValue.toFixed(2),
-        cgst_amount: cgst.toFixed(2),
-        sgst_amount: sgst.toFixed(2),
-        igst_amount: igst.toFixed(2),
-        cess_amount: "0.00",
-        line_total: (taxableValue + totalTax).toFixed(2),
-        lot_id: null, serial_id: null,
-        remarks: dl.remarks ?? "",
-      });
-    });
-
-    const grandTotal = subtotal + taxTotal;
-
-    (F.INVOICES as Array<unknown>).push({
-      id: invoiceId, tenant_id: tid as string,
-      invoice_number: invoiceNumber,
-      invoice_date: new Date().toISOString().slice(0, 10),
-      due_date: null,
-      party_id: doc.party_id ?? null,
-      place_of_supply: placeOfSupply,
-      status: "draft",
-      challan_id: null,
-      source_doc_id: doc.id,
-      irn: null, qr_code_data: null,
-      subtotal: subtotal.toFixed(2),
-      tax_total: taxTotal.toFixed(2),
-      grand_total: grandTotal.toFixed(2),
-      amount_in_words: "",
-      remarks: `Promoted from sales order ${doc.document_number}`,
-      posting_date: null, cancelled_at: null, cancellation_reason: null,
-      version: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    if (!F.INVOICE_LINES[invoiceId]) F.INVOICE_LINES[invoiceId] = [];
-    (F.INVOICE_LINES[invoiceId] as Array<unknown>).push(...newLines);
-
-    // Flip the SO so it can't be re-promoted.
-    (doc as { is_promoted?: boolean; invoice_id?: string }).is_promoted = true;
-    (doc as { invoice_id?: string }).invoice_id = invoiceId;
-
-    return delay(ok({ invoice_id: invoiceId, invoice_number: invoiceNumber }, 201));
-  }
+  // SO → Invoice promotion removed 2026-05-18 with the SO module.
+  // Estimate → Invoice is the only doc-promotion path remaining (see
+  // /estimates/:id/promote-to-invoice handler above).
 
   // ── Phase 9 — Audit log ──
   if (method === "GET" && path === "/audit-log") {
@@ -2586,9 +2762,9 @@ function deriveSourceLabel(entry: { source_doc_type: string; source_doc_id: stri
     if (!p) return `Payment (${id})`;
     return p.direction === "received" ? `Receipt ${p.payment_number}` : `Payment ${p.payment_number}`;
   }
-  if (t === "challan") {
-    const c = (F.CHALLANS as Array<{ id: string; challan_number: string }>).find((x) => x.id === id);
-    return c ? `Challan ${c.challan_number}` : `Challan (${id})`;
+  if (t === "estimate") {
+    const c = (F.ESTIMATES as Array<{ id: string; estimate_number: string }>).find((x) => x.id === id);
+    return c ? `Estimate ${c.estimate_number}` : `Estimate (${id})`;
   }
   if (t === "vendor_bill") {
     const b = (F.VENDOR_BILLS as Array<{ id: string; bill_number: string }>).find((x) => x.id === id);

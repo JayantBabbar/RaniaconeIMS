@@ -128,8 +128,6 @@ export const LOCATIONS = {
 
 // ── Stock ─────────────────────────────────────────────────
 export const STOCK = {
-  MOVEMENTS: "/movements",
-  MOVEMENT: (id: string) => `/movements/${id}`,
   BALANCES: "/balances",
   BALANCE: (id: string) => `/balances/${id}`,
   VALUATION_LAYERS: "/valuation-layers",
@@ -148,20 +146,20 @@ export const INVOICES = {
   CANCEL: (id: string) => `/invoices/${id}/cancel`,
 } as const;
 
-// ── Challans (delivery notes, no GST) ─────────────────────
-export const CHALLANS = {
-  LIST: "/challans",
-  DETAIL: (id: string) => `/challans/${id}`,
-  LINES: (id: string) => `/challans/${id}/lines`,
-  LINE: (challanId: string, lineId: string) =>
-    `/challans/${challanId}/lines/${lineId}`,
-  POST: (id: string) => `/challans/${id}/post`,
-  CANCEL: (id: string) => `/challans/${id}/cancel`,
-  /** Promote a posted, unbilled challan into a tax invoice. The
-   *  backend creates the Invoice with `challan_id` set, copies the
-   *  lines (adding GST math), and flips the challan's
+// ── Estimates (delivery notes, no GST) ─────────────────────
+export const ESTIMATES = {
+  LIST: "/estimates",
+  DETAIL: (id: string) => `/estimates/${id}`,
+  LINES: (id: string) => `/estimates/${id}/lines`,
+  LINE: (estimateId: string, lineId: string) =>
+    `/estimates/${estimateId}/lines/${lineId}`,
+  POST: (id: string) => `/estimates/${id}/post`,
+  CANCEL: (id: string) => `/estimates/${id}/cancel`,
+  /** Promote a posted, unbilled estimate into a tax invoice. The
+   *  backend creates the Invoice with `estimate_id` set, copies the
+   *  lines (adding GST math), and flips the estimate's
    *  `is_billed=true`, `invoice_id=<new id>`. */
-  PROMOTE: (id: string) => `/challans/${id}/promote-to-invoice`,
+  PROMOTE: (id: string) => `/estimates/${id}/promote-to-invoice`,
 } as const;
 
 // ── Routes (sales territories) ────────────────────────────
@@ -302,6 +300,26 @@ export const PRICING_RULES = {
   LOOKUP: "/pricing-rules/lookup",
 } as const;
 
+/** Per-party pricing — (supplier, item) → cost. Versioned via
+ *  valid_from/valid_until. Existence of an active row means "this
+ *  supplier carries this item"; absence means they don't. */
+export const PARTY_ITEM_COSTS = {
+  LIST:   "/party-item-costs",
+  DETAIL: (id: string) => `/party-item-costs/${id}`,
+  /** GET /party-item-costs/lookup?party_id=&item_id=&as_of= */
+  LOOKUP: "/party-item-costs/lookup",
+} as const;
+
+/** Per-party pricing — (customer, item) → sale price. Versioned via
+ *  valid_from/valid_until. Used as the Estimate / Invoice line's
+ *  customer-visible per-unit price for this customer. */
+export const PARTY_ITEM_SALE_PRICES = {
+  LIST:   "/party-item-sale-prices",
+  DETAIL: (id: string) => `/party-item-sale-prices/${id}`,
+  /** GET /party-item-sale-prices/lookup?party_id=&item_id=&as_of= */
+  LOOKUP: "/party-item-sale-prices/lookup",
+} as const;
+
 /** Tenant-level catalog of valid thickness values + size codes used for
  *  pricing rules and document line entry. Editable from the
  *  Master Data → Item Pricing page. */
@@ -358,7 +376,7 @@ export const DOCUMENTS = {
   POST: (id: string) => `/documents/${id}/post`,
   CANCEL: (id: string) => `/documents/${id}/cancel`,
   /** Phase 10 — promote a posted Sales Order to a tax Invoice.
-   *  Mirror of the existing CHALLAN.PROMOTE route. */
+   *  Mirror of the existing ESTIMATE.PROMOTE route. */
   PROMOTE_TO_INVOICE: (id: string) => `/documents/${id}/promote-to-invoice`,
 } as const;
 

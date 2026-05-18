@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -16,6 +16,7 @@ import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
 import { itemService, brandService, categoryService } from "@/services/items.service";
 import { isApiError } from "@/lib/api-client";
+import { STANDARD_GST_RATES } from "@/lib/gst";
 import { ArrowLeft, Save, X, Lock } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -28,16 +29,21 @@ const itemSchema = z.object({
     .trim()
     .min(1, "Item code is required")
     .max(50, "Keep it under 50 characters"),
+  // Name is optional — when empty the item displays under its item_code
+  // everywhere (lists, pickers, line items). Useful for businesses
+  // whose internal SKU code is enough and there's no marketing name.
   name: z
     .string()
     .trim()
-    .min(1, "Name is required")
-    .max(255, "Too long"),
+    .max(255, "Too long")
+    .optional()
+    .or(z.literal("")),
   description: z.string().max(2000, "Too long").optional().or(z.literal("")),
   item_type: z.string().min(1),
   category_id: z.string().optional().or(z.literal("")),
   brand_id: z.string().optional().or(z.literal("")),
   base_uom_id: z.string().optional().or(z.literal("")),
+  default_tax_rate_pct: z.string().optional().or(z.literal("")),
   is_batch_tracked: z.boolean(),
   is_serial_tracked: z.boolean(),
   is_active: z.boolean(),
@@ -74,22 +80,43 @@ export default function NewItemPage() {
       category_id: "",
       brand_id: "",
       base_uom_id: "",
+      default_tax_rate_pct: "",
       is_batch_tracked: false,
       is_serial_tracked: false,
       is_active: true,
     },
   });
 
+  // When the user picks a category, inherit its default GST rate into the
+  // item's tax-rate field — unless the user has already typed a value.
+  const categoryId = watch("category_id");
+  const currentTaxRate = watch("default_tax_rate_pct");
+  useEffect(() => {
+    if (!categoryId) return;
+    if (currentTaxRate && currentTaxRate.length > 0) return;
+    const cat = (categories?.data || []).find((c) => c.id === categoryId);
+    if (cat?.gst_rate_pct) {
+      setValue("default_tax_rate_pct", cat.gst_rate_pct);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, categories]);
+
   const onSubmit = async (data: ItemFormValues) => {
     setServerError(null);
     setLoading(true);
     try {
+      // When the user leaves Name blank, fall back to item_code so list
+      // pages and pickers downstream always have something to display.
+      const trimmedName = (data.name ?? "").trim();
+      const effectiveName = trimmedName.length > 0 ? trimmedName : data.item_code;
       const item = await itemService.create({
         ...data,
+        name: effectiveName,
         description: data.description || undefined,
         category_id: data.category_id || undefined,
         brand_id: data.brand_id || undefined,
         base_uom_id: data.base_uom_id || undefined,
+        default_tax_rate_pct: data.default_tax_rate_pct || undefined,
       });
       toast.success("Item created successfully");
       router.push(`/items/${item.id}`);
@@ -175,9 +202,8 @@ export default function NewItemPage() {
               />
               <Input
                 label="Name"
-                placeholder="Widget A"
-                required
-                help="Human-readable name shown in lists and search."
+                placeholder="Widget A (optional)"
+                help="Optional — human-readable name shown in lists and search. Leave blank to display the item code only."
                 error={errors.name?.message}
                 disabled={loading}
                 {...register("name")}
@@ -239,6 +265,21 @@ export default function NewItemPage() {
                 disabled={loading}
                 {...register("base_uom_id")}
               />
+              <FormField
+                label="Default GST Rate (%)"
+                help="Defaults from the picked category. Override here only if this specific item is taxed differently."
+              >
+                <select
+                  className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  disabled={loading}
+                  {...register("default_tax_rate_pct")}
+                >
+                  <option value="">— Inherit from category —</option>
+                  {STANDARD_GST_RATES.map((r) => (
+                    <option key={r} value={r}>{r}%</option>
+                  ))}
+                </select>
+              </FormField>
             </div>
           </div>
 

@@ -27,6 +27,8 @@ export interface ExpenseCreate {
   vendor_id?: string;            // optional — for "petrol bill paid to BPCL"
   description: string;
   attachment_id?: string;        // optional bill photo
+  /** Required when the picked category has `is_fuel=true`. */
+  vehicle_number?: string;
 }
 
 export interface ExpenseUpdate {
@@ -37,6 +39,7 @@ export interface ExpenseUpdate {
   vendor_id?: string;
   description?: string;
   attachment_id?: string;
+  vehicle_number?: string;
 }
 
 export const expenseService = {
@@ -79,11 +82,15 @@ export interface ExpenseCategoryCreate {
   code: string;
   name: string;
   is_capital?: boolean;
+  /** Marks the category as a fuel category. When set, the New Expense
+   *  form requires a vehicle_number for each entry. */
+  is_fuel?: boolean;
 }
 
 export interface ExpenseCategoryUpdate {
   name?: string;
   is_capital?: boolean;
+  is_fuel?: boolean;
   is_active?: boolean;
 }
 

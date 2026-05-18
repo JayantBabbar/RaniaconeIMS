@@ -22,7 +22,7 @@
 • Add vendor, date, multiple products
 • Group under same order
 • Basically, the inventory information but without the cost price just the product and the stock.
-8. Outward Sales (Challan/Estimate)
+8. Outward Sales (Estimate/Estimate)
 • Select Route and based on that- Customer
 • Customer selection
 • Bill / No Bill
@@ -31,7 +31,7 @@
 • Default prices are set in the backend
 • If you have already added a particular product, it shouldn’t be allowed again on the parameters as a whole concatenation.
 9. Invoices
-• Create from challan
+• Create from estimate
 • Editable fields except invoice number
 10. Collections
 • Cash / GPay / Cheque

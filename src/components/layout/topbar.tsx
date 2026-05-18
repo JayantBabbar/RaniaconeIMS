@@ -40,16 +40,12 @@ const CRUMB_ROUTES: Record<string, string> = {
   "Serials": "/items/serials",
   "Locations": "/locations",
   "Stock Balances": "/balances",
-  "Movements": "/movements",
   "Reservations": "/reservations",
   "Valuation Layers": "/valuation",
   "Low Stock Alerts": "/alerts",
   "Attachments": "/attachments",
   // Documents
   "Documents": "/documents/all",
-  "Purchase Orders": "/documents/purchase-orders",
-  "Sales Orders": "/documents/sales-orders",
-  "Transfers": "/documents/transfers",
   // Operations
   "Stock Counts": "/counts",
   "Parties": "/parties",

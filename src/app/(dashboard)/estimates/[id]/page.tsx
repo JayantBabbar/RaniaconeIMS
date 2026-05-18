@@ -13,14 +13,14 @@ import { PageLoading } from "@/components/ui/shared";
 import { Can } from "@/components/ui/can";
 import { RequireRead } from "@/components/ui/forbidden-state";
 import { useToast } from "@/components/ui/toast";
-import { challanService, routeService } from "@/services/challans.service";
+import { estimateService, routeService } from "@/services/estimates.service";
 import { partyService } from "@/services/parties.service";
 import { isApiError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
-import type { ChallanStatus } from "@/types";
+import type { EstimateStatus } from "@/types";
 import { ArrowLeft, Lock, X as XIcon, Printer, ReceiptText } from "lucide-react";
 
-export default function ChallanDetailPage() {
+export default function EstimateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
@@ -30,105 +30,105 @@ export default function ChallanDetailPage() {
   const [showCancel, setShowCancel] = useState(false);
   const [showPromote, setShowPromote] = useState(false);
 
-  const { data: challan, isLoading } = useQuery({
-    queryKey: ["challan", id],
-    queryFn: () => challanService.getById(id),
+  const { data: estimate, isLoading } = useQuery({
+    queryKey: ["estimate", id],
+    queryFn: () => estimateService.getById(id),
     enabled: !!id,
   });
 
   const { data: lines = [] } = useQuery({
-    queryKey: ["challanLines", id],
-    queryFn: () => challanService.listLines(id),
+    queryKey: ["estimateLines", id],
+    queryFn: () => estimateService.listLines(id),
     enabled: !!id,
   });
 
   const { data: party } = useQuery({
-    queryKey: ["party", challan?.party_id],
-    queryFn: () => (challan?.party_id ? partyService.getById(challan.party_id) : null),
-    enabled: !!challan?.party_id,
+    queryKey: ["party", estimate?.party_id],
+    queryFn: () => (estimate?.party_id ? partyService.getById(estimate.party_id) : null),
+    enabled: !!estimate?.party_id,
   });
 
   const { data: route } = useQuery({
-    queryKey: ["route", challan?.route_id],
-    queryFn: () => (challan?.route_id ? routeService.getById(challan.route_id) : null),
-    enabled: !!challan?.route_id,
+    queryKey: ["route", estimate?.route_id],
+    queryFn: () => (estimate?.route_id ? routeService.getById(estimate.route_id) : null),
+    enabled: !!estimate?.route_id,
   });
 
   const postMut = useMutation({
-    mutationFn: () => challanService.post(id),
+    mutationFn: () => estimateService.post(id),
     onSuccess: () => {
-      toast.success("Challan posted", "Stock OUT movements created.");
-      qc.invalidateQueries({ queryKey: ["challan", id] });
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      toast.success("Estimate posted", "Stock OUT movements created.");
+      qc.invalidateQueries({ queryKey: ["estimate", id] });
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       setShowPost(false);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not post challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not post estimate"),
   });
 
   // Phase 12: print-mode toggle directly from the detail page so the
   // user doesn't have to navigate to print preview just to change the
-  // mode. Per spec §8 — challans default to no_amount; flip to
-  // with_remarks when the customer asked for a priced challan.
+  // mode. Per spec §8 — estimates default to no_amount; flip to
+  // with_remarks when the customer asked for a priced estimate.
   const printModeMut = useMutation({
     mutationFn: (mode: "no_amount" | "with_remarks") =>
-      challanService.update(id, { print_mode: mode }),
+      estimateService.update(id, { print_mode: mode }),
     onSuccess: () => {
       toast.success("Print mode updated");
-      qc.invalidateQueries({ queryKey: ["challan", id] });
+      qc.invalidateQueries({ queryKey: ["estimate", id] });
     },
     onError: (err) => toast.error(isApiError(err) ? err.message : "Could not update print mode"),
   });
 
   const cancelMut = useMutation({
-    mutationFn: () => challanService.cancel(id, "Cancelled from detail page"),
+    mutationFn: () => estimateService.cancel(id, "Cancelled from detail page"),
     onSuccess: () => {
-      toast.success("Challan cancelled");
-      qc.invalidateQueries({ queryKey: ["challan", id] });
-      qc.invalidateQueries({ queryKey: ["challans"] });
+      toast.success("Estimate cancelled");
+      qc.invalidateQueries({ queryKey: ["estimate", id] });
+      qc.invalidateQueries({ queryKey: ["estimates"] });
       setShowCancel(false);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not cancel challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not cancel estimate"),
   });
 
   const promoteMut = useMutation({
-    mutationFn: () => challanService.promoteToInvoice(id),
+    mutationFn: () => estimateService.promoteToInvoice(id),
     onSuccess: ({ invoice }) => {
       toast.success("Invoice created", `Draft ${invoice.invoice_number}.`);
-      qc.invalidateQueries({ queryKey: ["challan", id] });
+      qc.invalidateQueries({ queryKey: ["estimate", id] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
       router.push(`/invoices/${invoice.id}`);
     },
-    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not promote challan"),
+    onError: (err) => toast.error(isApiError(err) ? err.message : "Could not promote estimate"),
   });
 
-  if (isLoading || !challan) return <PageLoading />;
+  if (isLoading || !estimate) return <PageLoading />;
 
   return (
-    <RequireRead perm="inventory.challans.read" crumbs={["Billing", "Challans", challan.challan_number]}>
+    <RequireRead perm="inventory.estimates.read" crumbs={["Billing", "Estimates", estimate.estimate_number]}>
     <div className="flex-1 bg-surface flex flex-col overflow-auto">
       <TopBar
-        crumbs={["Billing", "Challans", challan.challan_number]}
+        crumbs={["Billing", "Estimates", estimate.estimate_number]}
         right={
           <>
-            <Link href={`/challans/${challan.id}/print`}>
+            <Link href={`/estimates/${estimate.id}/print`}>
               <Button icon={<Printer size={13} />}>Print</Button>
             </Link>
-            {challan.status === "draft" && (
-              <Can perm="inventory.challans.post">
+            {estimate.status === "draft" && (
+              <Can perm="inventory.estimates.post">
                 <Button kind="primary" onClick={() => setShowPost(true)} icon={<Lock size={13} />}>
-                  Post challan
+                  Post estimate
                 </Button>
               </Can>
             )}
-            {challan.status === "posted" && !challan.is_billed && (
+            {estimate.status === "posted" && !estimate.is_billed && (
               <Can perm="inventory.invoices.write">
                 <Button kind="primary" onClick={() => setShowPromote(true)} icon={<ReceiptText size={13} />}>
                   Convert to invoice
                 </Button>
               </Can>
             )}
-            {challan.status === "posted" && (
-              <Can perm="inventory.challans.cancel">
+            {estimate.status === "posted" && (
+              <Can perm="inventory.estimates.cancel">
                 <Button kind="danger" onClick={() => setShowCancel(true)} icon={<XIcon size={13} />}>
                   Cancel
                 </Button>
@@ -140,54 +140,54 @@ export default function ChallanDetailPage() {
 
       <div className="p-4 md:p-5 max-w-5xl space-y-5">
         <button
-          onClick={() => router.push("/challans")}
+          onClick={() => router.push("/estimates")}
           className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
         >
-          <ArrowLeft size={14} /> Back to challans
+          <ArrowLeft size={14} /> Back to estimates
         </button>
 
         <PageHeader
-          title={challan.challan_number}
+          title={estimate.estimate_number}
           description={
-            challan.status === "draft"
-              ? "Editable. Posting locks the challan and creates the stock OUT movement."
-              : challan.status === "posted"
-                ? challan.is_billed
+            estimate.status === "draft"
+              ? "Editable. Posting locks the estimate and creates the stock OUT movement."
+              : estimate.status === "posted"
+                ? estimate.is_billed
                   ? "Posted and billed. Tax invoice has been raised."
                   : "Posted. Goods are out for delivery. Promote to an invoice when you're ready to bill."
                 : "Cancelled. Original kept for audit."
           }
           badge={
             <div className="flex items-center gap-1.5">
-              <StatusBadge status={challan.status} />
-              {challan.is_billed
+              <StatusBadge status={estimate.status} />
+              {estimate.is_billed
                 ? <Badge tone="green">Billed</Badge>
-                : challan.status === "posted" ? <Badge tone="blue">Pending invoice</Badge> : null}
+                : estimate.status === "posted" ? <Badge tone="blue">Pending invoice</Badge> : null}
             </div>
           }
         />
 
         {/* Linked invoice banner */}
-        {challan.invoice_id && (
+        {estimate.invoice_id && (
           <div className="bg-status-blue-bg border border-status-blue/20 rounded-md p-3 text-[12.5px] text-status-blue-text flex items-center justify-between">
             <div>
               <div className="font-semibold mb-0.5">Linked invoice</div>
-              <div>This challan was promoted to a tax invoice.</div>
+              <div>This estimate was promoted to a tax invoice.</div>
             </div>
-            <Link href={`/invoices/${challan.invoice_id}`} className="font-mono font-medium hover:underline">
+            <Link href={`/invoices/${estimate.invoice_id}`} className="font-mono font-medium hover:underline">
               Open invoice →
             </Link>
           </div>
         )}
 
         {/* Cancellation banner */}
-        {challan.status === "cancelled" && challan.cancellation_reason && (
+        {estimate.status === "cancelled" && estimate.cancellation_reason && (
           <div className="bg-status-red-bg border border-status-red/20 rounded-md p-3 text-[12.5px] text-status-red-text">
             <div className="font-semibold mb-1">Cancellation reason</div>
-            <div>{challan.cancellation_reason}</div>
-            {challan.cancelled_at && (
+            <div>{estimate.cancellation_reason}</div>
+            {estimate.cancelled_at && (
               <div className="font-mono text-[11px] mt-1.5 text-foreground-muted">
-                Cancelled {formatDate(challan.cancelled_at)}
+                Cancelled {formatDate(estimate.cancelled_at)}
               </div>
             )}
           </div>
@@ -201,23 +201,23 @@ export default function ChallanDetailPage() {
             {/* Print mode is editable inline so the user can flip between
                 with/without amounts without navigating to print preview.
                 Disabled while save is in flight. Operator + admin both
-                can write challans, so no extra perm gate beyond <Can>. */}
+                can write estimates, so no extra perm gate beyond <Can>. */}
             <div className="min-w-0">
               <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                 Print mode
               </div>
-              <Can perm="inventory.challans.write" fallback={
+              <Can perm="inventory.estimates.write" fallback={
                 <div className="text-sm font-medium mt-0.5">
-                  {challan.print_mode === "with_remarks" ? "With amounts" : "No amounts"}
+                  {estimate.print_mode === "with_remarks" ? "With amounts" : "No amounts"}
                 </div>
               }>
                 <div className="mt-1 inline-flex rounded border border-hairline overflow-hidden text-[12px]">
                   <button
                     type="button"
-                    onClick={() => challan.print_mode !== "no_amount" && printModeMut.mutate("no_amount")}
+                    onClick={() => estimate.print_mode !== "no_amount" && printModeMut.mutate("no_amount")}
                     disabled={printModeMut.isPending}
                     className={`px-2.5 py-1 transition-colors ${
-                      challan.print_mode === "no_amount"
+                      estimate.print_mode === "no_amount"
                         ? "bg-brand text-white font-medium"
                         : "bg-white text-foreground-secondary hover:bg-surface"
                     }`}
@@ -226,10 +226,10 @@ export default function ChallanDetailPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => challan.print_mode !== "with_remarks" && printModeMut.mutate("with_remarks")}
+                    onClick={() => estimate.print_mode !== "with_remarks" && printModeMut.mutate("with_remarks")}
                     disabled={printModeMut.isPending}
                     className={`px-2.5 py-1 transition-colors border-l border-hairline ${
-                      challan.print_mode === "with_remarks"
+                      estimate.print_mode === "with_remarks"
                         ? "bg-brand text-white font-medium"
                         : "bg-white text-foreground-secondary hover:bg-surface"
                     }`}
@@ -239,53 +239,53 @@ export default function ChallanDetailPage() {
                 </div>
               </Can>
               <p className="text-[10.5px] text-foreground-muted mt-1 leading-relaxed">
-                {challan.print_mode === "no_amount"
+                {estimate.print_mode === "no_amount"
                   ? "Driver / customer copy — products + qty only."
                   : "Billing copy — amounts shown in the remarks column."}
               </p>
             </div>
-            <Field label="Challan date" value={formatDate(challan.challan_date)} mono />
+            <Field label="Estimate date" value={formatDate(estimate.estimate_date)} mono />
             <Field
-              label={challan.status === "posted" ? "Posted on" : "Created"}
-              value={challan.posting_date ? formatDate(challan.posting_date) : formatDate(challan.created_at)}
+              label={estimate.status === "posted" ? "Posted on" : "Created"}
+              value={estimate.posting_date ? formatDate(estimate.posting_date) : formatDate(estimate.created_at)}
               mono
             />
             <Field
               label="Bill toggle"
-              value={challan.is_billed ? "An invoice will follow" : "No bill (cash / estimate)"}
+              value={estimate.is_billed ? "An invoice will follow" : "No bill (cash / estimate)"}
             />
           </div>
 
-          {(challan.vehicle_number || challan.driver_name) && (
+          {(estimate.vehicle_number || estimate.driver_name) && (
             <div className="mt-4 pt-4 border-t border-hairline-light">
               <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider mb-2">
                 Dispatch
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {challan.vehicle_number && <Field label="Vehicle" value={challan.vehicle_number} mono />}
-                {challan.driver_name && <Field label="Driver" value={challan.driver_name} />}
-                {challan.driver_phone && <Field label="Phone" value={challan.driver_phone} mono />}
+                {estimate.vehicle_number && <Field label="Vehicle" value={estimate.vehicle_number} mono />}
+                {estimate.driver_name && <Field label="Driver" value={estimate.driver_name} />}
+                {estimate.driver_phone && <Field label="Phone" value={estimate.driver_phone} mono />}
               </div>
             </div>
           )}
 
-          {challan.destination_address && (
+          {estimate.destination_address && (
             <div className="mt-4 pt-4 border-t border-hairline-light">
               <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider mb-1">
                 Destination
               </div>
               <div className="text-sm text-foreground-secondary whitespace-pre-line">
-                {challan.destination_address}
+                {estimate.destination_address}
               </div>
             </div>
           )}
 
-          {challan.remarks && (
+          {estimate.remarks && (
             <div className="mt-4 pt-4 border-t border-hairline-light">
               <div className="text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider mb-1">
                 Remarks
               </div>
-              <div className="text-sm text-foreground-secondary">{challan.remarks}</div>
+              <div className="text-sm text-foreground-secondary">{estimate.remarks}</div>
             </div>
           )}
         </section>
@@ -326,15 +326,15 @@ export default function ChallanDetailPage() {
         {/* Totals */}
         <section className="bg-white border border-hairline rounded-md p-4 md:p-5 max-w-md ml-auto">
           <dl className="space-y-1.5 text-sm">
-            <Row label="Sub-total" value={challan.subtotal} />
-            {parseFloat(challan.discount_total) > 0 && (
-              <Row label="Discount" value={`− ${challan.discount_total}`} muted />
+            <Row label="Sub-total" value={estimate.subtotal} />
+            {parseFloat(estimate.discount_total) > 0 && (
+              <Row label="Discount" value={`− ${estimate.discount_total}`} muted />
             )}
             <div className="pt-2 mt-2 border-t border-hairline">
-              <Row label="Grand total" value={`₹ ${challan.grand_total}`} bold />
+              <Row label="Grand total" value={`₹ ${estimate.grand_total}`} bold />
             </div>
             <div className="pt-2 mt-2 text-[11px] text-foreground-muted italic leading-snug">
-              Challans are not tax documents — no GST shown. Promote to an invoice to add tax.
+              Estimates are not tax documents — no GST shown. Promote to an invoice to add tax.
             </div>
           </dl>
         </section>
@@ -344,9 +344,9 @@ export default function ChallanDetailPage() {
         open={showPost}
         onClose={() => setShowPost(false)}
         onConfirm={() => postMut.mutate()}
-        title={`Post ${challan.challan_number}?`}
-        description="Posting locks the challan and creates stock OUT movements. Use Cancel to reverse if dispatch fails."
-        confirmLabel="Post challan"
+        title={`Post ${estimate.estimate_number}?`}
+        description="Posting locks the estimate and creates stock OUT movements. Use Cancel to reverse if dispatch fails."
+        confirmLabel="Post estimate"
         confirmKind="primary"
         loading={postMut.isPending}
       />
@@ -355,9 +355,9 @@ export default function ChallanDetailPage() {
         open={showCancel}
         onClose={() => setShowCancel(false)}
         onConfirm={() => cancelMut.mutate()}
-        title={`Cancel ${challan.challan_number}?`}
+        title={`Cancel ${estimate.estimate_number}?`}
         description="Cancellation creates reversal movements. Original kept for audit. If a linked invoice exists, cancel that first."
-        confirmLabel="Cancel challan"
+        confirmLabel="Cancel estimate"
         confirmKind="danger"
         loading={cancelMut.isPending}
       />
@@ -366,8 +366,8 @@ export default function ChallanDetailPage() {
         open={showPromote}
         onClose={() => setShowPromote(false)}
         onConfirm={() => promoteMut.mutate()}
-        title={`Promote ${challan.challan_number} to invoice?`}
-        description="Creates a draft tax invoice with these lines. GST is added based on each item's default rate and the customer's place of supply (CGST+SGST same-state, IGST inter-state). The challan flips to 'billed'."
+        title={`Promote ${estimate.estimate_number} to invoice?`}
+        description="Creates a draft tax invoice with these lines. GST is added based on each item's default rate and the customer's place of supply (CGST+SGST same-state, IGST inter-state). The estimate flips to 'billed'."
         confirmLabel="Create invoice"
         confirmKind="primary"
         loading={promoteMut.isPending}
@@ -377,7 +377,7 @@ export default function ChallanDetailPage() {
   );
 }
 
-function StatusBadge({ status }: { status: ChallanStatus }) {
+function StatusBadge({ status }: { status: EstimateStatus }) {
   const tone = status === "posted" ? "green" : status === "cancelled" ? "red" : "amber";
   const label = status === "posted" ? "Posted" : status === "cancelled" ? "Cancelled" : "Draft";
   return <Badge tone={tone}>{label}</Badge>;

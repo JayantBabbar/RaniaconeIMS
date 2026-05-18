@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { challanService, routeService } from "@/services/challans.service";
+import { estimateService, routeService } from "@/services/estimates.service";
 import { partyService } from "@/services/parties.service";
 import { useAuth } from "@/providers/auth-provider";
 import { useBranding } from "@/providers/branding-provider";
@@ -11,63 +11,63 @@ import { PageLoading } from "@/components/ui/shared";
 import { Button } from "@/components/ui/button";
 import { RequireRead } from "@/components/ui/forbidden-state";
 import { formatDate } from "@/lib/utils";
-import type { ChallanPrintMode } from "@/types";
+import type { EstimatePrintMode } from "@/types";
 import { ArrowLeft, Printer, Eye, EyeOff } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════
-// Challan — Print view.
-// Two modes (toggleable on screen, persisted at default in challan):
+// Estimate — Print view.
+// Two modes (toggleable on screen, persisted at default in estimate):
 //   - with_remarks  → shows unit price + line totals (billing copy)
 //   - no_amount     → hides prices entirely (driver / customer copy)
 // ═══════════════════════════════════════════════════════════════════
 
-export default function ChallanPrintPage() {
+export default function EstimatePrintPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const brand = useBranding();
   const { tenantName } = useAuth();
 
-  const { data: challan, isLoading } = useQuery({
-    queryKey: ["challan", id],
-    queryFn: () => challanService.getById(id),
+  const { data: estimate, isLoading } = useQuery({
+    queryKey: ["estimate", id],
+    queryFn: () => estimateService.getById(id),
     enabled: !!id,
   });
   const { data: lines = [] } = useQuery({
-    queryKey: ["challanLines", id],
-    queryFn: () => challanService.listLines(id),
+    queryKey: ["estimateLines", id],
+    queryFn: () => estimateService.listLines(id),
     enabled: !!id,
   });
   const { data: party } = useQuery({
-    queryKey: ["party", challan?.party_id],
-    queryFn: () => (challan?.party_id ? partyService.getById(challan.party_id) : null),
-    enabled: !!challan?.party_id,
+    queryKey: ["party", estimate?.party_id],
+    queryFn: () => (estimate?.party_id ? partyService.getById(estimate.party_id) : null),
+    enabled: !!estimate?.party_id,
   });
   const { data: route } = useQuery({
-    queryKey: ["route", challan?.route_id],
-    queryFn: () => (challan?.route_id ? routeService.getById(challan.route_id) : null),
-    enabled: !!challan?.route_id,
+    queryKey: ["route", estimate?.route_id],
+    queryFn: () => (estimate?.route_id ? routeService.getById(estimate.route_id) : null),
+    enabled: !!estimate?.route_id,
   });
 
-  const [mode, setMode] = useState<ChallanPrintMode>("no_amount");
+  const [mode, setMode] = useState<EstimatePrintMode>("no_amount");
   useEffect(() => {
-    if (challan) setMode(challan.print_mode);
-  }, [challan]);
+    if (estimate) setMode(estimate.print_mode);
+  }, [estimate]);
 
   useEffect(() => {
-    document.title = challan?.challan_number
-      ? `Challan ${challan.challan_number}`
-      : "Challan";
-  }, [challan?.challan_number]);
+    document.title = estimate?.estimate_number
+      ? `Estimate ${estimate.estimate_number}`
+      : "Estimate";
+  }, [estimate?.estimate_number]);
 
-  if (isLoading || !challan) return <PageLoading />;
+  if (isLoading || !estimate) return <PageLoading />;
 
   const showAmounts = mode === "with_remarks";
   const sellerName = tenantName || brand.name || "Company name";
 
   return (
-    <RequireRead perm="inventory.challans.read" crumbs={["Billing", "Challans", challan.challan_number, "Print"]}>
-    <div className="challan-print-root">
-      <div className="challan-toolbar print-hidden">
+    <RequireRead perm="inventory.estimates.read" crumbs={["Billing", "Estimates", estimate.estimate_number, "Print"]}>
+    <div className="estimate-print-root">
+      <div className="estimate-toolbar print-hidden">
         <Button onClick={() => router.back()} icon={<ArrowLeft size={13} />}>Back</Button>
         <Button
           onClick={() => setMode(mode === "with_remarks" ? "no_amount" : "with_remarks")}
@@ -80,10 +80,10 @@ export default function ChallanPrintPage() {
         </Button>
       </div>
 
-      <article className="challan-paper" aria-label={`Delivery challan ${challan.challan_number}`}>
+      <article className="estimate-paper" aria-label={`Delivery estimate ${estimate.estimate_number}`}>
         <header className="cp-head">
           <div>
-            <div className="cp-eyebrow">Delivery Challan</div>
+            <div className="cp-eyebrow">Delivery Estimate</div>
             <h1 className="cp-seller">{sellerName}</h1>
             <div className="cp-seller-meta">
               {!showAmounts && <div className="cp-mode-tag">Driver / Customer copy · Amounts withheld</div>}
@@ -91,32 +91,32 @@ export default function ChallanPrintPage() {
             </div>
           </div>
           <div className="cp-doc-meta">
-            <div className="cp-doc-num">{challan.challan_number}</div>
+            <div className="cp-doc-num">{estimate.estimate_number}</div>
             <dl className="cp-meta-grid">
-              <Meta label="Challan date" value={formatDate(challan.challan_date)} mono />
+              <Meta label="Estimate date" value={formatDate(estimate.estimate_date)} mono />
               {route && <Meta label="Route" value={`${route.code} · ${route.name}`} />}
-              <Meta label="Status" value={challan.status.toUpperCase()} />
-              <Meta label="Bill toggle" value={challan.is_billed ? "INVOICED" : "NO INVOICE"} />
+              <Meta label="Status" value={estimate.status.toUpperCase()} />
+              <Meta label="Bill toggle" value={estimate.is_billed ? "INVOICED" : "NO INVOICE"} />
             </dl>
           </div>
         </header>
 
         <section className="cp-billto">
           <div className="cp-section-label">Deliver to</div>
-          <div className="cp-billto-name">{party?.name || challan.party_id}</div>
+          <div className="cp-billto-name">{party?.name || estimate.party_id}</div>
           {party?.legal_name && <div className="cp-billto-legal">{party.legal_name}</div>}
-          {challan.destination_address && (
-            <div className="cp-billto-address">{challan.destination_address}</div>
+          {estimate.destination_address && (
+            <div className="cp-billto-address">{estimate.destination_address}</div>
           )}
         </section>
 
-        {(challan.vehicle_number || challan.driver_name) && (
+        {(estimate.vehicle_number || estimate.driver_name) && (
           <section className="cp-dispatch">
             <div className="cp-section-label">Dispatch</div>
             <div className="cp-dispatch-row">
-              {challan.vehicle_number && <span><strong>Vehicle:</strong> <span className="cp-mono">{challan.vehicle_number}</span></span>}
-              {challan.driver_name && <span><strong>Driver:</strong> {challan.driver_name}</span>}
-              {challan.driver_phone && <span className="cp-mono">{challan.driver_phone}</span>}
+              {estimate.vehicle_number && <span><strong>Vehicle:</strong> <span className="cp-mono">{estimate.vehicle_number}</span></span>}
+              {estimate.driver_name && <span><strong>Driver:</strong> {estimate.driver_name}</span>}
+              {estimate.driver_phone && <span className="cp-mono">{estimate.driver_phone}</span>}
             </div>
           </section>
         )}
@@ -150,11 +150,11 @@ export default function ChallanPrintPage() {
 
         {showAmounts && (
           <section className="cp-totals">
-            <TotalRow label="Sub-total" value={challan.subtotal} />
-            {parseFloat(challan.discount_total) > 0 && <TotalRow label="Discount" value={challan.discount_total} />}
-            <TotalRow label="Grand total" value={`₹ ${challan.grand_total}`} bold />
+            <TotalRow label="Sub-total" value={estimate.subtotal} />
+            {parseFloat(estimate.discount_total) > 0 && <TotalRow label="Discount" value={estimate.discount_total} />}
+            <TotalRow label="Grand total" value={`₹ ${estimate.grand_total}`} bold />
             <div className="cp-tax-note">
-              Challan is not a tax invoice. GST will be added on the linked invoice.
+              Estimate is not a tax invoice. GST will be added on the linked invoice.
             </div>
           </section>
         )}
@@ -172,7 +172,7 @@ export default function ChallanPrintPage() {
       </article>
 
       <style jsx>{`
-        .challan-print-root {
+        .estimate-print-root {
           min-height: 100vh;
           background: var(--color-surface);
           padding: 24px;
@@ -181,14 +181,14 @@ export default function ChallanPrintPage() {
           gap: 16px;
           align-items: center;
         }
-        .challan-toolbar {
+        .estimate-toolbar {
           width: 100%;
           max-width: 800px;
           display: flex;
           gap: 8px;
           justify-content: flex-end;
         }
-        .challan-paper {
+        .estimate-paper {
           background: white;
           color: #1a1a1a;
           width: 100%;
@@ -342,11 +342,11 @@ export default function ChallanPrintPage() {
         }
 
         @media print {
-          .challan-print-root {
+          .estimate-print-root {
             background: white;
             padding: 0;
           }
-          .challan-paper {
+          .estimate-paper {
             box-shadow: none;
             border-radius: 0;
             padding: 16mm 14mm;

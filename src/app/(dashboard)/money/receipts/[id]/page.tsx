@@ -181,7 +181,7 @@ function ReceiptDetail({ id }: { id: string }) {
                       const inv = a.invoice_id ? invoiceById.get(a.invoice_id) : undefined;
                       return (
                         <tr key={a.id} className="border-t border-border">
-                          <td className="px-3 py-2">{inv ? <Link href={`/invoices/${inv.id}`} className="text-brand hover:underline">{inv.invoice_number}</Link> : (a.invoice_id ?? a.challan_id)}</td>
+                          <td className="px-3 py-2">{inv ? <Link href={`/invoices/${inv.id}`} className="text-brand hover:underline">{inv.invoice_number}</Link> : (a.invoice_id ?? a.estimate_id)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(a.amount, "INR", "en-IN")}</td>
                         </tr>
                       );

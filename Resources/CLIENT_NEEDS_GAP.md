@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-The first known production client of RaniacOne is a **mid-size Indian distribution business** (construction-materials trade — ACP panels, hardener, APP membrane, etc.). Their spec is a small-business operating system: inventory + GST invoicing + challan flow + payments + multi-account ledgers + expenses + reports.
+The first known production client of RaniacOne is a **mid-size Indian distribution business** (construction-materials trade — ACP panels, hardener, APP membrane, etc.). Their spec is a small-business operating system: inventory + GST invoicing + estimate flow + payments + multi-account ledgers + expenses + reports.
 
 **Current product matches roughly 30%** of their ask. Most of the missing 70% is **the billing + financial accounting side** — and it's NOT custom client work. These are standard features any general-purpose IMS / distribution suite ships (think Tally, Vyapar, Zoho Books, Marg ERP, Cin7, Sortly+QuickBooks combo). Building them moves RaniacOne from "warehouse engine" to "distribution OS" — a much bigger market.
 
@@ -22,7 +22,7 @@ The first known production client of RaniacOne is a **mid-size Indian distributi
 The product mandate is a **generic IMS for the general market**, not a one-off implementation for one distributor. So:
 
 - Features the client **didn't ask for but the product already has** (multi-tenant, RBAC, FIFO, custom fields, audit log, workflows, lots/serials, optimistic locking) — **stay**. They're table-stakes for any future enterprise prospect.
-- Features the client **did ask for that are genuinely standard** (invoicing, GST, challans, payments, AR ledger, expenses, reports) — **get built** as product features, not as customisations. They land in the trunk and serve every future client.
+- Features the client **did ask for that are genuinely standard** (invoicing, GST, estimates, payments, AR ledger, expenses, reports) — **get built** as product features, not as customisations. They land in the trunk and serve every future client.
 - Features the client asked for that are **niche to their workflow** (route-based sales, "Bill / No Bill" toggle, the specific cheque-deposit-tracking ledger, salary-auto-debit-on-1st) — **get evaluated case-by-case**. Some are useful generically (route-based sales = sales-territory module — good); some are local quirks ("Arpit Specific Thing" in the spec) we'd implement once the use-case is clear.
 
 The point: **this client's spec becomes the kickstart for the IMS-for-distribution module of the product**, not a forked custom build.
@@ -116,7 +116,7 @@ Legend:
 **FE work:** PO form lets the user check "no cost yet" → unit price field is hidden, line total is 0.
 **BE work:** Allow `unit_price = null` on PO lines; balance + valuation logic must handle zero-cost layers without breaking FIFO COGS.
 
-### §8 — Outward Sales (Challan / Estimate)
+### §8 — Outward Sales (Estimate / Estimate)
 
 | Requirement | Status | Notes |
 | --- | --- | --- |
@@ -137,7 +137,7 @@ Legend:
 
 | Requirement | Status | Notes |
 | --- | --- | --- |
-| Create from challan | ❌ | Neither challan nor invoice exists as a doc type |
+| Create from estimate | ❌ | Neither estimate nor invoice exists as a doc type |
 | All fields editable except invoice number | ❌ | Moot until invoice exists |
 
 **Major new module.** See *New Entities Needed → Invoice* below.
@@ -221,7 +221,7 @@ The schemas below are **draft sketches** for the FE-first implementation. The FE
 // New document_type code "INVOICE"; new sub-type for legal tax invoices
 interface Invoice extends DocumentHeader {
   invoice_number: string;        // immutable once posted
-  challan_id?: string;            // null if direct invoice; set if promoted from a challan
+  estimate_id?: string;            // null if direct invoice; set if promoted from a estimate
   is_gst_registered: boolean;     // copied from Party.is_gst_registered at creation
   place_of_supply: string;        // 2-digit state code
   invoice_date: string;           // YYYY-MM-DD
@@ -242,13 +242,13 @@ interface InvoiceLine extends DocumentLine {
 }
 ```
 
-### `Challan` (delivery challan)
+### `Estimate` (delivery estimate)
 
 ```ts
-// New document_type code "CHALLAN"; affects stock (movement on post)
-interface Challan extends DocumentHeader {
-  challan_number: string;
-  challan_date: string;
+// New document_type code "ESTIMATE"; affects stock (movement on post)
+interface Estimate extends DocumentHeader {
+  estimate_number: string;
+  estimate_date: string;
   customer_id: string;            // Party.id with party_type ∈ ('customer','both')
   route_id?: string;
   vehicle_number?: string;
@@ -258,7 +258,7 @@ interface Challan extends DocumentHeader {
   invoice_id?: string;            // null until promoted; FK once an Invoice is created from this
 }
 
-// Lines are standard DocumentLine; no tax fields (challan is not a tax doc)
+// Lines are standard DocumentLine; no tax fields (estimate is not a tax doc)
 ```
 
 ### `Route` (sales territory)
@@ -298,7 +298,7 @@ interface Payment {
   mode: PaymentMode;
   // Mode-specific metadata in a polymorphic JSONB blob — the FE renders different forms per mode
   details: ChequeDetails | GPayDetails | CashDetails | BankDetails;
-  applied_against: PaymentAllocation[];   // which invoices/challans this settles
+  applied_against: PaymentAllocation[];   // which invoices/estimates this settles
   remarks?: string;
   created_at: string;
 }
@@ -328,7 +328,7 @@ interface BankDetails {
 
 interface PaymentAllocation {
   invoice_id?: string;
-  challan_id?: string;
+  estimate_id?: string;
   amount: string;
 }
 ```
@@ -365,7 +365,7 @@ interface LedgerEntry {
   tenant_id: string;
   account_id: string;
   entry_date: string;
-  source_doc_type: 'invoice' | 'challan' | 'payment' | 'expense' | 'salary' | 'opening' | 'manual';
+  source_doc_type: 'invoice' | 'estimate' | 'payment' | 'expense' | 'salary' | 'opening' | 'manual';
   source_doc_id: string;
   debit: string;           // exactly one of debit/credit non-zero
   credit: string;
@@ -446,7 +446,7 @@ interface PartyAdditions {
   opening_balance: string;
 }
 
-// DocumentHeader — Bill/NoBill + print mode (used by Challan especially)
+// DocumentHeader — Bill/NoBill + print mode (used by Estimate especially)
 interface DocumentHeaderAdditions {
   is_billed?: boolean;
   print_mode?: 'with_remarks' | 'no_amount';
@@ -478,20 +478,20 @@ Unblock the inventory side cheaply. Everything in this phase has clear backend a
 
 The legally-required tax + dispatch documents.
 
-- **`Challan` document type** with route, vehicle, driver, Bill/NoBill, two print modes
+- **`Estimate` document type** with route, vehicle, driver, Bill/NoBill, two print modes
 - **`Invoice` document type** with HSN, CGST/SGST/IGST split, place-of-supply, GST math
-- **Challan-to-Invoice promotion flow**
+- **Estimate-to-Invoice promotion flow**
 - **PDF rendering** for both (server-side, via a templating service)
-- **Number Series** wiring for invoice + challan numbers
+- **Number Series** wiring for invoice + estimate numbers
 - **Item-level GST defaults** flow into invoice lines
 - **Two-column out-of-stock modal** replacing the current toast on SO post
-- **Variant-attribute cascading dropdowns** on SO/Challan forms
+- **Variant-attribute cascading dropdowns** on SO/Estimate forms
 
 **Out of scope for Phase 2 (deferred to Phase 4):**
 - e-Invoice IRN/QR (NIC integration — separate beast)
 - e-Way Bill (NIC integration)
 
-**FE deliverables:** new document creation flows for Invoice + Challan, line-tax UI (CGST/SGST/IGST live calc), promote-from-challan modal, PDF preview.
+**FE deliverables:** new document creation flows for Invoice + Estimate, line-tax UI (CGST/SGST/IGST live calc), promote-from-estimate modal, PDF preview.
 **BE deliverables:** two new doc types, line-tax fields, GST math service (place-of-supply matrix: same-state → CGST+SGST, inter-state → IGST), PDF rendering service, number-series allocation.
 
 ### Phase 3 — Financial accounting (4-6 sprints)
@@ -502,7 +502,7 @@ The ledger + payments + expenses + debtors module.
 - **Multi-ledger UX**: separate views for cash / bank / cheque-pending / gpay / per-party
 - **Payments module** (cash / cheque / gpay / bank / upi / card) with mode-specific forms
 - **Cheque-deposit workflow** (cheque-in-transit → bank account on deposit)
-- **Settlement allocation** (apply payment to invoice/challan, partial-pay support)
+- **Settlement allocation** (apply payment to invoice/estimate, partial-pay support)
 - **`Expense` + `ExpenseCategory`** module
 - **`Employee` + `SalaryRule`** + scheduled job for monthly salary debit
 - **Debtors view** (top of dashboard + dedicated page)
@@ -514,13 +514,13 @@ The ledger + payments + expenses + debtors module.
 
 ### Phase 4 — e-Invoice + e-Way Bill integrations (2-4 sprints)
 
-Government API integrations on top of the now-mature invoice/challan core.
+Government API integrations on top of the now-mature invoice/estimate core.
 
 - **NIC e-Invoice integration**: post invoice JSON, receive IRN + signed QR, store on the invoice
-- **e-Way Bill generation**: post movement JSON, receive EWB number, store on the challan
+- **e-Way Bill generation**: post movement JSON, receive EWB number, store on the estimate
 - **Bulk operations**: cancel/regenerate IRN, EWB validity tracking
 
-**Why last:** these need a stable invoice + challan first. Building them earlier means rebuilding when invoice schema changes.
+**Why last:** these need a stable invoice + estimate first. Building them earlier means rebuilding when invoice schema changes.
 
 ---
 
@@ -542,13 +542,13 @@ Government API integrations on top of the now-mature invoice/challan core.
 | # | Action | Owner | Phase | Effort |
 | --- | --- | --- | --- | --- |
 | 1 | Lock `.impeccable.md` design context for the new modules (forms-heavy, accounting-style) | FE | 1 | 0.5d |
-| 2 | Extend `src/lib/demo/fixtures.ts` with the new entities (Route, Invoice, Challan, Payment, FinancialAccount, LedgerEntry, Expense, ExpenseCategory, Employee) | FE | 1 | 1-2d |
+| 2 | Extend `src/lib/demo/fixtures.ts` with the new entities (Route, Invoice, Estimate, Payment, FinancialAccount, LedgerEntry, Expense, ExpenseCategory, Employee) | FE | 1 | 1-2d |
 | 3 | Extend `src/lib/demo/adapter.ts` to mock the new endpoints | FE | 1 | 1-2d |
 | 4 | Build Phase 1 FE screens (Route, Party additions, Item GST defaults, As-of-date balance, Dashboard filters) | FE | 1 | 5-8d |
 | 5 | Have client click through Phase 1 in demo mode; capture feedback | FE+Sales | 1 | 1d |
 | 6 | Write `raniacone-dev/changes_required.txt` REQ-N entries with full schemas + endpoint specs derived from working FE | FE | 1 | 1d |
 | 7 | Hand to backend; FE swaps demo adapter for real endpoints when BE ships | FE+BE | 1 | depends on BE |
-| 8 | Repeat for Phase 2 (Invoice + Challan) | FE | 2 | 3 weeks |
+| 8 | Repeat for Phase 2 (Invoice + Estimate) | FE | 2 | 3 weeks |
 | 9 | Repeat for Phase 3 (Ledgers + Payments + Expenses + Debtors) | FE | 3 | 4 weeks |
 | 10 | Repeat for Phase 4 (e-Invoice + e-Way Bill) | FE+BE | 4 | 2 weeks |
 

@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RequireRead } from "@/components/ui/forbidden-state";
 import {
   TrendingUp, TrendingDown, AlarmClock, Hourglass,
-  PiggyBank, Boxes, ArrowRight, FileJson, Lock,
+  PiggyBank, Boxes, ArrowRight, FileJson, Lock, BarChart3,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -79,6 +79,16 @@ export default function ReportsLandingPage() {
           title="Reports"
           description="Statements over your invoices, bills, payments, expenses and salary. Pick the question you're trying to answer; each report is a date-bounded view you can filter and export."
         />
+
+        <Section title="At a glance" hint="One screen for the big picture — earning, spending, what's selling.">
+          <ReportCard
+            title="Business overview"
+            blurb="Total earning vs spend, item-wise revenue, top customers, and where the money went — all over a date range you pick."
+            href="/reports/overview"
+            icon={BarChart3}
+            tone="green"
+          />
+        </Section>
 
         <Section title="Tax registers" hint="Pick a date range, see every line. Foundation for GST returns.">
           <ReportCard

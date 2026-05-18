@@ -16,10 +16,10 @@ The system has two user personas at Nova Bond on day-1:
 | Role | Who | What they see | What they don't see |
 |---|---|---|---|
 | **Admin** | Mr. Arpit (owner) | Everything — items, stock, GRNs, bills, invoices, money, reports, P&L, GSTR, master data, pricing rules | Nothing hidden |
-| **Warehouse Operator** | Floor staff (1+ persons) | Items, stock, lots, locations, GRNs (no cost), Sales Orders, Challans (with sale price OK), Stock Counts, Parties | Bills, invoices, payments, expenses, salary, accounts, ledger, reports, audit log, valuation, **pricing config**, **master data master**, P&L — **anything money or admin-config related** |
+| **Warehouse Operator** | Floor staff (1+ persons) | Items, stock, lots, locations, GRNs (no cost), Sales Orders, Estimates (with sale price OK), Stock Counts, Parties | Bills, invoices, payments, expenses, salary, accounts, ledger, reports, audit log, valuation, **pricing config**, **master data master**, P&L — **anything money or admin-config related** |
 
 Two more roles exist for the future:
-- **Salesman** (field rep) — same as Operator + challan creation focus
+- **Salesman** (field rep) — same as Operator + estimate creation focus
 - **Cashier** (front desk) — payments-only access, no cost visibility
 
 Admin's view of the world is unrestricted; Operator's view is operations-only with **zero money on screen**.
@@ -34,7 +34,7 @@ It's 9:30 AM on a Monday. The warehouse operator logs in.
 
 The dashboard greets him with **3 tiles**:
 1. **Items in stock** — 39 SKUs across 4 locations
-2. **Draft documents** — 4 GRNs / Challans pending
+2. **Draft documents** — 4 GRNs / Estimates pending
 3. **Stock counts** — 2 open
 
 He doesn't see "Inventory value" or "GRNs pending bill" — those are admin-only. He doesn't see Money / Reports / Master Data / Audit Log groups in the sidebar at all.
@@ -80,7 +80,7 @@ He saves and clicks **Post**. Stock rises: NB-1101 went from 138 → 338 sheets.
 
 Greenfield Retail sent their truck for 5 sheets of NB-1101 (sample swatches for a project bid).
 
-Operator opens **Sales → Challans → + New Challan**. Form fields:
+Operator opens **Sales → Estimates → + New Estimate**. Form fields:
 
 | Field | What he enters |
 |---|---|
@@ -92,10 +92,10 @@ Operator opens **Sales → Challans → + New Challan**. Form fields:
 
 Adds line: NB-1101 × 5 sheets, **3 mm + 1220×2440**. Because the dimensions are picked, the system **auto-fills `unit price` = ₹5,800** *(pulled from the active pricing rule — the "Q4 list price" effective since 3 March)*.
 
-He posts the challan, hits **Print**. The printed challan shows products + qty in the remarks column, **no amounts** (per the saved print mode). Driver signs, leaves.
+He posts the estimate, hits **Print**. The printed estimate shows products + qty in the remarks column, **no amounts** (per the saved print mode). Driver signs, leaves.
 
 > **Plot twist**: Greenfield calls back: "Send me a priced version for our records."
-> Operator opens the challan detail, clicks the **With amounts** chip in the Print mode toggle, hits Print again. Same data, with prices visible this time. Saved automatically.
+> Operator opens the estimate detail, clicks the **With amounts** chip in the Print mode toggle, hits Print again. Same data, with prices visible this time. Saved automatically.
 
 ### 12:30 PM · Quick stock count
 
@@ -105,7 +105,7 @@ Mr. Arpit asked for a count of the Premium Collection rack. Operator opens **Inv
 
 Operator logs out. He has handled:
 - 1 inward receipt (200 sheets · 1 lot recorded · no cost typed)
-- 3 outbound challans (sale price auto-filled from pricing rules)
+- 3 outbound estimates (sale price auto-filled from pricing rules)
 - 1 stock count
 
 He never saw a single rupee of cost or P&L. He saw the *sale* price (auto-filled when he picked thickness + size); he didn't see what Nova Bond paid Kaizen, what margin it makes, or how much customers owe.
@@ -162,16 +162,16 @@ The system:
 
 He can see the prior price in the expanded history row beneath the active one.
 
-> **Side note**: A new customer just asked about 6mm panels in a 4×16 ft size — combinations Nova Bond hasn't carried before. Mr. Arpit clicks **Manage dimensions** at the top of the page, types `6` under "Add a thickness" → Add, then enters `1220x4880` / "1220 × 4880 mm (4×16 ft)" under Sizes → Add. Both options are immediately available everywhere — pricing rules, GRNs, challans, invoices. Removing a thickness/size is blocked while any pricing rule references it, so history can't be orphaned by accident.
+> **Side note**: A new customer just asked about 6mm panels in a 4×16 ft size — combinations Nova Bond hasn't carried before. Mr. Arpit clicks **Manage dimensions** at the top of the page, types `6` under "Add a thickness" → Add, then enters `1220x4880` / "1220 × 4880 mm (4×16 ft)" under Sizes → Add. Both options are immediately available everywhere — pricing rules, GRNs, estimates, invoices. Removing a thickness/size is blocked while any pricing rule references it, so history can't be orphaned by accident.
 
 > **+ Add price rule** at the top right is the discoverable entry point for fresh combinations: it opens the modal with an item picker (so he can pick any item and create the very first rule for any thickness × size combo).
 
 ### 7:00 PM · Posting an invoice for Greenfield
 
-Greenfield's earlier challan was for a sample shipment. Mr. Arpit decides to convert it to a tax invoice.
+Greenfield's earlier estimate was for a sample shipment. Mr. Arpit decides to convert it to a tax invoice.
 
-He opens the challan detail → clicks **Promote to invoice**. System:
-1. Creates a draft invoice with `source_doc_id = <challan>`
+He opens the estimate detail → clicks **Promote to invoice**. System:
+1. Creates a draft invoice with `source_doc_id = <estimate>`
 2. Copies lines, computes GST splits (intra-state → CGST 9% + SGST 9%)
 3. Sets `print_mode = with_amount` (tax invoice law requires amounts)
 4. Redirects to invoice detail
@@ -221,7 +221,7 @@ It's the 1st of the next month — payroll day. Mr. Arpit:
 Mr. Arpit logs out. Today he handled:
 - 3 vendor bills posted (cost data flowed in)
 - 1 price update (with version history preserved)
-- 1 invoice created from challan
+- 1 invoice created from estimate
 - 1 receipt recorded
 - 4 salaries posted via batch
 - Period close after CA sign-off
@@ -278,14 +278,14 @@ These are the requirements from `clientneeds.txt`. Each marks how it landed.
 | ✅ | Cost flows in via Vendor Bills (Admin-only) — backfill into FIFO layers |
 | ✅ | Thickness + Size dropdowns added; persisted on the line for traceability |
 
-### §8 — Outward Sales (Challan/Estimate)
+### §8 — Outward Sales (Estimate/Estimate)
 > *Bill / No Bill toggle, two print modes, route-based customer selection*
 
 | Built | What |
 |---|---|
-| ✅ | Challan creation with `print_mode` (no_amount / with_remarks) toggle on form AND detail page |
+| ✅ | Estimate creation with `print_mode` (no_amount / with_remarks) toggle on form AND detail page |
 | ✅ | Print page renders with or without amounts based on mode |
-| ✅ | Bill / No Bill flag (`is_billed` on challan) |
+| ✅ | Bill / No Bill flag (`is_billed` on estimate) |
 | ✅ | Routes (sales territories) modelled |
 | 🟡 | Route-based cascading customer dropdown (Route → filter Customer list) — not on form yet |
 | ✅ | Auto-populate item details on item code selection |
@@ -293,12 +293,12 @@ These are the requirements from `clientneeds.txt`. Each marks how it landed.
 | ✅ | Out-of-stock detection at post time |
 
 ### §9 — Invoices
-> *Create from challan, all fields editable except invoice number*
+> *Create from estimate, all fields editable except invoice number*
 
 | Built | What |
 |---|---|
-| ✅ | Promote-to-invoice from challan |
-| ✅ | Promote-to-invoice from sales order (Phase 10 — mirror of challan promotion) |
+| ✅ | Promote-to-invoice from estimate |
+| ✅ | Promote-to-invoice from sales order (Phase 10 — mirror of estimate promotion) |
 | ✅ | GST math computed at promotion (CGST+SGST vs IGST per state) |
 | ✅ | Invoice number from NumberSeries (not editable) |
 | ✅ | All other fields editable on the draft |
@@ -379,7 +379,7 @@ This compares what existed when we started vs what's there now (after Phases 1�
 | **Item detail page** | 10 tabs (General / Identifiers / Variants / UoMs / Lots / Serials / Stock / Reorder / Custom / Attachments) | **11 tabs** — added **Pricing tab** (read-only thickness×size grid with current prices) |
 | **Lots** | Manual "Add Lot" button on `/items/lots` (could create orphan lots) | Read-only viewer. **Lots are born from GRN line entry only** — no manual creation path |
 | **UoMs** | 6 units in 3 categories | **22 units in 5 categories** (count/weight/length/area/volume) — covers SHEET, BUNDLE, SQ.FT, MTR, MT, ROLL, DRUM, NOS, etc. + 12 conversion factors |
-| **Challan print mode** | No print modes; always one layout with amounts | `no_amount` (default) / `with_remarks` toggle on form + detail + print page |
+| **Estimate print mode** | No print modes; always one layout with amounts | `no_amount` (default) / `with_remarks` toggle on form + detail + print page |
 | **Operator visibility** | Saw all amounts everywhere | Sees ZERO money: no cost on GRN, no Value on balances, no cost on movements, no bills/payments/reports/master-data access |
 | **Admin dashboard** | Generic KPIs | Plus "GRNs pending bill" indicator flagging unbilled receipts |
 | **Permission model** | Single tier — admin or read-only | **Three new gates**: `cost.read` (cost surfaces) + `financials.read` (money/reports) + `master_data.read` (master data sidebar group). Operator role trimmed to physical-only. |
@@ -462,9 +462,9 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 
 | Feature | Required by Arpit? | Notes |
 |---|---|---|
-| Challans (delivery notes) | ✅ | With print_mode toggle |
-| Challan → Invoice promotion | ✅ | |
-| SO → Invoice promotion | extension | Phase 10 — mirror of challan promote |
+| Estimates (delivery notes) | ✅ | With print_mode toggle |
+| Estimate → Invoice promotion | ✅ | |
+| SO → Invoice promotion | extension | Phase 10 — mirror of estimate promote |
 | Invoices (tax docs with GST) | ✅ | |
 | GST math (CGST+SGST vs IGST) | ✅ | Auto from state code |
 | Print modes (no_amount / with_remarks) | ✅ | Per spec §8; editable inline on detail page |
@@ -546,7 +546,7 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 | Feature | Why deferred |
 |---|---|
 | NIC e-Invoice / IRN integration | Needs GSP credentials + per-tenant API key + retry queue |
-| NIC e-Way Bill auto-generation | Same infrastructure + transport details on challan |
+| NIC e-Way Bill auto-generation | Same infrastructure + transport details on estimate |
 | Direct GSTN portal upload | Needs GSP relationship; CSV/JSON download works as interim |
 | GSTR-9 annual return | January 2027 filing; future |
 | Trial balance / Balance sheet | Needs equity accounts modelled |
@@ -567,7 +567,7 @@ Every feature in the system, regardless of whether Mr. Arpit asked. Some come "f
 ```
 Dashboard
 ─────────────────
-Sales              (Challans · Invoices · Sales Orders)
+Sales              (Estimates · Invoices · Sales Orders)
 Purchases          (Goods Receipts · Vendor Bills · Purchase Orders)
 Money              (Overview · Debtors · Receipts · Payments · Cheques ·
                     Expenses · Salary · Payroll Batch · Accounts)
@@ -594,7 +594,7 @@ Admin              (Users · Roles · Permissions · Bulk imports ·
 ```
 Dashboard
 ─────────────────
-Sales              (Challans · Sales Orders — Invoices hidden)
+Sales              (Estimates · Sales Orders — Invoices hidden)
 Purchases          (Goods Receipts · Purchase Orders — Vendor Bills hidden)
 Inventory          (Items · Stock Balances · Lots · Stock Counts ·
                     Locations & Bins · Low Stock Alerts · Reservations ·
@@ -625,7 +625,7 @@ For the backend dev to implement when ready:
 - `PHASE10_BACKEND_SPEC.md` — SO → Invoice promotion
 - **`PHASE12_BACKEND_SPEC.md`** — Cost/Financials split + GRN→Bill matching ⭐
 - **`PHASE13_BACKEND_SPEC.md`** — Item Dimensions + Versioned Pricing ⭐
-- `INVOICE_BACKEND_SPEC.md`, `CHALLAN_BACKEND_SPEC.md` — earlier billing
+- `INVOICE_BACKEND_SPEC.md`, `ESTIMATE_BACKEND_SPEC.md` — earlier billing
 
 ### Source files (in `frontend/src/`)
 
@@ -730,7 +730,7 @@ Open the file `frontend/changes_required.txt` for the running list of backend ch
 - 12 thickness × size combinations seeded (4 mm × 3 sizes; now extensible from UI)
 - Versioned pricing rules per (item × dimension) with `valid_from` / `valid_until`
 - New admin page `/master-data/item-pricing` with grid view + history
-- Line forms (GRN/SO/Challan) get Thickness + Size dropdowns + auto-fill unit price
+- Line forms (GRN/SO/Estimate) get Thickness + Size dropdowns + auto-fill unit price
 - New "Pricing" tab on item detail page showing the price grid
 - Old invoices keep snapshotted prices; rule changes only affect new lines
 
@@ -741,7 +741,7 @@ Open the file `frontend/changes_required.txt` for the running list of backend ch
 - Operator now sees zero money on screen
 
 ### Print mode toggle *(Apr 28)*
-- Inline 2-button toggle on Challan detail page (No amounts / With amounts)
+- Inline 2-button toggle on Estimate detail page (No amounts / With amounts)
 - Saves immediately via PATCH on click
 
 ---

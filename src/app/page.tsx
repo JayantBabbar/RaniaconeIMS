@@ -509,7 +509,7 @@ const LANDING_CSS = `
 [data-page="landing"] .cap-grid .tile-po        { grid-column: span 3; grid-row: span 1; }
 [data-page="landing"] .cap-grid .tile-so        { grid-column: span 3; grid-row: span 1; }
 [data-page="landing"] .cap-grid .tile-invoice   { grid-column: span 4; grid-row: span 2; }
-[data-page="landing"] .cap-grid .tile-challan   { grid-column: span 2; grid-row: span 1; }
+[data-page="landing"] .cap-grid .tile-estimate   { grid-column: span 2; grid-row: span 1; }
 [data-page="landing"] .cap-grid .tile-stock     { grid-column: span 2; grid-row: span 1; }
 [data-page="landing"] .cap-grid .tile-tracking  { grid-column: span 6; grid-row: span 1; }
 
@@ -920,15 +920,15 @@ const LANDING_CSS = `
   margin-top: var(--s-2);
 }
 
-/* Challan */
-[data-page="landing"] .ui-challan .vehicle-row {
+/* Estimate */
+[data-page="landing"] .ui-estimate .vehicle-row {
   display: flex; align-items: center; gap: var(--s-3);
   padding: var(--s-3);
   background: var(--surface-deep);
   color: oklch(0.96 0 0);
   border-radius: var(--r-sm);
 }
-[data-page="landing"] .ui-challan .vehicle-plate {
+[data-page="landing"] .ui-estimate .vehicle-plate {
   font-family: var(--ff-mono);
   font-weight: 700;
   font-size: 12px;
@@ -939,16 +939,16 @@ const LANDING_CSS = `
   letter-spacing: 0.05em;
   border: 1.5px solid oklch(0.18 0.020 50);
 }
-[data-page="landing"] .ui-challan .vehicle-row .driver { font-size: 11px; line-height: 1.3; }
-[data-page="landing"] .ui-challan .vehicle-row .driver .nm { color: oklch(0.96 0 0); font-weight: 600; }
-[data-page="landing"] .ui-challan .vehicle-row .driver .ph { font-family: var(--ff-mono); font-size: 10px; color: oklch(0.85 0 0); }
-[data-page="landing"] .ui-challan .route {
+[data-page="landing"] .ui-estimate .vehicle-row .driver { font-size: 11px; line-height: 1.3; }
+[data-page="landing"] .ui-estimate .vehicle-row .driver .nm { color: oklch(0.96 0 0); font-weight: 600; }
+[data-page="landing"] .ui-estimate .vehicle-row .driver .ph { font-family: var(--ff-mono); font-size: 10px; color: oklch(0.85 0 0); }
+[data-page="landing"] .ui-estimate .route {
   display: flex; align-items: center; gap: var(--s-2);
   font-family: var(--ff-mono);
   font-size: 10.5px;
   color: var(--ink-2);
 }
-[data-page="landing"] .ui-challan .route .arrow { color: var(--ink-faint); }
+[data-page="landing"] .ui-estimate .route .arrow { color: var(--ink-faint); }
 
 /* Tracking */
 [data-page="landing"] .ui-tracking { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); flex: 1; }
@@ -1447,7 +1447,7 @@ const LANDING_CSS = `
   [data-page="landing"] .cap-grid .tile-po,
   [data-page="landing"] .cap-grid .tile-so       { grid-column: span 2; }
   [data-page="landing"] .cap-grid .tile-invoice  { grid-column: span 4; grid-row: span 2; }
-  [data-page="landing"] .cap-grid .tile-challan,
+  [data-page="landing"] .cap-grid .tile-estimate,
   [data-page="landing"] .cap-grid .tile-stock    { grid-column: span 2; }
   [data-page="landing"] .cap-grid .tile-tracking { grid-column: span 4; }
   [data-page="landing"] #facts .row { grid-template-columns: repeat(3, 1fr); gap: var(--s-6); }
@@ -1764,7 +1764,7 @@ export default function LandingPage() {
                 <span className="india">Built for India.</span>
               </h1>
               <p className="lead">
-                Purchase orders, GST invoices, delivery challans, live shipment tracking — plus an AI that writes your reports. One platform that knows the difference between CGST and IGST.
+                Purchase orders, GST invoices, delivery estimates, live shipment tracking — plus an AI that writes your reports. One platform that knows the difference between CGST and IGST.
               </p>
               <div className="hero-cta">
                 <Link href="/contact" className="btn btn-primary btn-lg">
@@ -2078,21 +2078,21 @@ export default function LandingPage() {
               </div>
             </article>
 
-            {/* Challan */}
-            <article className="tile tile-challan" data-tile>
+            {/* Estimate */}
+            <article className="tile tile-estimate" data-tile>
               <div className="tile-intro">
-                <span className="tag">Delivery challan</span>
+                <span className="tag">Delivery estimate</span>
                 <h3>Send goods. Document everything.</h3>
                 <p>Vehicle, driver, route — captured before the truck rolls.</p>
               </div>
               <div className="window">
                 <header className="window-chrome">
                   <div className="dots"><i /><i /><i /></div>
-                  <div className="url"><span className="lock">⌁</span>app.raniacone.in / challans / DC-2026-0891</div>
+                  <div className="url"><span className="lock">⌁</span>app.raniacone.in / estimates / DC-2026-0891</div>
                   <div className="placeholder" />
                 </header>
                 <div className="window-body">
-                  <div className="ui ui-challan">
+                  <div className="ui ui-estimate">
                     <div className="doc-head">
                       <span className="doc-num">DC-2026-0891</span>
                       <span className="pill brand"><span className="dot" />Dispatched</span>
@@ -2287,7 +2287,7 @@ export default function LandingPage() {
             <div className="item">
               <div className="label">Documents</div>
               <div className="num"><em>6</em> Out-of-the-box</div>
-              <div className="desc">PO, SO, Tax Invoice, Delivery Challan, Credit Note, e-Way Bill — pre-numbered, validated.</div>
+              <div className="desc">PO, SO, Tax Invoice, Delivery Estimate, Credit Note, e-Way Bill — pre-numbered, validated.</div>
             </div>
             <div className="item">
               <div className="label">Latency</div>

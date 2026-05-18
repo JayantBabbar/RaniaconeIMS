@@ -1800,4 +1800,57 @@ Why deferred: requires a contracted GSP (GST Suvidha Provider)
 relationship with credentials. Phase 5's CSV/JSON download
 already unblocks filing — just one extra manual step for the CA.
 
+═══════════════════════════════════════════════════════════════════
+Phase 14 — Per-party pricing + Estimate→Invoice 2× rule + Category GST (2026-05-13)
+═══════════════════════════════════════════════════════════════════
+
+What the FE now does:
+
+1. **Challan → Estimate rename.** Full rename including DB-level
+   identifiers: route paths `/challans/*` → `/estimates/*`, permission
+   codes `inventory.challans.*` → `inventory.estimates.*`, error codes
+   `CHALLAN_*` → `ESTIMATE_*`, FK column `invoice.challan_id` →
+   `invoice.estimate_id`, FK column `payment_allocation.challan_id` →
+   `payment_allocation.estimate_id`, DocumentType code `"challan"` →
+   `"estimate"`. No behavior change from the rename itself.
+
+2. **`item_categories.gst_rate_pct` column** added (NUMERIC(5,2) NOT NULL
+   DEFAULT '18'). All Arpit-tenant categories seeded with `'18'`. New-item
+   form auto-fills `items.default_tax_rate_pct` from the picked category's
+   `gst_rate_pct` unless admin overrides.
+
+3. **Per-party pricing — two new versioned tables:**
+   - `party_item_costs` — supplier→Arpit cost lists, keyed on
+     (tenant, party, item) with `valid_from`/`valid_until` versioning.
+     Bills/new auto-fills `unit_price` from active rule.
+     Permissions: `inventory.party_costs.{read,write}` (admin-only).
+   - `party_item_sale_prices` — Arpit→customer GST-inclusive sale prices,
+     same versioning. Invoices/new + Estimates/new auto-fill from rule;
+     fallback chain: party-specific → `Item.default_sale_price` → manual.
+     Permissions: `inventory.party_prices.{read,write}` (read open to
+     operators, write admin-only).
+
+4. **Estimate → Invoice promotion math:**
+   - `quantity = estimate_line.quantity × ESTIMATE_TO_INVOICE_QTY_MULTIPLIER`
+     (currently `2`; lift to tenant_config if you onboard a tenant with a
+     different rule, defaulting to `1`).
+   - `unit_price = reverseGst(estimate_line.unit_price, rate_pct).baseAmount`.
+   - Stock invariant unchanged: invoice with `estimate_id` skips stock OUT.
+   - Customer-paid total on invoice = 2× estimate total (customer receives
+     2× units at the same per-unit final price as the estimate).
+
+Backend deliverables:
+- See `Resources/backend-bundle/PARTY_PRICING_BACKEND_SPEC.md` for the
+  full party-pricing spec (schema, endpoints, RBAC, tests).
+- See `Resources/backend-bundle/ESTIMATE_BACKEND_SPEC.md` §5.8 for the
+  updated promote handler semantics.
+
+Migrations needed:
+- Rename challan tables/columns/perms (one mechanical migration).
+- Add `gst_rate_pct` to `item_categories`; backfill `'18'` for Arpit-tenant
+  rows; per spec default `'18'` for new rows.
+- Create `party_item_costs`, `party_item_sale_prices` tables with the
+  unique-active partial index per spec §2.
+- Seed four new permission codes; auto-grant all four to `admin` role.
+
 (End of file — append future requests below this marker.)

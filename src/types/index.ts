@@ -195,6 +195,9 @@ export interface ItemCategory {
   code: string;
   name: string;
   parent_id?: string;
+  /** Default GST rate (%) for items in this category. New items inherit this
+   *  into Item.default_tax_rate_pct but can override per-item. */
+  gst_rate_pct: string;
   created_at: string;
   updated_at: string;
 }
@@ -463,8 +466,13 @@ export interface Invoice {
    *  Determines CGST+SGST (same-state as seller) vs IGST. */
   place_of_supply: string;
   status: InvoiceStatus;
-  /** Promoted from a challan? Null for direct invoices. */
-  challan_id?: string;
+  /** Set when this invoice was auto-promoted from an Estimate.
+   *  When set, the line `quantity` is `ESTIMATE_TO_INVOICE_QTY_MULTIPLIER`
+   *  times the source estimate's qty, and the line `unit_price` is the
+   *  reverse-GST'd taxable base (so customer-visible per-unit price ==
+   *  estimate.unit_price). Backend skips stock OUT on post when this is
+   *  set — the estimate's post already drained inventory. */
+  estimate_id?: string;
   /** e-Invoice IRN — set after NIC integration (Phase 4). */
   irn?: string;
   qr_code_data?: string;
@@ -472,7 +480,11 @@ export interface Invoice {
   subtotal: string;
   /** Sum of all lines' cgst+sgst+igst+cess. */
   tax_total: string;
-  /** subtotal + tax_total. */
+  /** Signed paise adjustment so `grand_total` lands on a whole rupee.
+   *  Range typically (−0.50, +0.50). `subtotal + tax_total + round_off
+   *  = grand_total`. Rendered as a "Round off" line on printed invoices. */
+  round_off?: string;
+  /** Rounded payable — `subtotal + tax_total + round_off`, always whole-rupee. */
   grand_total: string;
   /** Indian rupees-to-words rendering for the printed invoice. */
   amount_in_words?: string;
@@ -519,7 +531,7 @@ export interface InvoiceLine {
 //
 // Sales territory / dispatch route master data. Used to scope which
 // customers a delivery serves, and (later, in Phase 1 cleanup) to
-// drive cascading customer pickers on Challan/SO/Invoice forms.
+// drive cascading customer pickers on Estimate/SO/Invoice forms.
 
 export interface Route {
   id: string;
@@ -531,32 +543,32 @@ export interface Route {
   updated_at: string;
 }
 
-// ── Challans ──────────────────────────────────────────────
+// ── Estimates ──────────────────────────────────────────────
 //
-// A Challan is a dispatch / delivery note. It moves stock OUT (just
-// like a Sales Order) but carries no GST math — challans are NOT tax
+// A Estimate is a dispatch / delivery note. It moves stock OUT (just
+// like a Sales Order) but carries no GST math — estimates are NOT tax
 // documents. The customer typically gets an Invoice within a month
-// referencing one or more Challans (the "promote to invoice" flow).
+// referencing one or more Estimates (the "promote to invoice" flow).
 //
 // Billing toggle:
 //   is_billed=false  →  customer hasn't been invoiced yet
-//   is_billed=true   →  an Invoice has been raised; challan is linked
+//   is_billed=true   →  an Invoice has been raised; estimate is linked
 //
 // Two print modes (matches the construction-trade workflow where
-// drivers carry challans without amounts to avoid showing prices to
+// drivers carry estimates without amounts to avoid showing prices to
 // the warehouse staff handling unloading):
-//   "with_remarks" — amounts visible (default for billed challans)
+//   "with_remarks" — amounts visible (default for billed estimates)
 //   "no_amount"    — amounts hidden, only product + qty (default for
 //                    drivers' copies)
 
-export type ChallanStatus = "draft" | "posted" | "cancelled";
-export type ChallanPrintMode = "with_remarks" | "no_amount";
+export type EstimateStatus = "draft" | "posted" | "cancelled";
+export type EstimatePrintMode = "with_remarks" | "no_amount";
 
-export interface Challan {
+export interface Estimate {
   id: string;
   tenant_id: string;
-  challan_number: string;
-  challan_date: string;            // YYYY-MM-DD
+  estimate_number: string;
+  estimate_date: string;            // YYYY-MM-DD
   party_id: string;                // customer
   route_id?: string;
   source_location_id?: string;     // where goods left from
@@ -564,18 +576,18 @@ export interface Challan {
   vehicle_number?: string;
   driver_name?: string;
   driver_phone?: string;
-  status: ChallanStatus;
+  status: EstimateStatus;
 
   /** Bill / No-Bill toggle — set when posting. False = "estimate /
    *  delivery without invoice". True = "tax invoice will follow". */
   is_billed: boolean;
 
-  /** Default print mode for this challan. Overridable at print time. */
-  print_mode: ChallanPrintMode;
+  /** Default print mode for this estimate. Overridable at print time. */
+  print_mode: EstimatePrintMode;
 
-  /** Linked invoice id once the challan has been promoted. Null
+  /** Linked invoice id once the estimate has been promoted. Null
    *  until then. Set by the Invoice creation flow when the user
-   *  picks this challan from the "Source challan" dropdown. */
+   *  picks this estimate from the "Source estimate" dropdown. */
   invoice_id?: string;
 
   /** No GST split here. Just gross totals — invoices add tax later. */
@@ -596,15 +608,19 @@ export interface Challan {
   updated_by?: string;
 }
 
-export interface ChallanLine {
+export interface EstimateLine {
   id: string;
-  challan_id: string;
+  estimate_id: string;
   line_number: number;
   item_id: string;
   description?: string;
   uom_id: string;
   quantity: string;
-  unit_price: string;              // for "with_remarks" print only — challan is not a tax doc
+  /** Customer-visible per-unit price (GST-inclusive). When promoting to
+   *  an invoice, this is the value that gets reverse-GST'd into the
+   *  invoice line's taxable base. Shown only on `with_remarks` prints —
+   *  Estimate itself is not a tax document. */
+  unit_price: string;
   discount_pct: string;
   line_total: string;              // (unit_price × qty) − discount
   lot_id?: string;
@@ -677,7 +693,7 @@ export interface FinancialAccount {
 
 export type LedgerSourceType =
   | "invoice"
-  | "challan"
+  | "estimate"
   | "payment"
   | "cheque_deposit"
   | "vendor_bill"      // Phase 3.5
@@ -753,8 +769,8 @@ export interface PaymentAllocation {
   payment_id: string;
   /** Sales invoice — for direction='received' allocations. */
   invoice_id?: string;
-  /** Challan — reserved for Phase 3.5 challan-direct settlement. */
-  challan_id?: string;
+  /** Estimate — reserved for Phase 3.5 estimate-direct settlement. */
+  estimate_id?: string;
   /** Vendor bill — for direction='paid' allocations (Phase 3.5). */
   bill_id?: string;
   amount: string;
@@ -905,6 +921,9 @@ export interface ExpenseCategory {
   /** Distinguishes capex from opex. Capital expenses go on the
    *  balance sheet, not the P&L; reporting cares about this. */
   is_capital: boolean;
+  /** Marks this as a fuel category — expense entry against this
+   *  category requires a vehicle_number on the Expense record. */
+  is_fuel?: boolean;
   is_active: boolean;
   /** Auto-set to the matching expense_category account, like
    *  Employee.float_account_id. Lets the list page show running
@@ -931,6 +950,10 @@ export interface Expense {
   description: string;
   /** Optional bill photo / receipt. */
   attachment_id?: string;
+  /** Required when the expense's category has `is_fuel=true`. Free-text
+   *  Indian-style plate (e.g. "MH-12-AB-3491"). Surfaced on the expense
+   *  list + detail so admin can audit per-vehicle fuel cost. */
+  vehicle_number?: string;
   status: ExpenseStatus;
   posting_date?: string;
   cancelled_at?: string;
@@ -1080,7 +1103,7 @@ export interface ProfitLossResponse {
   /** Sum of taxable_value on posted invoices in range (we exclude
    *  GST since it's a pass-through, not revenue). */
   revenue: string;
-  /** COGS: stock-out valuation on posted invoice/challan moves. */
+  /** COGS: stock-out valuation on posted invoice/estimate moves. */
   cogs: string;
   gross_profit: string;        // revenue − cogs
   /** Expenses by category (posted in range). */
@@ -1476,7 +1499,7 @@ export interface AuditLogEntry {
 //   rule where valid_from <= as_of_date AND
 //   (valid_until IS NULL OR valid_until >= as_of_date).
 //
-// Lines on Invoice / Challan / GRN documents reference the dimension
+// Lines on Invoice / Estimate / GRN documents reference the dimension
 // at line creation. The unit_price stored on the line is a SNAPSHOT —
 // changing the pricing rule later does NOT mutate historical lines.
 // ═══════════════════════════════════════════════════════════
@@ -1519,6 +1542,56 @@ export interface ItemPricingLookupResponse {
   rule: ItemPricingRule | null;
   /** Server-rendered helper for FE — "Effective since 2026-04-15" etc. */
   effective_label?: string;
+}
+
+// ── Per-Party Pricing ─────────────────────────────────────
+// Versioned cost / sale-price agreements keyed on (party, item, thickness).
+// Same valid_from/valid_until version mechanic as ItemPricingRule.
+// Thicker boards cost more, so prices are stored per thickness.
+
+export interface PartyItemCost {
+  id: string;
+  tenant_id: string;
+  /** Supplier / vendor / both party. Existence of the row marks "this
+   *  supplier carries this item at this thickness"; absence means they don't. */
+  party_id: string;
+  item_id: string;
+  /** Sheet thickness in mm. Required — every cost row is thickness-specific. */
+  thickness_mm: number;
+  /** Per-unit cost in the item's base UoM. */
+  cost: string;
+  valid_from: string;          // YYYY-MM-DD
+  /** NULL = currently active. */
+  valid_until: string | null;
+  notes?: string;
+  created_at: string;
+  created_by?: string;
+}
+
+export interface PartyItemCostLookupResponse {
+  rule: PartyItemCost | null;
+}
+
+export interface PartyItemSalePrice {
+  id: string;
+  tenant_id: string;
+  /** Customer / both party. */
+  party_id: string;
+  item_id: string;
+  /** Sheet thickness in mm. Required — every sale-price row is thickness-specific. */
+  thickness_mm: number;
+  /** Customer-visible per-unit price (used as the Estimate / Invoice
+   *  line's GST-inclusive unit_price for this customer at this thickness). */
+  sale_price: string;
+  valid_from: string;          // YYYY-MM-DD
+  valid_until: string | null;
+  notes?: string;
+  created_at: string;
+  created_by?: string;
+}
+
+export interface PartyItemSalePriceLookupResponse {
+  rule: PartyItemSalePrice | null;
 }
 
 // ── Auth State ────────────────────────────────────────────

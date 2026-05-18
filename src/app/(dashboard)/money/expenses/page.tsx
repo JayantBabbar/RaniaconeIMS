@@ -95,7 +95,14 @@ export default function ExpensesPage() {
                     <td className="px-3 py-2 font-mono text-[12px]">{e.expense_number}</td>
                     <td className="px-3 py-2 text-text-tertiary">{formatDate(e.expense_date)}</td>
                     <td className="px-3 py-2">{catById.get(e.category_id)?.name ?? e.category_id}</td>
-                    <td className="px-3 py-2 max-w-xs truncate">{e.description}</td>
+                    <td className="px-3 py-2 max-w-xs">
+                      <div className="truncate">{e.description}</div>
+                      {e.vehicle_number && (
+                        <div className="mt-0.5 text-[10.5px] font-mono inline-block px-1.5 py-0.5 rounded bg-bg-subtle border border-border text-text-tertiary">
+                          {e.vehicle_number}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-text-tertiary">{accById.get(e.paid_from_account_id)?.name ?? e.paid_from_account_id}</td>
                     <td className="px-3 py-2 text-text-tertiary">{e.vendor_id ? partyById.get(e.vendor_id)?.name ?? "—" : "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(e.amount, "INR", "en-IN")}</td>

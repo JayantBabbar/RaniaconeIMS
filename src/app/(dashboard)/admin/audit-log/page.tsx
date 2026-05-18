@@ -26,7 +26,7 @@ const ACTION_PREFIXES = [
   { value: "", label: "All actions" },
   { value: "invoice.", label: "Invoices" },
   { value: "vendor_bill.", label: "Vendor bills" },
-  { value: "challan.", label: "Challans" },
+  { value: "estimate.", label: "Estimates" },
   { value: "payment.", label: "Payments" },
   { value: "expense.", label: "Expenses" },
   { value: "salary.", label: "Salary" },

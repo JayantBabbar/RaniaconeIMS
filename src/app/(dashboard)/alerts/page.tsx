@@ -30,6 +30,7 @@ import {
   ExternalLink,
   Package,
   SlidersHorizontal,
+  Plus,
 } from "lucide-react";
 import type { Item, Balance } from "@/types";
 import type { ReorderPolicy } from "@/services/items.service";
@@ -56,6 +57,7 @@ export default function LowStockAlertsPage() {
   const canReorder = can("inventory.documents.write");
   const canEditThreshold = can("inventory.reorder_policies.write") || can("inventory.items.write");
   const [editTarget, setEditTarget] = useState<AlertRow | null>(null);
+  const [showAddThreshold, setShowAddThreshold] = useState(false);
   const qc = useQueryClient();
   const toast = useToast();
 
@@ -206,20 +208,27 @@ export default function LowStockAlertsPage() {
       <TopBar
         crumbs={["Alerts", "Low Stock"]}
         right={
-          <Can perm="inventory.documents.write">
-            <Link href="/documents/purchase-orders/new">
-              <Button kind="primary" icon={<ShoppingCart size={13} />}>
-                New Purchase Order
+          <>
+            {canEditThreshold && (
+              <Button icon={<Plus size={13} />} onClick={() => setShowAddThreshold(true)}>
+                Add threshold
               </Button>
-            </Link>
-          </Can>
+            )}
+            <Can perm="inventory.documents.write">
+              <Link href="/documents/goods-receipts/new">
+                <Button kind="primary" icon={<ShoppingCart size={13} />}>
+                  New goods receipt
+                </Button>
+              </Link>
+            </Can>
+          </>
         }
       />
 
       <div className="p-4 md:p-5 space-y-4">
         <PageHeader
           title="Low Stock Alerts"
-          description="Items at or below their reorder threshold, per location. Click 'Reorder' to open a pre-filled Purchase Order."
+          description="Items at or below their reorder threshold, per location. Click 'Receive stock' on any row to open a new Goods Receipt for that vendor."
           learnMore="Alerts only fire when you've set a reorder policy on an item/location (Item detail → Reorder Policies). 'Critical' means zero or negative available; 'Low' means under the reorder point but still positive. Shortfall is the gap between current available and the reorder point."
           badge={
             <Badge tone={counts.all > 0 ? "red" : "green"} dot>
@@ -406,13 +415,13 @@ export default function LowStockAlertsPage() {
                           </Button>
                         </Link>
                         {canReorder && (
-                          <Link href="/documents/purchase-orders/new">
+                          <Link href="/documents/goods-receipts/new">
                             <Button
                               size="sm"
                               kind="primary"
                               icon={<ShoppingCart size={11} />}
                             >
-                              Reorder
+                              Receive stock
                             </Button>
                           </Link>
                         )}
@@ -437,8 +446,144 @@ export default function LowStockAlertsPage() {
           }}
         />
       )}
+      {showAddThreshold && (
+        <AddThresholdModal
+          items={items}
+          locations={locations}
+          onClose={() => setShowAddThreshold(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["reorderPoliciesAll"] });
+            qc.invalidateQueries({ queryKey: ["itemReorderPolicies"] });
+            toast.success("Threshold added");
+            setShowAddThreshold(false);
+          }}
+        />
+      )}
     </div>
     </RequireRead>
+  );
+}
+
+// ── Cross-item Add Threshold modal — opens from the alerts page top bar.
+// Lets the admin set a low-stock threshold for any (item, location) pair
+// without navigating to the item detail page first.
+function AddThresholdModal({
+  items, locations, onClose, onSaved,
+}: {
+  items: Item[];
+  locations: { id: string; code: string; name: string }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [itemId, setItemId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [minQty, setMinQty] = useState("");
+  const [reorderPoint, setReorderPoint] = useState("");
+  const [reorderQty, setReorderQty] = useState("");
+  const [maxQty, setMaxQty] = useState("");
+
+  const save = useMutation({
+    mutationFn: () => itemService.addReorderPolicy(itemId, {
+      location_id: locationId,
+      min_qty: Number(minQty),
+      ...(reorderPoint ? { reorder_point: Number(reorderPoint) } : {}),
+      ...(reorderQty   ? { reorder_qty:   Number(reorderQty) }   : {}),
+      ...(maxQty       ? { max_qty:       Number(maxQty) }       : {}),
+    }),
+    onSuccess: onSaved,
+    onError: (e) => toast.error(isApiError(e) ? e.message : "Could not save threshold"),
+  });
+
+  const canSave = !!itemId && !!locationId && !!minQty && Number(minQty) >= 0;
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="Add low-stock threshold"
+      description="Pick an item and location, then set the quantities that trigger an alert. Each (item × location) can have one active threshold."
+      width="md"
+    >
+      <div className="space-y-3">
+        <div>
+          <label className="block text-[12px] font-medium mb-1">Item *</label>
+          <select
+            value={itemId}
+            onChange={(e) => setItemId(e.target.value)}
+            className="w-full text-[13px] rounded border border-hairline bg-white px-2 py-1.5 h-9"
+          >
+            <option value="">— Select item —</option>
+            {items.map((it) => (
+              <option key={it.id} value={it.id}>{it.item_code} — {it.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[12px] font-medium mb-1">Location *</label>
+          <select
+            value={locationId}
+            onChange={(e) => setLocationId(e.target.value)}
+            className="w-full text-[13px] rounded border border-hairline bg-white px-2 py-1.5 h-9"
+          >
+            <option value="">— Select location —</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>{l.code} — {l.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Min qty"
+            type="number"
+            min={0}
+            value={minQty}
+            onChange={(e) => setMinQty(e.target.value)}
+            help="Absolute floor — alarm fires when available stock falls below this."
+            required
+          />
+          <Input
+            label="Reorder point"
+            type="number"
+            min={0}
+            value={reorderPoint}
+            onChange={(e) => setReorderPoint(e.target.value)}
+            help="Soft trigger — the alert appears when available is at or below this."
+          />
+          <Input
+            label="Reorder qty"
+            type="number"
+            min={0}
+            value={reorderQty}
+            onChange={(e) => setReorderQty(e.target.value)}
+            help="How much to reorder when the alert fires."
+          />
+          <Input
+            label="Max qty"
+            type="number"
+            min={0}
+            value={maxQty}
+            onChange={(e) => setMaxQty(e.target.value)}
+            help="Cap above which alerts stop firing (avoids overstock noise)."
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            kind="primary"
+            disabled={!canSave || save.isPending}
+            loading={save.isPending}
+            onClick={() => save.mutate()}
+          >
+            Save threshold
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

@@ -52,7 +52,7 @@ something happened but you can't prove it.
 ```
 invoice.post / invoice.cancel / invoice.create / invoice.update
 vendor_bill.post / vendor_bill.cancel
-challan.post / challan.cancel / challan.promote
+estimate.post / estimate.cancel / estimate.promote
 payment.post / payment.cancel / payment.deposit
 expense.post / expense.cancel
 salary.post / salary.cancel / salary.batch.generate / salary.batch.post

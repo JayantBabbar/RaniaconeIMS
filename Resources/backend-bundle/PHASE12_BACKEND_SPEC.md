@@ -99,7 +99,7 @@ ALL permissions including both new gates. No change in scope.
 - `inventory.counts.read/write/apply`
 - `inventory.reservations.read/write`
 - `inventory.lots.write`, `inventory.serials.write`
-- `inventory.challans.read/write/post/cancel`
+- `inventory.estimates.read/write/post/cancel`
 - `inventory.imports.read/write` (operator can do bulk imports)
 
 ### Viewer (`role-viewer`) — unchanged
@@ -188,13 +188,13 @@ This is the data behind the KPI tile shown on the Admin's dashboard
 
 ---
 
-## §6 Print mode for Challan / Invoice
+## §6 Print mode for Estimate / Invoice
 
 Per §8, customer-facing prints can include amounts even when the
 Operator's UI hides them. Implemented as a per-document setting:
 
 ```sql
-ALTER TABLE challans   ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'no_amount';
+ALTER TABLE estimates   ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'no_amount';
 ALTER TABLE invoices   ADD COLUMN print_mode TEXT NOT NULL DEFAULT 'with_amount';
 -- enum: 'no_amount' | 'with_amount'
 ```
@@ -300,7 +300,7 @@ will pick up the real endpoints with no FE redeploy beyond the env flip.
 3. Update GRN-line creation to allow `unit_cost = NULL`
 4. Implement Bill-post backfill logic (§5.2) — most load-bearing
 5. `GET /dashboard/pending-bills-count` endpoint
-6. Print-mode columns on challans/invoices; render templates respect them
+6. Print-mode columns on estimates/invoices; render templates respect them
 
 Each step is independently shippable; nothing breaks existing data
 because new columns default to safe values.

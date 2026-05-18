@@ -37,6 +37,7 @@ function NewExpenseForm() {
   const [paidFromId, setPaidFromId] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [description, setDescription] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
 
   const { data: cats } = useQuery({
     queryKey: ["expense-categories"],
@@ -57,6 +58,11 @@ function NewExpenseForm() {
   });
   const vendors = (partiesRaw?.data ?? []).filter((p) => p.party_type === "supplier" || p.party_type === "vendor" || p.party_type === "both");
 
+  // Fuel categories (Petrol / Diesel / etc) require a vehicle number so
+  // admin can audit per-vehicle running cost.
+  const selectedCategory = categories.find((c) => c.id === categoryId);
+  const isFuelCategory = !!selectedCategory?.is_fuel;
+
   const create = useMutation({
     mutationFn: () => expenseService.create({
       expense_date: expenseDate,
@@ -65,6 +71,7 @@ function NewExpenseForm() {
       paid_from_account_id: paidFromId,
       vendor_id: vendorId || undefined,
       description,
+      vehicle_number: isFuelCategory ? vehicleNumber.trim() : undefined,
     }),
     onSuccess: (e) => {
       toast.success(`Expense ${e.expense_number ?? "created"}`);
@@ -73,7 +80,12 @@ function NewExpenseForm() {
     onError: (e) => toast.error(isApiError(e) ? e.message : "Could not create expense"),
   });
 
-  const canSubmit = !!categoryId && Number(amount) > 0 && !!paidFromId && description.trim().length > 0;
+  const canSubmit =
+    !!categoryId &&
+    Number(amount) > 0 &&
+    !!paidFromId &&
+    description.trim().length > 0 &&
+    (!isFuelCategory || vehicleNumber.trim().length > 0);
 
   return (
     <>
@@ -116,6 +128,16 @@ function NewExpenseForm() {
               {vendors.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </FormField>
+          {isFuelCategory && (
+            <FormField label="Vehicle number" required hint="The vehicle this fuel was filled into. Used for per-vehicle running-cost reports.">
+              <Input
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                placeholder="MH-12-AB-3491"
+                autoComplete="off"
+              />
+            </FormField>
+          )}
           <FormField label="Description" required>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What was this for?" rows={3} />
           </FormField>

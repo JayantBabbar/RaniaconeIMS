@@ -3,7 +3,7 @@
 > **Status:** Living document. Updated as the FE prototype matures.
 > **Last revised:** 2026-04-29
 > **Origin:** derived from working FE prototype at `src/app/(dashboard)/money/*` + the party-ledger tab on `/parties/[id]?tab=ledger`.
-> **Companion:** [INVOICE_BACKEND_SPEC.md](INVOICE_BACKEND_SPEC.md) (REQ-4) and [CHALLAN_BACKEND_SPEC.md](CHALLAN_BACKEND_SPEC.md) (REQ-5) — Phase 3 wires those into a real ledger.
+> **Companion:** [INVOICE_BACKEND_SPEC.md](INVOICE_BACKEND_SPEC.md) (REQ-4) and [ESTIMATE_BACKEND_SPEC.md](ESTIMATE_BACKEND_SPEC.md) (REQ-5) — Phase 3 wires those into a real ledger.
 > **Companion:** [CLIENT_NEEDS_GAP.md](CLIENT_NEEDS_GAP.md) §5, §10, §11.
 > **For backend dev:** this is the contract. Build the API to satisfy it; FE will swap from demo adapter to real endpoints with zero further FE changes.
 
@@ -24,7 +24,7 @@ Phase 3 adds the **Money** module — collections, payments, multi-ledger UX, de
 | §11 Multi-ledger | `financial_accounts` + `ledger_entries` | Same |
 | Employee float | `financial_accounts` of type `employee_float` | One per employee, set on the receipt when payee=employee |
 
-**Status state machine** (mirrors invoices/challans):
+**Status state machine** (mirrors invoices/estimates):
 
 ```
 draft  →  posted  →  cancelled
@@ -149,7 +149,7 @@ CREATE INDEX idx_accounts_tenant_emp     ON financial_accounts(tenant_id, employ
 ```sql
 CREATE TYPE ledger_source_type AS ENUM (
   'invoice',
-  'challan',
+  'estimate',
   'payment',
   'cheque_deposit',
   'expense',
@@ -262,19 +262,19 @@ CREATE TABLE payment_allocations (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id  UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
   invoice_id  UUID REFERENCES invoices(id),
-  challan_id  UUID REFERENCES challans(id),
+  estimate_id  UUID REFERENCES estimates(id),
   amount      NUMERIC(15,2) NOT NULL CHECK (amount > 0),
 
-  CHECK ((invoice_id IS NOT NULL)::int + (challan_id IS NOT NULL)::int = 1),
+  CHECK ((invoice_id IS NOT NULL)::int + (estimate_id IS NOT NULL)::int = 1),
   -- Phase 3 v1: only invoice allocations are exercised by the FE.
-  -- challan_id reserved for Phase 3.5 challan-direct settlement.
+  -- estimate_id reserved for Phase 3.5 estimate-direct settlement.
 
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_alloc_payment ON payment_allocations(payment_id);
 CREATE INDEX idx_alloc_invoice ON payment_allocations(invoice_id) WHERE invoice_id IS NOT NULL;
-CREATE INDEX idx_alloc_challan ON payment_allocations(challan_id) WHERE challan_id IS NOT NULL;
+CREATE INDEX idx_alloc_estimate ON payment_allocations(estimate_id) WHERE estimate_id IS NOT NULL;
 ```
 
 **Server-side rule:** `SUM(payment_allocations.amount WHERE payment_id=X) = payments[X].allocated_amount`. Maintain in same transaction as the allocation insert/delete.
@@ -606,13 +606,13 @@ Cr. financial_account WHERE type='gst_output'                                   
 
 Reverse the above three entries (paired with sign-flip), same group_id strategy as Payment CANCEL.
 
-### 7.3 The challan-linked-invoice case (REQ-5 invariant preserved)
+### 7.3 The estimate-linked-invoice case (REQ-5 invariant preserved)
 
-If `invoice.challan_id IS NOT NULL`:
-- Stock OUT was already created on challan post — DON'T create again. (This was already in REQ-5.)
-- Ledger entries for the invoice ARE still created — the financial entry only happens on invoice post, never on challan post (challan doesn't write to the ledger).
+If `invoice.estimate_id IS NOT NULL`:
+- Stock OUT was already created on estimate post — DON'T create again. (This was already in REQ-5.)
+- Ledger entries for the invoice ARE still created — the financial entry only happens on invoice post, never on estimate post (estimate doesn't write to the ledger).
 
-So the cross-product behaves correctly: stock moves on challan post, ledger moves on invoice post, no double counting either way.
+So the cross-product behaves correctly: stock moves on estimate post, ledger moves on invoice post, no double counting either way.
 
 ---
 
@@ -663,7 +663,7 @@ test_employee_gpay_with_company_account_rejected
 # Cross-module (REQ-4 wiring)
 test_invoice_post_writes_ar_sales_gst_entries
 test_invoice_cancel_reverses_ledger_entries_with_sign_flip
-test_invoice_with_challan_skips_stock_but_writes_ledger
+test_invoice_with_estimate_skips_stock_but_writes_ledger
 
 # Permissions
 test_payments_read_requires_perm
@@ -682,7 +682,7 @@ These are deliberately punted — the FE does not exercise them:
 - **Vendor bills (purchase invoices)** — symmetric to sales invoices but a fresh module. Phase 3.5.
 - **Reports** (debt aging, sales/purchase/P&L). Phase 3.5; tiles + per-account journal cover v1.
 - **Bulk operations** (bulk cheque deposit, bulk receipt entry).
-- **Allocation against challans** (challan_id on payment_allocations is reserved but not exercised).
+- **Allocation against estimates** (estimate_id on payment_allocations is reserved but not exercised).
 - **Period close** (locking ledger entries before a date).
 - **Multi-currency journal entries** — INR only for Phase 3.
 

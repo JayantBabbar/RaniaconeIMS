@@ -178,6 +178,12 @@ export default function InvoicePrintPage() {
             {isInterState && igstTotal > 0 && <TotalRow label="IGST" value={igstTotal.toFixed(2)} />}
             {cessTotal > 0 && <TotalRow label="Cess" value={cessTotal.toFixed(2)} />}
             <TotalRow label="Total tax" value={invoice.tax_total} />
+            {invoice.round_off && Number(invoice.round_off) !== 0 && (
+              <TotalRow
+                label="Round off"
+                value={(Number(invoice.round_off) > 0 ? "+ " : "− ") + Math.abs(Number(invoice.round_off)).toFixed(2)}
+              />
+            )}
             <TotalRow label="Grand total" value={`₹ ${invoice.grand_total}`} bold />
           </dl>
         </section>

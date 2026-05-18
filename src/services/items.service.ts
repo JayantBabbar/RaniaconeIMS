@@ -1,6 +1,6 @@
 import { api } from "@/lib/api-client";
 import { ITEMS, ITEM_BRANDS, ITEM_CATEGORIES, STOCK, CUSTOM_FIELDS, ATTACHMENTS } from "@/lib/api-constants";
-import type { Item, Balance, PaginatedResponse } from "@/types";
+import type { Item, ItemCategory, Balance, PaginatedResponse } from "@/types";
 
 // ═══════════════════════════════════════════════════════════
 // Items Service — Items + all sub-resources
@@ -137,6 +137,9 @@ export const itemService = {
     brand_id?: string;
     item_type?: string;
     base_uom_id?: string;
+    /** Default GST rate %, normally inherited from the picked category but
+     *  overridable per item. Used as the line-default on invoices. */
+    default_tax_rate_pct?: string;
     is_batch_tracked?: boolean;
     is_serial_tracked?: boolean;
     is_active?: boolean;
@@ -234,7 +237,7 @@ export const brandService = {
 };
 
 export const categoryService = {
-  async list(): Promise<PaginatedResponse<{ id: string; code: string; name: string; parent_id?: string }>> {
+  async list(): Promise<PaginatedResponse<ItemCategory>> {
     return api.get(ITEM_CATEGORIES.LIST, { limit: 200 });
   },
 };

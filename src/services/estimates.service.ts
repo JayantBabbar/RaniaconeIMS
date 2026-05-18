@@ -1,26 +1,26 @@
 import { api } from "@/lib/api-client";
 import { unwrapList } from "@/lib/utils";
-import { CHALLANS, ROUTES } from "@/lib/api-constants";
+import { ESTIMATES, ROUTES } from "@/lib/api-constants";
 import type {
-  Challan,
-  ChallanLine,
-  ChallanPrintMode,
+  Estimate,
+  EstimateLine,
+  EstimatePrintMode,
   Invoice,
   PaginatedResponse,
   Route,
 } from "@/types";
 
 // ═══════════════════════════════════════════════════════════════════
-// Challans service.
+// Estimates service.
 //
 // Mirrors invoices.service.ts but for delivery notes (no GST math).
 // Adds one extra action — promote-to-invoice — that returns both
-// the updated challan and the newly-created invoice stub.
+// the updated estimate and the newly-created invoice stub.
 // ═══════════════════════════════════════════════════════════════════
 
-export interface ChallanCreate {
-  challan_number?: string;
-  challan_date: string;            // YYYY-MM-DD
+export interface EstimateCreate {
+  estimate_number?: string;
+  estimate_date: string;            // YYYY-MM-DD
   party_id: string;
   route_id?: string;
   source_location_id?: string;
@@ -29,12 +29,12 @@ export interface ChallanCreate {
   driver_name?: string;
   driver_phone?: string;
   is_billed?: boolean;             // default false
-  print_mode?: ChallanPrintMode;   // default "no_amount"
+  print_mode?: EstimatePrintMode;   // default "no_amount"
   remarks?: string;
 }
 
-export interface ChallanUpdate {
-  challan_date?: string;
+export interface EstimateUpdate {
+  estimate_date?: string;
   party_id?: string;
   route_id?: string | null;
   source_location_id?: string;
@@ -43,11 +43,11 @@ export interface ChallanUpdate {
   driver_name?: string;
   driver_phone?: string;
   is_billed?: boolean;
-  print_mode?: ChallanPrintMode;
+  print_mode?: EstimatePrintMode;
   remarks?: string;
 }
 
-export interface ChallanLineCreate {
+export interface EstimateLineCreate {
   item_id: string;
   description?: string;
   uom_id: string;
@@ -55,9 +55,10 @@ export interface ChallanLineCreate {
   unit_price: string;
   discount_pct?: string;
   remarks?: string;
+  thickness_mm?: number;
 }
 
-export interface ChallanLineUpdate {
+export interface EstimateLineUpdate {
   description?: string;
   quantity?: string;
   unit_price?: string;
@@ -65,66 +66,66 @@ export interface ChallanLineUpdate {
   remarks?: string;
 }
 
-export const challanService = {
+export const estimateService = {
   list: async (params?: {
     limit?: number;
     cursor?: string;
     party_id?: string;
     status?: string;
     is_billed?: boolean;
-  }): Promise<Challan[]> => {
-    const res = await api.get<Challan[] | PaginatedResponse<Challan>>(
-      CHALLANS.LIST,
+  }): Promise<Estimate[]> => {
+    const res = await api.get<Estimate[] | PaginatedResponse<Estimate>>(
+      ESTIMATES.LIST,
       params,
     );
     return unwrapList(res);
   },
 
-  getById: (id: string) => api.get<Challan>(CHALLANS.DETAIL(id)),
+  getById: (id: string) => api.get<Estimate>(ESTIMATES.DETAIL(id)),
 
-  create: (data: ChallanCreate) =>
-    api.post<Challan>(CHALLANS.LIST, data),
+  create: (data: EstimateCreate) =>
+    api.post<Estimate>(ESTIMATES.LIST, data),
 
-  update: (id: string, data: ChallanUpdate) =>
-    api.patch<Challan>(CHALLANS.DETAIL(id), data),
+  update: (id: string, data: EstimateUpdate) =>
+    api.patch<Estimate>(ESTIMATES.DETAIL(id), data),
 
-  delete: (id: string) => api.delete<void>(CHALLANS.DETAIL(id)),
+  delete: (id: string) => api.delete<void>(ESTIMATES.DETAIL(id)),
 
-  /** Post (dispatch) the challan. Server creates OUT stock movements
-   *  at the source location (no ledger impact — challan is not a tax
+  /** Post (dispatch) the estimate. Server creates OUT stock movements
+   *  at the source location (no ledger impact — estimate is not a tax
    *  document; the linked invoice handles ledger when promoted). */
-  post: (id: string) => api.post<Challan>(CHALLANS.POST(id)),
+  post: (id: string) => api.post<Estimate>(ESTIMATES.POST(id)),
 
-  /** Cancel a posted challan. Reverses the OUT movements. If a
+  /** Cancel a posted estimate. Reverses the OUT movements. If a
    *  linked invoice exists, the server returns 409 — cancel the
    *  invoice first, which unlinks. */
   cancel: (id: string, reason?: string) =>
-    api.post<Challan>(CHALLANS.CANCEL(id), { reason }),
+    api.post<Estimate>(ESTIMATES.CANCEL(id), { reason }),
 
   // ── Lines ─────────────────────────────────────────────
-  listLines: async (challanId: string): Promise<ChallanLine[]> => {
-    const res = await api.get<ChallanLine[] | PaginatedResponse<ChallanLine>>(
-      CHALLANS.LINES(challanId),
+  listLines: async (estimateId: string): Promise<EstimateLine[]> => {
+    const res = await api.get<EstimateLine[] | PaginatedResponse<EstimateLine>>(
+      ESTIMATES.LINES(estimateId),
     );
     return unwrapList(res);
   },
 
-  createLine: (challanId: string, data: ChallanLineCreate) =>
-    api.post<ChallanLine>(CHALLANS.LINES(challanId), data),
+  createLine: (estimateId: string, data: EstimateLineCreate) =>
+    api.post<EstimateLine>(ESTIMATES.LINES(estimateId), data),
 
-  updateLine: (challanId: string, lineId: string, data: ChallanLineUpdate) =>
-    api.patch<ChallanLine>(CHALLANS.LINE(challanId, lineId), data),
+  updateLine: (estimateId: string, lineId: string, data: EstimateLineUpdate) =>
+    api.patch<EstimateLine>(ESTIMATES.LINE(estimateId, lineId), data),
 
-  deleteLine: (challanId: string, lineId: string) =>
-    api.delete<void>(CHALLANS.LINE(challanId, lineId)),
+  deleteLine: (estimateId: string, lineId: string) =>
+    api.delete<void>(ESTIMATES.LINE(estimateId, lineId)),
 
-  /** Promote a posted, unbilled challan into a draft invoice.
-   *  Server creates the Invoice with `challan_id` linked, copies the
+  /** Promote a posted, unbilled estimate into a draft invoice.
+   *  Server creates the Invoice with `estimate_id` linked, copies the
    *  lines (adding GST math from item defaults + tenant/customer
-   *  state), and flips the challan's `is_billed=true` + `invoice_id`.
+   *  state), and flips the estimate's `is_billed=true` + `invoice_id`.
    *  Returns both records so the FE can navigate to the new invoice. */
   promoteToInvoice: (id: string) =>
-    api.post<{ challan: Challan; invoice: Invoice }>(CHALLANS.PROMOTE(id)),
+    api.post<{ estimate: Estimate; invoice: Invoice }>(ESTIMATES.PROMOTE(id)),
 };
 
 // ── Routes (sales territories) ────────────────────────────

@@ -156,11 +156,12 @@ export default function InvoicesPage() {
       <TopBar
         crumbs={["Billing", "Invoices"]}
         right={
-          <Can perm="inventory.invoices.write">
-            <Link href="/invoices/new">
-              <Button kind="primary" icon={<Plus size={13} />}>New Invoice</Button>
-            </Link>
-          </Can>
+          // Invoices are created exclusively by promoting a posted Estimate
+          // (Convert to invoice on the Estimate detail page, or via the
+          // Source-estimate dropdown on /invoices/new). No standalone
+          // "new invoice" entry point — keeps the Estimate→Invoice flow
+          // the only way revenue gets booked.
+          null
         }
       />
 
@@ -216,16 +217,16 @@ export default function InvoicesPage() {
                 activeFilterCount > 0
                   ? "Loosen the filters or clear them to start over."
                   : can("inventory.invoices.write")
-                    ? "Create your first tax invoice. Drafts are editable; posting creates the stock movements."
+                    ? "Invoices are created by converting a posted Estimate — open the Estimates page and click \"Convert to invoice\" on any posted estimate that hasn't been billed yet."
                     : "No invoices have been created yet. Once your colleagues issue some, they'll appear here."
               }
               action={
-                activeFilterCount === 0 && can("inventory.invoices.write") ? (
-                  <Link href="/invoices/new">
-                    <Button kind="primary" icon={<Plus size={13} />}>New Invoice</Button>
-                  </Link>
-                ) : activeFilterCount > 0 ? (
+                activeFilterCount > 0 ? (
                   <Button onClick={clearAll}>Clear all filters</Button>
+                ) : can("inventory.estimates.read") ? (
+                  <Link href="/estimates">
+                    <Button kind="primary">Go to Estimates</Button>
+                  </Link>
                 ) : undefined
               }
             />

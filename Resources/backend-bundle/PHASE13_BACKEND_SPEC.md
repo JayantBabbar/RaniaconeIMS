@@ -4,7 +4,7 @@ Owner: Backend dev · Drafted: 2026-05-02 · FE prototype: complete
 
 > Pairs with `frontend/src/services/pricing.service.ts`,
 > `/master-data/item-pricing` page, and the dimension fields added
-> to the document/invoice/challan line forms.
+> to the document/invoice/estimate line forms.
 
 ---
 
@@ -18,7 +18,7 @@ until he updates it; old invoices keep their original price.
 This phase adds:
 1. **`item_dimensions`** — fixed lookup of (thickness, size) combos
 2. **`item_pricing_rules`** — versioned per-(item, dimension) prices
-3. **Dimension fields on line documents** — invoice / challan / GRN /
+3. **Dimension fields on line documents** — invoice / estimate / GRN /
    PO / transfer lines now carry `thickness_mm` and `size_code`
 4. **Auto-lookup** — when Operator/Admin picks item + thickness + size
    on a line, the form fetches the active rule and pre-fills `unit_price`
@@ -45,7 +45,7 @@ Why: ensures lookup is deterministic; no overlapping rules.
 
 ### 2.2 Lines snapshot their price
 
-Existing `unit_price` on invoice/challan/document lines stores the
+Existing `unit_price` on invoice/estimate/document lines stores the
 price *at the time the line was created*. Pricing rule changes do
 NOT mutate historical lines.
 
@@ -82,7 +82,7 @@ Pricing rules contain sale prices, which are sensitive. The
 `inventory.master_data.read` (Admin only). Operator never sees the
 prices in this UI.
 
-But — Operator DOES see `unit_price` on Sales Order / Challan lines
+But — Operator DOES see `unit_price` on Sales Order / Estimate lines
 (per §8 of the client spec: "the operator sees sale price, not
 cost"). The auto-lookup serves the Operator a number; they don't
 need to know it's pulled from the rules table.
@@ -146,7 +146,7 @@ ALTER TABLE invoice_lines
   ADD COLUMN thickness_mm INTEGER,
   ADD COLUMN size_code TEXT;
 
-ALTER TABLE challan_lines
+ALTER TABLE estimate_lines
   ADD COLUMN thickness_mm INTEGER,
   ADD COLUMN size_code TEXT;
 
@@ -242,7 +242,7 @@ Error cases:
 ### 4.5 Line POST integration (existing endpoints)
 
 When the FE submits a line via `POST /documents/:id/lines`,
-`POST /invoices/:id/lines`, or `POST /challans/:id/lines`:
+`POST /invoices/:id/lines`, or `POST /estimates/:id/lines`:
 
 - New optional fields in the body: `thickness_mm`, `size_code`
 - Server stores them on the line
@@ -287,7 +287,7 @@ Reuses existing master-data perms — no new codes:
 | `services/pricing.service.ts` | New: `listDimensions`, `list`, `lookup`, `create` |
 | `lib/demo/adapter.ts` | New: GET /item-dimensions, GET/POST /pricing-rules, GET /pricing-rules/lookup with full versioning semantics |
 | `lib/api-constants.ts` | New: `ITEM_DIMENSIONS`, `PRICING_RULES` |
-| `types/index.ts` | New types: `ItemDimension`, `ItemPricingRule`, `ItemPricingLookupResponse`. Extended `DocumentLine`, `InvoiceLine`, `ChallanLine` with `thickness_mm` + `size_code` |
+| `types/index.ts` | New types: `ItemDimension`, `ItemPricingRule`, `ItemPricingLookupResponse`. Extended `DocumentLine`, `InvoiceLine`, `EstimateLine` with `thickness_mm` + `size_code` |
 | `services/documents.service.ts` | `createLine` now accepts `thickness_mm`/`size_code` |
 | `app/.../master-data/item-pricing/page.tsx` | New admin page: filterable table grouped by (item × dim), expandable history, Update-price modal |
 | `app/.../documents/detail/[id]/page.tsx` | Line modal gains Thickness + Size dropdowns; auto-lookup populates unit_price; persists dimension snapshot |
@@ -319,5 +319,5 @@ When backend lands:
 2. Seed `item_dimensions` for Nova Bond (12 rows)
 3. GET endpoints (`/item-dimensions`, `/pricing-rules`, `/pricing-rules/lookup`)
 4. POST `/pricing-rules` with the version-close transaction
-5. Wire dimension fields into existing line endpoints (invoice / challan / document / bill)
+5. Wire dimension fields into existing line endpoints (invoice / estimate / document / bill)
 6. Auto-lookup on line POST (§4.5)

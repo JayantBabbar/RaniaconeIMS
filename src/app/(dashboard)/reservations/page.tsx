@@ -155,7 +155,7 @@ export default function ReservationsPage() {
         <PageHeader
           title="Reservations"
           description="Soft-hold stock for open orders without physically moving it. Prevents you from committing the same stock to two customers."
-          learnMore="When you reserve 10 units, 'qty_reserved' goes up by 10 and 'qty_available' goes down by 10 — but 'qty_on_hand' stays the same (nothing has moved yet). Fulfilling a reservation doesn't automatically move the stock; you still need to post a real OUT movement from the Sales Order."
+          learnMore="When you reserve 10 units, 'qty_reserved' goes up by 10 and 'qty_available' goes down by 10 — but 'qty_on_hand' stays the same (nothing has moved yet). Fulfilling a reservation doesn't automatically move the stock; you still need to post an Estimate or Invoice that consumes it."
           badge={
             <Badge tone="neutral">
               {rows.length}
@@ -302,7 +302,7 @@ export default function ReservationsPage() {
         onClose={() => setCancelTarget(null)}
         onConfirm={() => cancelTarget && cancelMut.mutate(cancelTarget)}
         title="Release this reservation?"
-        description="The held quantity goes back to 'available'. If this was tied to a Sales Order, that order will show insufficient stock on post until you reserve again or the physical stock increases."
+        description="The held quantity goes back to 'available'. If this was tied to an Estimate, that document will show insufficient stock on post until you reserve again or the physical stock increases."
         confirmLabel="Release reservation"
         confirmKind="danger"
         loading={cancelMut.isPending}

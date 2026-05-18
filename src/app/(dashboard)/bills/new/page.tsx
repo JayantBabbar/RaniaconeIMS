@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { TopBar } from "@/components/layout/topbar";
@@ -13,9 +13,11 @@ import { useToast } from "@/components/ui/toast";
 import { partyService } from "@/services/parties.service";
 import { itemService } from "@/services/items.service";
 import { billService, type VendorBillCreate, type VendorBillLineCreate } from "@/services/bills.service";
+import { partyPricingService } from "@/services/party-pricing.service";
+import { THICKNESSES_MM } from "@/lib/constants";
 import { isApiError } from "@/lib/api-client";
 import { computeGstLine, INDIAN_STATES, STANDARD_GST_RATES } from "@/lib/gst";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -40,11 +42,13 @@ interface DraftLine {
   unit_price: string;
   discount_pct: string;
   rate_pct: string;
+  thickness_mm: string;        // "" until user picks
 }
 
 const blankLine = (): DraftLine => ({
   description: "", item_id: undefined, hsn_code: "",
   quantity: "1", unit_price: "0", discount_pct: "0", rate_pct: "18",
+  thickness_mm: "",
 });
 
 export default function NewBillPage() {
@@ -66,6 +70,12 @@ function NewBillForm() {
   const [pos, setPos]                 = useState("27");
   const [remarks, setRemarks]         = useState("");
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
+  // Per-line chip state:
+  //   "loading" — lookup in flight
+  //   "<date>"  — supplier-pricelist rule applied; valid_from
+  //   null      — no rule found, manual entry
+  //   undefined — no item picked / no vendor picked
+  const [priceFromList, setPriceFromList] = useState<Record<number, string | null | undefined>>({});
 
   const { data: partiesRaw } = useQuery({
     queryKey: ["parties"],
@@ -82,6 +92,41 @@ function NewBillForm() {
   // For demo we assume tenant state = "27" (Maharashtra). Real BE will
   // fetch from /tenants/me — Phase 1 already exposes state_code on Tenant.
   const sellerState = "27";
+
+  // Apply the supplier's per-(item, thickness) cost to a bill line. The
+  // thickness picker on each line drives this — without a thickness
+  // there's no lookup and the user can type manually.
+  const applyCostForLine = useCallback(async (lineIdx: number, itemId: string, thicknessStr: string, currentPartyId: string) => {
+    const thicknessMm = thicknessStr ? Number(thicknessStr) : NaN;
+    if (!currentPartyId || !itemId || !Number.isFinite(thicknessMm)) {
+      setPriceFromList((m) => ({ ...m, [lineIdx]: undefined }));
+      return;
+    }
+    setPriceFromList((m) => ({ ...m, [lineIdx]: "loading" }));
+    try {
+      const res = await partyPricingService.costs.lookup({
+        party_id: currentPartyId, item_id: itemId, thickness_mm: thicknessMm,
+      });
+      if (res.rule) {
+        setLines((prev) => prev.map((l, idx) => (idx === lineIdx ? { ...l, unit_price: res.rule!.cost } : l)));
+        setPriceFromList((m) => ({ ...m, [lineIdx]: res.rule!.valid_from }));
+      } else {
+        setPriceFromList((m) => ({ ...m, [lineIdx]: null }));
+      }
+    } catch {
+      setPriceFromList((m) => ({ ...m, [lineIdx]: null }));
+    }
+  }, []);
+
+  // Re-fetch supplier costs for every line whenever the vendor changes.
+  useEffect(() => {
+    lines.forEach((l, idx) => {
+      if (l.item_id) void applyCostForLine(idx, l.item_id, l.thickness_mm, partyId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Depend ONLY on partyId — including `applyCostForLine` would loop
+    // because the callback's closure changes reference on each render.
+  }, [partyId]);
 
   // Live totals (same engine as InvoiceLine — just used in AP context)
   const computed = useMemo(() => {
@@ -219,6 +264,7 @@ function NewBillForm() {
               <tr>
                 <th className="text-left px-2 py-2 font-medium">#</th>
                 <th className="text-left px-2 py-2 font-medium">Description / item</th>
+                <th className="text-left px-2 py-2 font-medium w-24">Thickness</th>
                 <th className="text-left px-2 py-2 font-medium">HSN</th>
                 <th className="text-right px-2 py-2 font-medium">Qty</th>
                 <th className="text-right px-2 py-2 font-medium">Unit price</th>
@@ -247,8 +293,12 @@ function NewBillForm() {
                             updateLine(i, "description", it.name);
                             if (it.hsn_code) updateLine(i, "hsn_code", it.hsn_code);
                             if (it.default_tax_rate_pct) updateLine(i, "rate_pct", it.default_tax_rate_pct);
+                            // Per-(vendor, item, thickness) cost lookup
+                            // fires when a thickness is also picked.
+                            void applyCostForLine(i, it.id, l.thickness_mm, partyId);
                           } else {
                             updateLine(i, "item_id", "");
+                            setPriceFromList((m) => { const n = { ...m }; delete n[i]; return n; });
                           }
                         }}
                       >
@@ -256,6 +306,37 @@ function NewBillForm() {
                         {items.map((it) => <option key={it.id} value={it.id}>{it.item_code} — {it.name}</option>)}
                       </select>
                       <Input className="mt-1" value={l.description} onChange={(e) => updateLine(i, "description", e.target.value)} placeholder="Description" />
+                      {priceFromList[i] === "loading" && (
+                        <div className="mt-1 text-[10px] text-foreground-muted bg-bg-subtle rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                          <Spinner size={10} /> looking up vendor cost…
+                        </div>
+                      )}
+                      {priceFromList[i] && priceFromList[i] !== "loading" && (
+                        <div className="mt-1 text-[10px] text-status-green-text bg-status-green-bg/40 rounded px-1.5 py-0.5 inline-block">
+                          From vendor pricelist · eff. {formatDate(priceFromList[i] as string)}
+                        </div>
+                      )}
+                      {l.item_id && partyId && priceFromList[i] === null && (
+                        <div className="mt-1 text-[10px] text-status-amber-text bg-status-amber-bg/40 rounded px-1.5 py-0.5 inline-block">
+                          No vendor-specific cost — enter manually
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <select
+                        className={inputClass + (l.item_id && !l.thickness_mm ? " border-status-amber" : "")}
+                        value={l.thickness_mm}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateLine(i, "thickness_mm", v);
+                          if (l.item_id) void applyCostForLine(i, l.item_id, v, partyId);
+                        }}
+                      >
+                        <option value="">—</option>
+                        {THICKNESSES_MM.map((mm) => (
+                          <option key={mm} value={mm}>{mm} mm</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-2 py-1.5"><Input value={l.hsn_code} onChange={(e) => updateLine(i, "hsn_code", e.target.value)} placeholder="8471" className="w-20" /></td>
                     <td className="px-2 py-1.5"><Input type="number" step="0.01" min="0" value={l.quantity} onChange={(e) => updateLine(i, "quantity", e.target.value)} className="w-20 text-right" /></td>

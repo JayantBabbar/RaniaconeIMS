@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useBranding } from "@/providers/branding-provider";
 import { useSidebar } from "@/components/layout/sidebar-context";
+import { useLowStockAlertCount } from "@/hooks/useLowStockAlertCount";
 import { X, ChevronDown } from "lucide-react";
 import {
   LayoutDashboard,
@@ -110,9 +111,10 @@ const NAVIGATION: NavSection[] = [
     label: "Sales",
     module: "inventory",
     items: [
-      { id: "challans", label: "Challans",      icon: ScrollText,  href: "/challans",                permission: "inventory.challans.read" },
+      { id: "estimates", label: "Estimates",      icon: ScrollText,  href: "/estimates",                permission: "inventory.estimates.read" },
       { id: "invoices", label: "Invoices",      icon: ReceiptText, href: "/invoices",                permission: "inventory.invoices.read" },
-      { id: "sos",      label: "Sales Orders",  icon: FileText,    href: "/documents/sales-orders",  permission: "inventory.documents.read" },
+      // Sales Orders removed 2026-05-18 — Arpit's flow is Estimate → Invoice
+      // directly, no in-between sales-order document.
     ],
   },
 
@@ -123,7 +125,8 @@ const NAVIGATION: NavSection[] = [
     items: [
       { id: "grn",   label: "Goods Receipts",   icon: Truck,           href: "/documents/goods-receipts", permission: "inventory.documents.read" },
       { id: "bills", label: "Vendor Bills",     icon: FileSpreadsheet, href: "/bills",                    permission: "inventory.bills.read" },
-      { id: "pos",   label: "Purchase Orders",  icon: ShoppingCart,    href: "/documents/purchase-orders", permission: "inventory.documents.read" },
+      // Purchase Orders removed 2026-05-18 — Arpit receives directly and
+      // posts vendor bills against the goods received, no PO step.
     ],
   },
 
@@ -164,16 +167,11 @@ const NAVIGATION: NavSection[] = [
       { id: "reservations", label: "Reservations",     icon: Lock,           href: "/reservations",   permission: "inventory.reservations.read" },
       { id: "valuation",    label: "Valuation Layers", icon: Layers,         href: "/valuation",      permission: "inventory.cost.read" },
       { id: "attachments",  label: "Attachments",      icon: Paperclip,      href: "/attachments" },
-      // Movements — the audit-trail ledger. Pushed to the last spot
-      // because it's a forensic / read-only surface, rarely visited
-      // during day-to-day work (only when investigating "why did stock
-      // change last Tuesday?").
-      { id: "movements",    label: "Movements",        icon: ArrowLeftRight, href: "/movements",      permission: "inventory.movements.read" },
       // Hidden for Nova Bond — kept in code but not in nav.
       // Serials: Nova Bond's ACP is batch-tracked (lots), not serial-tracked. Re-enable when items with per-unit IDs are added.
       // { id: "serials",   label: "Serials",          icon: Fingerprint,    href: "/items/serials",        permission: "inventory.serials.read" },
-      // Transfers: single-warehouse setup; uncomment when a second location goes live.
-      // { id: "transfers", label: "Transfers",        icon: ArrowLeftRight, href: "/documents/transfers", permission: "inventory.documents.read" },
+      // Movements + Transfers removed 2026-05-14: Arpit runs a single
+      // warehouse and tracks stock at the document/lot level only.
     ],
   },
 
@@ -220,7 +218,6 @@ const NAVIGATION: NavSection[] = [
     label: "Master Data",
     module: "inventory",
     items: [
-      { id: "item-pricing",    label: "Item Pricing",    icon: Coins,          href: "/master-data/item-pricing",    permission: "inventory.master_data.read" },
       { id: "brands",          label: "Brands",          icon: Tag,            href: "/master-data/brands",          permission: "inventory.master_data.read" },
       { id: "categories",      label: "Categories",      icon: Folder,         href: "/master-data/categories",      permission: "inventory.master_data.read" },
       { id: "uoms",            label: "UoMs",            icon: Scale,          href: "/master-data/uoms",            permission: "inventory.master_data.read" },
@@ -257,6 +254,8 @@ export function Sidebar() {
   const { isMobileOpen, closeMobile } = useSidebar();
   const [collapsed, setCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  // Drives the blinking highlight on the "Low Stock Alerts" nav item.
+  const { count: lowStockCount } = useLowStockAlertCount();
 
   // Hydrate collapsed-sections from localStorage on first mount only.
   // Server render starts empty (all expanded) so SSR + first client paint match.
@@ -288,18 +287,6 @@ export function Sidebar() {
       return n;
     });
   };
-
-  // Section that owns the current route — always expanded so the user can
-  // never end up looking at a page whose nav entry is hidden behind a
-  // collapsed accordion.
-  const activeSectionLabel = useMemo(() => {
-    for (const section of NAVIGATION) {
-      if (section.items.some((it) => pathname === it.href || pathname.startsWith(it.href + "/"))) {
-        return section.label;
-      }
-    }
-    return null;
-  }, [pathname]);
 
   return (
     <aside
@@ -342,14 +329,15 @@ export function Sidebar() {
           );
           if (visibleItems.length === 0) return null;
 
-          // Active section is always expanded — the user is never trapped on a
-          // page whose nav entry has been hidden by a collapsed accordion.
-          const isActiveSection = section.label === activeSectionLabel;
-          const userCollapsed = !!section.label && collapsedSections.has(section.label);
-          const sectionCollapsed = userCollapsed && !isActiveSection;
+          const sectionCollapsed = !!section.label && collapsedSections.has(section.label);
           // Sections without a label (e.g. Dashboard) are always shown — no header, no chevron.
           const hasHeader = !!section.label && !collapsed;
           const sectionId = `nav-section-${sIdx}`;
+          // An "index" item is one whose href is a strict prefix of a sibling's
+          // (e.g. /reports vs /reports/sales). Index items must match the
+          // pathname exactly, otherwise Overview lights up on every sub-page.
+          const itemHrefs = visibleItems.map((it) => it.href);
+          const isIndexHref = (h: string) => itemHrefs.some((o) => o !== h && o.startsWith(h + "/"));
 
           return (
             <div key={sIdx} className={sIdx > 0 ? "mt-2" : ""}>
@@ -390,9 +378,17 @@ export function Sidebar() {
                 )}
               >
                 {visibleItems.map((item) => {
-                  const isActive =
-                    pathname === item.href || pathname.startsWith(item.href + "/");
+                  const isActive = isIndexHref(item.href)
+                    ? pathname === item.href
+                    : pathname === item.href || pathname.startsWith(item.href + "/");
                   const Icon = item.icon;
+                  // Blink the Low Stock Alerts nav row whenever one or
+                  // more items are at/below their reorder threshold —
+                  // and only when this row is not the currently active
+                  // page (otherwise the active highlight + blink would
+                  // visually fight).
+                  const isAlertsBlinking = item.id === "alerts" && lowStockCount > 0 && !isActive;
+                  const alertsBadge = item.id === "alerts" && lowStockCount > 0 ? String(lowStockCount) : null;
 
                   return (
                     <Link
@@ -404,7 +400,8 @@ export function Sidebar() {
                         isActive
                           ? "bg-sidebar-bg-hover text-sidebar-text"
                           : "text-sidebar-text-muted hover:bg-sidebar-bg-hover hover:text-sidebar-text",
-                        collapsed && "justify-center px-0"
+                        collapsed && "justify-center px-0",
+                        isAlertsBlinking && "nav-blink text-sidebar-text",
                       )}
                       title={collapsed ? item.label : undefined}
                     >
@@ -412,9 +409,13 @@ export function Sidebar() {
                       {!collapsed && (
                         <>
                           <span className="flex-1 truncate">{item.label}</span>
-                          {item.badge && (
+                          {alertsBadge ? (
+                            <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-full bg-status-amber text-white font-semibold">
+                              {alertsBadge}
+                            </span>
+                          ) : item.badge ? (
                             <span className="text-[10px] text-sidebar-text-muted tabular-nums">{item.badge}</span>
-                          )}
+                          ) : null}
                         </>
                       )}
                     </Link>

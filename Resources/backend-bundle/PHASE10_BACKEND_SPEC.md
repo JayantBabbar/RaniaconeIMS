@@ -10,7 +10,7 @@ Owner: Backend dev · Drafted: 2026-05-02 · FE prototype: complete
 
 ## §1 Overview
 
-Mirror of the existing Challan → Invoice promotion (Phase 2),
+Mirror of the existing Estimate → Invoice promotion (Phase 2),
 on the sales-order side. After a customer confirms an SO, this
 turns it into a tax invoice with one click — preserving the link
 in both directions for audit + reordering.
@@ -60,8 +60,8 @@ The SO's reservations stay as reservations until the resulting
 invoice is posted (which then converts reservations to stock-out
 movements). The promotion itself doesn't move stock.
 
-This mirrors the challan-promote behaviour — challan already
-created the stock-out; invoice-from-challan skips its own.
+This mirrors the estimate-promote behaviour — estimate already
+created the stock-out; invoice-from-estimate skips its own.
 
 For SO-promote, the stock-out happens when the new invoice is
 posted (just like a fresh invoice). Reservations get released by
@@ -140,7 +140,7 @@ Backend writes one audit entry per promotion:
 
 ```json
 {
-  "action": "challan.promote",  // pattern reused; consider "sales_order.promote"
+  "action": "estimate.promote",  // pattern reused; consider "sales_order.promote"
   "entity_type": "document",
   "entity_id": "<so id>",
   "before": { "is_promoted": false },
@@ -149,7 +149,7 @@ Backend writes one audit entry per promotion:
 ```
 
 (If we want a distinct action code, use `sales_order.promote` — FE
-doesn't care, treat it consistently with challan.promote.)
+doesn't care, treat it consistently with estimate.promote.)
 
 ---
 

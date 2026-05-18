@@ -147,6 +147,18 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
+        {/* Auto-promotion banner — only when this invoice was generated
+            from an Estimate. Total stays the same as the estimate; qty
+            doubles and per-unit halves, with reverse-GST baked in. */}
+        {invoice.estimate_id && lines.length > 0 && (
+          <div className="bg-status-blue-bg border border-status-blue/20 rounded-md p-3 text-[12.5px] text-status-blue-text">
+            <div className="font-semibold mb-1">Generated from estimate</div>
+            <div>
+              This invoice was auto-promoted from an estimate. Line quantities are <span className="font-semibold">2×</span> the source estimate&apos;s and per-unit prices are halved with reverse-GST applied — so the invoice total (incl. GST) matches the original estimate total to the rupee.
+            </div>
+          </div>
+        )}
+
         {/* Header card */}
         <section className="bg-white border border-hairline rounded-md p-4 md:p-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -219,6 +231,9 @@ export default function InvoiceDetailPage() {
           <dl className="space-y-1.5 text-sm">
             <Row label="Sub-total" value={invoice.subtotal} />
             <Row label="Tax" value={invoice.tax_total} />
+            {invoice.round_off && Number(invoice.round_off) !== 0 && (
+              <Row label="Round off" value={(Number(invoice.round_off) > 0 ? "+ " : "− ") + Math.abs(Number(invoice.round_off)).toFixed(2)} />
+            )}
             <div className="pt-2 mt-2 border-t border-hairline">
               <Row label="Grand total" value={`₹ ${invoice.grand_total}`} bold />
             </div>

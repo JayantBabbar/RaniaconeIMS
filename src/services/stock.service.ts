@@ -1,10 +1,12 @@
 import { api } from "@/lib/api-client";
 import { unwrapList } from "@/lib/utils";
 import { STOCK, LOTS, SERIALS } from "@/lib/api-constants";
-import type { Balance, Movement, PaginatedResponse } from "@/types";
+import type { Balance, PaginatedResponse } from "@/types";
 
 // ═══════════════════════════════════════════════════════════
-// Stock Service — Movements, Balances, Valuation, Reservations
+// Stock Service — Balances, Valuation, Reservations
+// (Movements module removed 2026-05-14 — single-warehouse setup,
+//  stock is tracked at the document/lot level only.)
 // ═══════════════════════════════════════════════════════════
 
 export interface ValuationLayer {
@@ -63,43 +65,6 @@ export interface Serial {
   created_at: string;
   updated_at: string;
 }
-
-// ── Movements ──────────────────────────────────────────────
-export const movementService = {
-  list: async (params?: {
-    limit?: number;
-    cursor?: string;
-    item_id?: string;
-    location_id?: string;
-    direction?: "in" | "out";
-    start_date?: string;
-    end_date?: string;
-  }): Promise<Movement[]> => {
-    const res = await api.get<Movement[] | PaginatedResponse<Movement>>(
-      STOCK.MOVEMENTS,
-      params,
-    );
-    return unwrapList(res);
-  },
-
-  getById: (id: string) => api.get<Movement>(STOCK.MOVEMENT(id)),
-
-  create: (data: {
-    item_id: string;
-    location_id: string;
-    direction: "in" | "out";
-    quantity: string;
-    uom_id: string;
-    unit_cost?: string;
-    posting_date?: string;
-    bin_id?: string;
-    lot_id?: string;
-    serial_id?: string;
-    reference_movement_id?: string;
-    source?: string;
-    document_id?: string;
-  }) => api.post<Movement>(STOCK.MOVEMENTS, data),
-};
 
 // ── Balances ───────────────────────────────────────────────
 export const balanceService = {

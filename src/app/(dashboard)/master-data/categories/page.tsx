@@ -16,6 +16,7 @@ import { GlobalSearch } from "@/components/ui/table-toolkit";
 import { useToast } from "@/components/ui/toast";
 import { itemCategoryService } from "@/services/master-data.service";
 import { isApiError } from "@/lib/api-client";
+import { STANDARD_GST_RATES } from "@/lib/gst";
 import type { ItemCategory } from "@/types";
 import {
   Plus, Edit, Trash2, Folder,
@@ -170,6 +171,7 @@ export default function ItemCategoriesPage() {
                     <Folder size={14} className="text-brand flex-shrink-0" />
                     <code className="font-mono text-xs font-bold text-foreground-muted">{node.code}</code>
                     <span className="text-sm font-medium flex-1 truncate">{node.name}</span>
+                    <Badge tone="neutral">GST {node.gst_rate_pct}%</Badge>
                     {canWrite && (
                       <ActionMenu
                         items={[
@@ -279,6 +281,7 @@ function TreeRow({
         <Folder size={14} className="text-brand flex-shrink-0" />
         <code className="font-mono text-xs font-bold text-foreground-muted">{node.code}</code>
         <span className="text-sm font-medium flex-1 truncate">{node.name}</span>
+        <Badge tone="neutral">GST {node.gst_rate_pct}%</Badge>
         {canWrite && (
           <ActionMenu
             items={[
@@ -330,6 +333,7 @@ function CategoryFormModal({
     code: target?.code || "",
     name: target?.name || "",
     parent_id: target?.parent_id ?? parentId ?? "",
+    gst_rate_pct: target?.gst_rate_pct ?? "18",
   });
   const [errors, setErrors] = useState<{ code?: string; name?: string }>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -355,12 +359,14 @@ function CategoryFormModal({
         await itemCategoryService.update(target!.id, {
           name: form.name,
           parent_id: form.parent_id || null,
+          gst_rate_pct: form.gst_rate_pct,
         });
       } else {
         await itemCategoryService.create({
           code: form.code,
           name: form.name,
           parent_id: form.parent_id || null,
+          gst_rate_pct: form.gst_rate_pct,
         });
       }
       toast.success(isEdit ? "Category updated" : "Category created");
@@ -437,6 +443,22 @@ function CategoryFormModal({
           >
             <option value="">— None (root) —</option>
             {selectableParents.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+          </select>
+        </FormField>
+        <FormField
+          label="Default GST Rate (%)"
+          required
+          help="Items added under this category will default to this GST rate. You can still override the rate per item if needed."
+        >
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-surface-secondary disabled:text-foreground-muted"
+            value={form.gst_rate_pct}
+            disabled={loading}
+            onChange={(e) => setForm({ ...form, gst_rate_pct: e.target.value })}
+          >
+            {STANDARD_GST_RATES.map((r) => (
+              <option key={r} value={r}>{r}%</option>
+            ))}
           </select>
         </FormField>
         <div className="flex justify-end gap-2 pt-2">

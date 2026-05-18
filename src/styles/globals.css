@@ -65,4 +65,21 @@
   .sidebar-section {
     @apply text-[10px] font-medium uppercase tracking-wider text-sidebar-text-muted px-4 pt-5 pb-1.5;
   }
+
+  /* Blinking highlight for the Low Stock Alerts nav item when one or
+   * more items are at/below threshold. Subtle pulse on the background
+   * so the eye is drawn but the rest of the sidebar stays calm. */
+  @keyframes nav-blink {
+    0%, 100% {
+      background-color: var(--color-status-amber-bg);
+      box-shadow: inset 2px 0 0 0 var(--color-status-amber);
+    }
+    50% {
+      background-color: transparent;
+      box-shadow: inset 2px 0 0 0 transparent;
+    }
+  }
+  .nav-blink {
+    animation: nav-blink 1.6s ease-in-out infinite;
+  }
 }

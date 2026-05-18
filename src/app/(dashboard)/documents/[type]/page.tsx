@@ -26,18 +26,14 @@ import { formatDate } from "@/lib/utils";
 
 // ═══════════════════════════════════════════════════════════
 // Documents list — scoped by /documents/[type]
-//   type = "purchase-orders", "sales-orders", "transfers", "all"
+//   type = "goods-receipts", "all"
 // Maps to backend document_type code(s).
+// PO + SO removed 2026-05-18 — Arpit's flow is direct receipt + bills
+// on purchase side, Estimate→Invoice on sales side.
 // ═══════════════════════════════════════════════════════════
 
 const TYPE_MAP: Record<string, { label: string; codes: string[]; module?: string }> = {
-  "purchase-orders": { label: "Purchase Orders", codes: ["PO"], module: "purchase" },
-  "sales-orders": { label: "Sales Orders", codes: ["SO"], module: "sales" },
-  // Goods Receipt Note — confirms physical receipt at the warehouse.
-  // Posting a GRN moves stock IN. Can be PO-backed (source_doc_id set)
-  // or "direct" (phone-deal / walk-in receipt with no parent PO).
   "goods-receipts": { label: "Goods Receipts", codes: ["GRN"], module: "inventory" },
-  "transfers": { label: "Transfers", codes: ["TRANSFER", "XFER"], module: "inventory" },
   "all": { label: "All Documents", codes: [] },
 };
 

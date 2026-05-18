@@ -19,11 +19,16 @@ import { useToast } from "@/components/ui/toast";
 import { partyService } from "@/services/parties.service";
 import { ledgerService } from "@/services/ledger.service";
 import { accountService } from "@/services/accounts.service";
+import { partyPricingService } from "@/services/party-pricing.service";
+import { itemService } from "@/services/items.service";
+import { THICKNESSES_MM } from "@/lib/constants";
 import { isApiError } from "@/lib/api-client";
 import { formatCurrency, formatDate, getInitials } from "@/lib/utils";
 import {
   ArrowLeft, MapPin, Phone, Mail, Plus, Building2, User,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
+import type { PartyItemCost, PartyItemSalePrice, Item } from "@/types";
 
 export default function PartyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,12 +37,14 @@ export default function PartyDetailPage() {
   const canRead = can("inventory.parties.read");
   const canWrite = can("inventory.parties.write");
   const sp = useSearchParams();
-  const initialTab = (sp.get("tab") as "overview" | "addresses" | "contacts" | "ledger") || "overview";
-  const [tab, setTab] = useState<"overview" | "addresses" | "contacts" | "ledger">(initialTab);
+  type TabKey = "overview" | "addresses" | "contacts" | "ledger" | "item-costs" | "sale-prices";
+  const ALL_TABS: TabKey[] = ["overview", "addresses", "contacts", "ledger", "item-costs", "sale-prices"];
+  const initialTab = (sp.get("tab") as TabKey) || "overview";
+  const [tab, setTab] = useState<TabKey>(initialTab);
   // Keep state in sync if query param changes (e.g. arriving from Debtors page)
   useEffect(() => {
     const t = sp.get("tab");
-    if (t && ["overview", "addresses", "contacts", "ledger"].includes(t)) setTab(t as typeof tab);
+    if (t && (ALL_TABS as string[]).includes(t)) setTab(t as TabKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
 
@@ -102,23 +109,34 @@ export default function PartyDetailPage() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — Item costs appears only for suppliers/vendors */}
         <div className="border-b border-hairline">
           <div className="flex gap-0">
-            {(["overview", "addresses", "contacts", "ledger"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={
-                  "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px " +
-                  (tab === t
-                    ? "text-brand border-brand"
-                    : "text-foreground-secondary border-transparent hover:text-foreground")
-                }
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
+            {(() => {
+              const tabs: TabKey[] = ["overview", "addresses", "contacts", "ledger"];
+              const isSupplier = party.party_type === "supplier" || party.party_type === "vendor" || party.party_type === "both";
+              const isCustomer = party.party_type === "customer" || party.party_type === "both";
+              if (isSupplier && can("inventory.party_costs.read")) tabs.push("item-costs");
+              if (isCustomer && can("inventory.party_prices.read")) tabs.push("sale-prices");
+              const labelFor = (t: TabKey) =>
+                t === "item-costs" ? "Item costs"
+                : t === "sale-prices" ? "Sale prices"
+                : t.charAt(0).toUpperCase() + t.slice(1);
+              return tabs.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={
+                    "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px " +
+                    (tab === t
+                      ? "text-brand border-brand"
+                      : "text-foreground-secondary border-transparent hover:text-foreground")
+                  }
+                >
+                  {labelFor(t)}
+                </button>
+              ));
+            })()}
           </div>
         </div>
 
@@ -137,8 +155,557 @@ export default function PartyDetailPage() {
         {tab === "addresses" && <AddressesTab partyId={party.id} canWrite={canWrite} />}
         {tab === "contacts" && <ContactsTab partyId={party.id} canWrite={canWrite} />}
         {tab === "ledger" && <LedgerTab partyId={party.id} />}
+        {tab === "item-costs" && (
+          <ItemCostsTab partyId={party.id} canWrite={can("inventory.party_costs.write")} />
+        )}
+        {tab === "sale-prices" && (
+          <SalePricesTab partyId={party.id} canWrite={can("inventory.party_prices.write")} />
+        )}
       </div>
     </div>
+  );
+}
+
+// ── Item Costs Tab ─────────────────────────────────────────
+// Visible only when the party is a supplier/vendor/both. Shows the
+// per-item cost list with version history (collapsed by default,
+// expand to see the audit trail of previous costs).
+function ItemCostsTab({ partyId, canWrite }: { partyId: string; canWrite: boolean }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const { data: rowsRes, isLoading } = useQuery({
+    queryKey: ["partyItemCosts", { party_id: partyId }],
+    queryFn: () => partyPricingService.costs.list({ party_id: partyId, limit: 200 }),
+  });
+  const rows = (rowsRes?.data ?? []) as PartyItemCost[];
+  const { data: itemsRes } = useQuery({
+    queryKey: ["items", { limit: 500 }],
+    queryFn: () => itemService.list({ limit: 200 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const items = (itemsRes?.data ?? []) as Item[];
+  const itemById = new Map(items.map((i) => [i.id, i]));
+
+  // Group rows by item_id; within each group sort by valid_from desc so
+  // the active row (valid_until=null) is first.
+  const grouped = new Map<string, PartyItemCost[]>();
+  rows.forEach((r) => {
+    const list = grouped.get(r.item_id) ?? [];
+    list.push(r);
+    grouped.set(r.item_id, list);
+  });
+  grouped.forEach((list) => list.sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1)));
+
+  if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
+
+  if (grouped.size === 0) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">No item costs recorded yet</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Add the per-unit cost this supplier charges for each item they carry. Each cost change is stored as a new version, with the prior cost auto-closed.
+        </p>
+        {canWrite && (
+          <div className="mt-4">
+            <Button kind="primary" icon={<Plus size={13} />} onClick={() => setShowAdd(true)}>
+              Add item cost
+            </Button>
+          </div>
+        )}
+        {showAdd && (
+          <AddCostModal partyId={partyId} items={items} onClose={() => setShowAdd(false)}
+            onSaved={() => { qc.invalidateQueries({ queryKey: ["partyItemCosts"] }); setShowAdd(false); toast.success("Item cost added"); }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-foreground-muted">
+          Per-unit costs this supplier charges. Click a row to see the version history.
+        </p>
+        {canWrite && (
+          <Button kind="primary" icon={<Plus size={13} />} onClick={() => setShowAdd(true)}>
+            Add / update cost
+          </Button>
+        )}
+      </div>
+      <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead className="bg-bg-subtle text-text-tertiary text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium w-8"></th>
+              <th className="text-left px-3 py-2 font-medium">Item</th>
+              <th className="text-right px-3 py-2 font-medium">Current cost</th>
+              <th className="text-left px-3 py-2 font-medium">Effective since</th>
+              <th className="text-left px-3 py-2 font-medium">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from(grouped.entries()).map(([itemId, list]) => {
+              const active = list.find((r) => r.valid_until === null);
+              const history = list.filter((r) => r.valid_until !== null);
+              const item = itemById.get(itemId);
+              const isOpen = expanded.has(itemId);
+              return (
+                <React.Fragment key={itemId}>
+                  <tr
+                    className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
+                    onClick={() => {
+                      setExpanded((s) => {
+                        const n = new Set(s);
+                        if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+                        return n;
+                      });
+                    }}
+                  >
+                    <td className="px-3 py-2">
+                      {history.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{item?.name ?? itemId}</div>
+                      <div className="text-[11px] text-foreground-muted font-mono">{item?.item_code}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      {active ? formatCurrency(active.cost, "INR", "en-IN") : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted">
+                      {active ? formatDate(active.valid_from) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted truncate max-w-[200px]">
+                      {active?.notes ?? ""}
+                    </td>
+                  </tr>
+                  {isOpen && history.length > 0 && (
+                    <tr>
+                      <td colSpan={5} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
+                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">History</div>
+                        <table className="w-full text-[12.5px]">
+                          <thead className="text-text-tertiary text-[10.5px]">
+                            <tr>
+                              <th className="text-right px-2 py-1 font-medium">Cost</th>
+                              <th className="text-left px-2 py-1 font-medium">From</th>
+                              <th className="text-left px-2 py-1 font-medium">Until</th>
+                              <th className="text-left px-2 py-1 font-medium">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {history.map((h) => (
+                              <tr key={h.id} className="border-t border-hairline-light">
+                                <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(h.cost, "INR", "en-IN")}</td>
+                                <td className="px-2 py-1">{formatDate(h.valid_from)}</td>
+                                <td className="px-2 py-1">{h.valid_until ? formatDate(h.valid_until) : "—"}</td>
+                                <td className="px-2 py-1 text-foreground-muted">{h.notes ?? ""}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {showAdd && (
+        <AddCostModal
+          partyId={partyId}
+          items={items}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["partyItemCosts"] });
+            setShowAdd(false);
+            toast.success("Item cost recorded");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddCostModal({ partyId, items, onClose, onSaved }: {
+  partyId: string;
+  items: Item[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [form, setForm] = useState({
+    item_id: "",
+    thickness_mm: "",
+    cost: "",
+    valid_from: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ item_id?: string; thickness_mm?: string; cost?: string }>({});
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: typeof errors = {};
+    if (!form.item_id) errs.item_id = "Pick an item";
+    if (!form.thickness_mm) errs.thickness_mm = "Pick a thickness";
+    if (!form.cost || Number(form.cost) <= 0) errs.cost = "Enter a positive cost";
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setLoading(true);
+    try {
+      await partyPricingService.costs.create({
+        party_id: partyId,
+        item_id: form.item_id,
+        thickness_mm: Number(form.thickness_mm),
+        cost: form.cost,
+        valid_from: form.valid_from,
+        notes: form.notes || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      toast.error(isApiError(err) ? err.message : "Could not save cost");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} title="Add / update item cost" description="Setting a new cost auto-closes the previous one for the same (item, thickness). Both rows stay in history." width="sm">
+      <form onSubmit={submit} className="space-y-3">
+        <FormField label="Item" required error={errors.item_id} help="The item this cost applies to.">
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            value={form.item_id}
+            disabled={loading}
+            onChange={(e) => setForm({ ...form, item_id: e.target.value })}
+          >
+            <option value="">— Select item —</option>
+            {items.map((it) => (
+              <option key={it.id} value={it.id}>{it.item_code} — {it.name}</option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Thickness (mm)" required error={errors.thickness_mm} help="Cost is stored per thickness — thicker boards cost more.">
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            value={form.thickness_mm}
+            disabled={loading}
+            onChange={(e) => setForm({ ...form, thickness_mm: e.target.value })}
+          >
+            <option value="">— Select thickness —</option>
+            {THICKNESSES_MM.map((mm) => (
+              <option key={mm} value={mm}>{mm} mm</option>
+            ))}
+          </select>
+        </FormField>
+        <Input
+          label="Cost per unit (₹)"
+          required
+          type="number"
+          step="0.01"
+          help="Per-unit cost this supplier charges. The auto-fill on bills uses this."
+          error={errors.cost}
+          disabled={loading}
+          value={form.cost}
+          onChange={(e) => setForm({ ...form, cost: e.target.value })}
+        />
+        <Input
+          label="Effective from"
+          type="date"
+          help="When this cost takes effect. The prior active cost gets auto-closed the day before."
+          disabled={loading}
+          value={form.valid_from}
+          onChange={(e) => setForm({ ...form, valid_from: e.target.value })}
+        />
+        <Input
+          label="Notes (optional)"
+          placeholder="Q4 contract, monsoon surcharge, etc."
+          disabled={loading}
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" onClick={onClose}>Cancel</Button>
+          <Button type="submit" kind="primary" loading={loading}>Save cost</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+// ── Sale Prices Tab ────────────────────────────────────────
+// Mirror of ItemCostsTab on the customer side. Visible only when the
+// party is a customer/both. The sale_price is the GST-inclusive
+// customer-visible price (consumed by /estimates/new and /invoices/new
+// as the line unit_price).
+function SalePricesTab({ partyId, canWrite }: { partyId: string; canWrite: boolean }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const { data: rowsRes, isLoading } = useQuery({
+    queryKey: ["partyItemSalePrices", { party_id: partyId }],
+    queryFn: () => partyPricingService.prices.list({ party_id: partyId, limit: 200 }),
+  });
+  const rows = (rowsRes?.data ?? []) as PartyItemSalePrice[];
+  const { data: itemsRes } = useQuery({
+    queryKey: ["items", { limit: 500 }],
+    queryFn: () => itemService.list({ limit: 200 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const items = (itemsRes?.data ?? []) as Item[];
+  const itemById = new Map(items.map((i) => [i.id, i]));
+
+  const grouped = new Map<string, PartyItemSalePrice[]>();
+  rows.forEach((r) => {
+    const list = grouped.get(r.item_id) ?? [];
+    list.push(r);
+    grouped.set(r.item_id, list);
+  });
+  grouped.forEach((list) => list.sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1)));
+
+  if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
+
+  if (grouped.size === 0) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">No customer-specific prices set</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Without a price here, estimates and invoices fall back to the item&apos;s default sale price. Add a row to lock in a customer-specific rate.
+        </p>
+        {canWrite && (
+          <div className="mt-4">
+            <Button kind="primary" icon={<Plus size={13} />} onClick={() => setShowAdd(true)}>
+              Add item price
+            </Button>
+          </div>
+        )}
+        {showAdd && (
+          <AddSalePriceModal partyId={partyId} items={items} onClose={() => setShowAdd(false)}
+            onSaved={() => { qc.invalidateQueries({ queryKey: ["partyItemSalePrices"] }); setShowAdd(false); toast.success("Item price added"); }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-foreground-muted">
+          Per-unit prices for this customer (GST-inclusive). Click a row to see the version history.
+        </p>
+        {canWrite && (
+          <Button kind="primary" icon={<Plus size={13} />} onClick={() => setShowAdd(true)}>
+            Add / update price
+          </Button>
+        )}
+      </div>
+      <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead className="bg-bg-subtle text-text-tertiary text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium w-8"></th>
+              <th className="text-left px-3 py-2 font-medium">Item</th>
+              <th className="text-right px-3 py-2 font-medium">Current price</th>
+              <th className="text-left px-3 py-2 font-medium">Effective since</th>
+              <th className="text-left px-3 py-2 font-medium">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from(grouped.entries()).map(([itemId, list]) => {
+              const active = list.find((r) => r.valid_until === null);
+              const history = list.filter((r) => r.valid_until !== null);
+              const item = itemById.get(itemId);
+              const isOpen = expanded.has(itemId);
+              return (
+                <React.Fragment key={itemId}>
+                  <tr
+                    className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
+                    onClick={() => {
+                      setExpanded((s) => {
+                        const n = new Set(s);
+                        if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+                        return n;
+                      });
+                    }}
+                  >
+                    <td className="px-3 py-2">
+                      {history.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{item?.name ?? itemId}</div>
+                      <div className="text-[11px] text-foreground-muted font-mono">{item?.item_code}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      {active ? formatCurrency(active.sale_price, "INR", "en-IN") : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted">
+                      {active ? formatDate(active.valid_from) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-foreground-muted truncate max-w-[200px]">
+                      {active?.notes ?? ""}
+                    </td>
+                  </tr>
+                  {isOpen && history.length > 0 && (
+                    <tr>
+                      <td colSpan={5} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
+                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">History</div>
+                        <table className="w-full text-[12.5px]">
+                          <thead className="text-text-tertiary text-[10.5px]">
+                            <tr>
+                              <th className="text-right px-2 py-1 font-medium">Price</th>
+                              <th className="text-left px-2 py-1 font-medium">From</th>
+                              <th className="text-left px-2 py-1 font-medium">Until</th>
+                              <th className="text-left px-2 py-1 font-medium">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {history.map((h) => (
+                              <tr key={h.id} className="border-t border-hairline-light">
+                                <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(h.sale_price, "INR", "en-IN")}</td>
+                                <td className="px-2 py-1">{formatDate(h.valid_from)}</td>
+                                <td className="px-2 py-1">{h.valid_until ? formatDate(h.valid_until) : "—"}</td>
+                                <td className="px-2 py-1 text-foreground-muted">{h.notes ?? ""}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {showAdd && (
+        <AddSalePriceModal
+          partyId={partyId}
+          items={items}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["partyItemSalePrices"] });
+            setShowAdd(false);
+            toast.success("Item price recorded");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddSalePriceModal({ partyId, items, onClose, onSaved }: {
+  partyId: string;
+  items: Item[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [form, setForm] = useState({
+    item_id: "",
+    thickness_mm: "",
+    sale_price: "",
+    valid_from: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ item_id?: string; thickness_mm?: string; sale_price?: string }>({});
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: typeof errors = {};
+    if (!form.item_id) errs.item_id = "Pick an item";
+    if (!form.thickness_mm) errs.thickness_mm = "Pick a thickness";
+    if (!form.sale_price || Number(form.sale_price) <= 0) errs.sale_price = "Enter a positive price";
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setLoading(true);
+    try {
+      await partyPricingService.prices.create({
+        party_id: partyId,
+        item_id: form.item_id,
+        thickness_mm: Number(form.thickness_mm),
+        sale_price: form.sale_price,
+        valid_from: form.valid_from,
+        notes: form.notes || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      toast.error(isApiError(err) ? err.message : "Could not save price");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} title="Add / update customer price" description="Setting a new price auto-closes the previous one for the same (item, thickness). Both rows stay in history." width="sm">
+      <form onSubmit={submit} className="space-y-3">
+        <FormField label="Item" required error={errors.item_id} help="The item this price applies to.">
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            value={form.item_id}
+            disabled={loading}
+            onChange={(e) => setForm({ ...form, item_id: e.target.value })}
+          >
+            <option value="">— Select item —</option>
+            {items.map((it) => (
+              <option key={it.id} value={it.id}>{it.item_code} — {it.name}</option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Thickness (mm)" required error={errors.thickness_mm} help="Price is stored per thickness — thicker boards cost more.">
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20"
+            value={form.thickness_mm}
+            disabled={loading}
+            onChange={(e) => setForm({ ...form, thickness_mm: e.target.value })}
+          >
+            <option value="">— Select thickness —</option>
+            {THICKNESSES_MM.map((mm) => (
+              <option key={mm} value={mm}>{mm} mm</option>
+            ))}
+          </select>
+        </FormField>
+        <Input
+          label="Sale price per unit (₹, GST-inclusive)"
+          required
+          type="number"
+          step="0.01"
+          help="This is the customer-visible per-unit price. Invoice promotion reverse-calculates the taxable base from this."
+          error={errors.sale_price}
+          disabled={loading}
+          value={form.sale_price}
+          onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
+        />
+        <Input
+          label="Effective from"
+          type="date"
+          help="When this price takes effect. The prior active price gets auto-closed the day before."
+          disabled={loading}
+          value={form.valid_from}
+          onChange={(e) => setForm({ ...form, valid_from: e.target.value })}
+        />
+        <Input
+          label="Notes (optional)"
+          placeholder="Negotiated deal, bulk discount, etc."
+          disabled={loading}
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+        />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" onClick={onClose}>Cancel</Button>
+          <Button type="submit" kind="primary" loading={loading}>Save price</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

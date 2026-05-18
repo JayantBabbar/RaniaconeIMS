@@ -21,7 +21,8 @@ import { CostMask } from "@/components/ui/cost-mask";
 import { cn } from "@/lib/utils";
 import { documentService } from "@/services/documents.service";
 import { documentTypeService } from "@/services/master-data.service";
-import { pricingService } from "@/services/pricing.service";
+import { partyPricingService } from "@/services/party-pricing.service";
+import { THICKNESSES_MM } from "@/lib/constants";
 import { partyService } from "@/services/parties.service";
 import { locationService } from "@/services/locations.service";
 import { itemService } from "@/services/items.service";
@@ -110,17 +111,6 @@ export default function DocumentDetailPage() {
     onError: (e) => toast.error(isApiError(e) ? e.message : "Cancel failed"),
   });
 
-  const promoteMut = useMutation({
-    mutationFn: () => documentService.promoteToInvoice(id),
-    onSuccess: (res) => {
-      toast.success(`Invoice ${res.invoice_number} created`, "Lines + GST math copied; review and post in /invoices");
-      qc.invalidateQueries({ queryKey: ["document", id] });
-      qc.invalidateQueries({ queryKey: ["invoices"] });
-      router.push(`/invoices/${res.invoice_id}`);
-    },
-    onError: (e) => toast.error(isApiError(e) ? e.message : "Promotion failed"),
-  });
-
   const deleteLineMut = useMutation({
     mutationFn: (lineId: string) => documentService.deleteLine(id, lineId),
     onSuccess: () => {
@@ -147,7 +137,7 @@ export default function DocumentDetailPage() {
   // Phase 12 (Nova Bond): PO/GRN/Transfer documents have no money on
   // them by design — cost is recorded separately on the matching
   // vendor bill. Hide the Unit price + Total columns for these doc
-  // types regardless of permission. SO/Challan keep them (sale side).
+  // types regardless of permission. SO/Estimate keep them (sale side).
   const docCode = docType?.code;
   const documentHasNoPrice =
     docCode === "PO" || docCode === "GRN" ||
@@ -176,17 +166,6 @@ export default function DocumentDetailPage() {
               </>
             ) : (
               <>
-                {/* Phase 10: Promote to invoice (sales orders only) */}
-                {docType?.code === "SO" && !(doc as { is_promoted?: boolean }).is_promoted && can("inventory.invoices.write") && (
-                  <Button
-                    kind="primary"
-                    icon={<ArrowRightIcon size={13} />}
-                    onClick={() => promoteMut.mutate()}
-                    disabled={promoteMut.isPending}
-                  >
-                    Promote to invoice
-                  </Button>
-                )}
                 {canCancel && (
                   <Button icon={<XCircle size={13} />} onClick={() => setCancelConfirm(true)}>
                     Cancel (creates reversals)
@@ -326,6 +305,7 @@ export default function DocumentDetailPage() {
         <AddLineModal
           documentId={id}
           docTypeCode={docType?.code ?? null}
+          partyId={doc.party_id ?? null}
           items={items}
           uoms={uoms}
           onClose={() => setShowAddLine(false)}
@@ -410,26 +390,33 @@ const lineSchema = z.object({
 type LineFormValues = z.infer<typeof lineSchema>;
 
 function AddLineModal({
-  documentId, docTypeCode, items, uoms, onClose, nextLineNumber,
+  documentId, docTypeCode, partyId, items, uoms, onClose, nextLineNumber,
 }: {
   documentId: string;
   /** Document type code (PO / GRN / SO / TRANSFER etc). Drives whether
-   *  cost-related fields appear on the form. Per clientneeds.txt §7,
-   *  PO and GRN show NO cost — just product + qty. Transfers also
-   *  have no monetary fields. SO/Challan keep unit_price (sale side). */
+   *  cost-related fields appear on the form and which side of the
+   *  party pricelist to consult on auto-fill. */
   docTypeCode: string | null;
+  /** Party on the document — supplier for PO/GRN, customer for SO.
+   *  Used as the lookup key for per-party pricing. */
+  partyId: string | null;
   items: { id: string; item_code: string; name: string; is_batch_tracked?: boolean }[];
   uoms: { id: string; code: string; name: string }[];
   onClose: () => void;
   nextLineNumber: number;
 }) {
-  // Cost-bearing surfaces are PO + GRN (purchase side) and TRANSFER
-  // (no money concept). Hide unit_price + discount_pct + line_total
-  // for these. SO + Challan keep unit_price (sale side, fine for
-  // operator and salesman to see — see Mr. Arpit's brief).
-  const hidePriceFields =
-    docTypeCode === "PO" || docTypeCode === "GRN" ||
-    docTypeCode === "TRANSFER" || docTypeCode === "XFER";
+  const { can } = useCan();
+  // Vendor-side docs (PO + GRN) auto-fill the line's unit_price from the
+  // supplier's pricelist using `partyPricingService.costs.lookup`. Costs
+  // are sensitive — only show the field to users with cost.read so
+  // operators keep their "product + qty" entry flow. Customer-side docs
+  // (SO) always show price + auto-fill from the customer pricelist via
+  // `partyPricingService.prices.lookup`.
+  const isVendorSide = docTypeCode === "PO" || docTypeCode === "GRN";
+  const isCustomerSide = docTypeCode === "SO";
+  const isTransfer = docTypeCode === "TRANSFER" || docTypeCode === "XFER";
+  const canSeeCost = can("inventory.cost.read");
+  const hidePriceFields = isTransfer || (isVendorSide && !canSeeCost);
   const toast = useToast();
   const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
@@ -459,28 +446,44 @@ function AddLineModal({
   // Watch the picked item so the lot field can flag itself as required
   // when the item has is_batch_tracked=true.
   const watchedItemId = watch("item_id");
-  const watchedThickness = watch("thickness_mm");
-  const watchedSize = watch("size_code");
   const selectedItem = items.find((i) => i.id === watchedItemId);
   const lotRequired = !!selectedItem?.is_batch_tracked;
 
-  // Phase 13 — auto-lookup the active pricing rule whenever item +
-  // thickness + size are all chosen. Backfills unit_price unless the
-  // user has typed something manual already (we don't override their
-  // input). Skipped for PO/GRN/Transfer where the cost field is hidden.
-  const { data: priceLookup } = useQuery({
-    queryKey: ["pricing-lookup", watchedItemId, watchedThickness, watchedSize],
-    enabled: !hidePriceFields && !!watchedItemId && !!watchedThickness && !!watchedSize,
-    queryFn: () => pricingService.lookup({
+  // Phase 14 — auto-fill the line unit_price from the party's pricelist.
+  // Direction depends on doc type:
+  //   GRN / PO → supplier-side cost lookup  (per item × thickness)
+  //   SO       → customer-side sale-price lookup  (per item × thickness)
+  // Thickness is mandatory for both lookups — fires only once the user
+  // picks the thickness on the form.
+  const watchedThickness = watch("thickness_mm");
+  const thicknessMmNum = watchedThickness ? Number(watchedThickness) : NaN;
+  const thicknessReady = Number.isFinite(thicknessMmNum) && thicknessMmNum > 0;
+  const costLookup = useQuery({
+    queryKey: ["partyCostLookup", partyId, watchedItemId, watchedThickness],
+    enabled: !hidePriceFields && isVendorSide && !!partyId && !!watchedItemId && thicknessReady,
+    queryFn: () => partyPricingService.costs.lookup({
+      party_id: partyId as string,
       item_id: watchedItemId,
-      thickness_mm: Number(watchedThickness ?? "0"),
-      size_code: watchedSize ?? "",
+      thickness_mm: thicknessMmNum,
     }),
   });
+  const priceLookup = useQuery({
+    queryKey: ["partyPriceLookup", partyId, watchedItemId, watchedThickness],
+    enabled: !hidePriceFields && isCustomerSide && !!partyId && !!watchedItemId && thicknessReady,
+    queryFn: () => partyPricingService.prices.lookup({
+      party_id: partyId as string,
+      item_id: watchedItemId,
+      thickness_mm: thicknessMmNum,
+    }),
+  });
+  const lookupLoading = costLookup.isFetching || priceLookup.isFetching;
+  const lookupRule = isVendorSide ? costLookup.data?.rule : priceLookup.data?.rule;
+  const lookupAmount = lookupRule && "cost" in lookupRule ? lookupRule.cost
+    : lookupRule && "sale_price" in lookupRule ? lookupRule.sale_price
+    : null;
   React.useEffect(() => {
-    if (!priceLookup?.rule) return;
-    setValue("unit_price", priceLookup.rule.sale_price);
-  }, [priceLookup, setValue]);
+    if (lookupAmount) setValue("unit_price", lookupAmount);
+  }, [lookupAmount, setValue]);
 
   const onSubmit = async (data: LineFormValues) => {
     setServerError(null);
@@ -552,47 +555,35 @@ function AddLineModal({
           </select>
         </FormField>
 
-        {/* Phase 13 — Thickness + Size dropdowns. Hardcoded enums for
-            Nova Bond's ACP catalog (the same 12 combos as ITEM_DIMENSIONS
-            fixture). When both selected on a sale-side doc, unit_price
-            auto-fills from the active pricing rule via useQuery above. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Thickness" help="Panel thickness in mm. Drives the price.">
-            <select
-              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded border-hairline focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary"
-              disabled={submitting}
-              {...register("thickness_mm")}
-            >
-              <option value="">— Select —</option>
-              <option value="2">2 mm</option>
-              <option value="3">3 mm</option>
-              <option value="4">4 mm</option>
-              <option value="5">5 mm</option>
-            </select>
-          </FormField>
-          <FormField label="Size" help="Panel size (width × length, mm).">
-            <select
-              className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded border-hairline focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary"
-              disabled={submitting}
-              {...register("size_code")}
-            >
-              <option value="">— Select —</option>
-              <option value="1220x2440">1220 × 2440 mm (4×8 ft)</option>
-              <option value="1220x3050">1220 × 3050 mm (4×10 ft)</option>
-              <option value="1220x3660">1220 × 3660 mm (4×12 ft)</option>
-            </select>
-          </FormField>
-        </div>
-        {!hidePriceFields && watchedItemId && watchedThickness && watchedSize && (
+        {/* Thickness picker — keys the per-party cost / sale-price lookup.
+            Size dropdown was removed 2026-05-18 along with the dimension-
+            based Item Pricing module; only thickness drives prices now. */}
+        <FormField label="Thickness" help="Panel thickness in mm. Drives the per-party price lookup.">
+          <select
+            className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border rounded border-hairline focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface-secondary"
+            disabled={submitting}
+            {...register("thickness_mm")}
+          >
+            <option value="">— Select —</option>
+            {THICKNESSES_MM.map((mm) => (
+              <option key={mm} value={mm}>{mm} mm</option>
+            ))}
+          </select>
+        </FormField>
+        {!hidePriceFields && partyId && watchedItemId && (
           <p className={cn(
             "text-[11px] -mt-1",
-            priceLookup?.rule
-              ? "text-emerald-700 dark:text-emerald-400"
-              : "text-amber-700 dark:text-amber-400",
+            lookupLoading
+              ? "text-foreground-muted"
+              : lookupRule
+                ? "text-emerald-700 dark:text-emerald-400"
+                : "text-amber-700 dark:text-amber-400",
           )}>
-            {priceLookup?.rule
-              ? `✓ Price auto-filled: ${priceLookup.rule.sale_price} per sheet — ${priceLookup.effective_label ?? ""}`
-              : "⚠ No active pricing rule for this combination. Enter unit price manually or set one in /master-data/item-pricing."}
+            {lookupLoading
+              ? `Looking up ${isVendorSide ? "vendor cost" : "customer price"}…`
+              : lookupRule
+                ? `✓ ${isVendorSide ? "Cost" : "Price"} auto-filled from ${isVendorSide ? "vendor" : "customer"} pricelist: ₹${lookupAmount} per unit (effective ${lookupRule.valid_from})`
+                : `⚠ No ${isVendorSide ? "vendor-specific cost" : "customer-specific price"} set. Enter unit price manually, or add one on the ${isVendorSide ? "vendor" : "customer"}'s party page → ${isVendorSide ? "Item Costs" : "Sale Prices"}.`}
           </p>
         )}
         <div className={cn("grid grid-cols-1 gap-3", hidePriceFields ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
@@ -627,7 +618,7 @@ function AddLineModal({
               step="0.01"
               min={0}
               placeholder="0.00"
-              help="Sale price per unit. For challans/SOs this is the price quoted to the customer."
+              help="Sale price per unit. For estimates/SOs this is the price quoted to the customer."
               error={errors.unit_price?.message}
               disabled={submitting}
               {...register("unit_price")}

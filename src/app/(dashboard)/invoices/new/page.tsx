@@ -16,7 +16,10 @@ import { invoiceService } from "@/services/invoices.service";
 import { partyService } from "@/services/parties.service";
 import { itemService } from "@/services/items.service";
 import { balanceService } from "@/services/stock.service";
-import { challanService } from "@/services/challans.service";
+import { estimateService } from "@/services/estimates.service";
+import { partyPricingService } from "@/services/party-pricing.service";
+import { THICKNESSES_MM } from "@/lib/constants";
+import { buildInvoiceLinesFromEstimate } from "@/lib/estimate-to-invoice";
 import { useAuth } from "@/providers/auth-provider";
 import { isApiError } from "@/lib/api-client";
 import {
@@ -46,6 +49,7 @@ interface DraftLine {
   discount_pct: string;
   rate_pct: string;
   cess_pct: string;
+  thickness_mm: string;         // "" until user picks
 }
 
 const blankLine = (): DraftLine => ({
@@ -59,6 +63,7 @@ const blankLine = (): DraftLine => ({
   discount_pct: "0",
   rate_pct: "18",
   cess_pct: "0",
+  thickness_mm: "",
 });
 
 export default function NewInvoicePage() {
@@ -72,12 +77,18 @@ export default function NewInvoicePage() {
   const [dueDate, setDueDate] = useState("");
   const [partyId, setPartyId] = useState("");
   const [placeOfSupply, setPlaceOfSupply] = useState("");
-  const [challanId, setChallanId] = useState("");   // optional — promote-from-challan flow
+  const [estimateId, setEstimateId] = useState("");   // optional — promote-from-estimate flow
   const [remarks, setRemarks] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Lines state
   const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
+  // Per-line auto-fill provenance:
+  //   "loading"  — lookup in flight
+  //   "<date>"   — customer-pricelist rule applied; the value is valid_from
+  //   null       — no customer rule, item default used
+  //   undefined  — no item picked / no customer picked
+  const [priceFromList, setPriceFromList] = useState<Record<string, string | null | undefined>>({});
 
   // Reference data
   const { data: partiesRaw } = useQuery({
@@ -115,46 +126,47 @@ export default function NewInvoicePage() {
     return m;
   }, [balances]);
 
-  // Posted, unbilled challans — the candidate set for promote-from-challan.
+  // Posted, unbilled estimates — the candidate set for promote-from-estimate.
   // Filtered to the picked customer once one is chosen so the dropdown
   // stays short. Until then, show all.
-  const { data: allChallans = [] } = useQuery({
-    queryKey: ["unbilledChallans"],
-    queryFn: () => challanService.list({ status: "posted", is_billed: false, limit: 200 }),
+  const { data: allEstimates = [] } = useQuery({
+    queryKey: ["unbilledEstimates"],
+    queryFn: () => estimateService.list({ status: "posted", is_billed: false, limit: 200 }),
     staleTime: 60 * 1000,
   });
-  const eligibleChallans = useMemo(
-    () => (partyId ? allChallans.filter((c) => c.party_id === partyId) : allChallans),
-    [allChallans, partyId],
+  const eligibleEstimates = useMemo(
+    () => (partyId ? allEstimates.filter((c) => c.party_id === partyId) : allEstimates),
+    [allEstimates, partyId],
   );
 
-  // When the user picks a source challan, copy its lines into the invoice
-  // form and lock the customer + place-of-supply to the challan's values.
-  // The user can still tweak qty / price / GST rate per line.
-  const onChallanPick = async (newChallanId: string) => {
-    setChallanId(newChallanId);
-    if (!newChallanId) return;
-    const ch = allChallans.find((c) => c.id === newChallanId);
+  // When the user picks a source estimate, copy its lines into the invoice
+  // form and lock the customer + place-of-supply to the estimate's values.
+  // The user can still tweak qty / price / GST rate per line. Lines are
+  // built via the shared buildInvoiceLinesFromEstimate util so the
+  // browser-side picker produces the same numbers as the demo adapter's
+  // POST /estimates/:id/promote-to-invoice handler.
+  const onEstimatePick = async (newEstimateId: string) => {
+    setEstimateId(newEstimateId);
+    if (!newEstimateId) return;
+    const ch = allEstimates.find((c) => c.id === newEstimateId);
     if (!ch) return;
     setPartyId(ch.party_id);
-    // Pull in the challan lines
     try {
-      const challanLines = await challanService.listLines(newChallanId);
-      const newLines = challanLines.map((cl) => {
-        const item = itemMap.get(cl.item_id);
-        return {
-          key: Math.random().toString(36).slice(2, 9),
-          item_id: cl.item_id,
-          hsn_code: item?.hsn_code || "",
-          description: cl.description || item?.name || "",
-          uom_id: cl.uom_id,
-          quantity: cl.quantity,
-          unit_price: cl.unit_price,
-          discount_pct: cl.discount_pct,
-          rate_pct: item?.default_tax_rate_pct || "18",
-          cess_pct: "0",
-        };
-      });
+      const estimateLines = await estimateService.listLines(newEstimateId);
+      const drafts = buildInvoiceLinesFromEstimate(ch, estimateLines, itemMap);
+      const newLines = drafts.map((d) => ({
+        key: Math.random().toString(36).slice(2, 9),
+        item_id: d.item_id,
+        hsn_code: d.hsn_code,
+        description: d.description,
+        uom_id: d.uom_id,
+        quantity: d.quantity,
+        unit_price: d.unit_price,
+        discount_pct: d.discount_pct,
+        rate_pct: d.rate_pct,
+        cess_pct: d.cess_pct,
+        thickness_mm: d.thickness_mm != null ? String(d.thickness_mm) : "",
+      }));
       if (newLines.length > 0) setLines(newLines);
     } catch {
       // Silently ignore — user can fall back to manual line entry
@@ -175,11 +187,53 @@ export default function NewInvoicePage() {
     if (p?.state_code && !placeOfSupply) setPlaceOfSupply(p.state_code);
   }, [partyId, parties, placeOfSupply]);
 
-  // Pre-fill line fields when an item is picked.
-  const onLineItemChange = (key: string, itemId: string) => {
+  // Fetch the customer's per-(item, thickness) sale price and apply it
+  // to the line. Falls back to Item.default_sale_price when no rule
+  // exists for this combo or when thickness isn't yet picked.
+  const applyPriceForLine = React.useCallback(async (key: string, itemId: string, thicknessStr: string, currentPartyId: string) => {
+    const thicknessMm = thicknessStr ? Number(thicknessStr) : NaN;
+    if (!currentPartyId) {
+      setLines((prev) => prev.map((l) => (l.key === key ? { ...l, unit_price: "0" } : l)));
+      setPriceFromList((m) => ({ ...m, [key]: "need-customer" }));
+      return;
+    }
+    if (!Number.isFinite(thicknessMm)) {
+      // Item.default_sale_price is intentionally NOT used as a fallback —
+      // it's the 4mm baseline and would mislead the user on 2mm / 8mm.
+      setLines((prev) => prev.map((l) => (l.key === key ? { ...l, unit_price: "0" } : l)));
+      setPriceFromList((m) => ({ ...m, [key]: "need-thickness" }));
+      return;
+    }
+    setPriceFromList((m) => ({ ...m, [key]: "loading" }));
+    try {
+      const res = await partyPricingService.prices.lookup({
+        party_id: currentPartyId, item_id: itemId, thickness_mm: thicknessMm,
+      });
+      if (res.rule) {
+        setLines((prev) =>
+          prev.map((l) => (l.key === key ? { ...l, unit_price: res.rule!.sale_price } : l)),
+        );
+        setPriceFromList((m) => ({ ...m, [key]: res.rule!.valid_from }));
+      } else {
+        setLines((prev) => prev.map((l) => (l.key === key ? { ...l, unit_price: "0" } : l)));
+        setPriceFromList((m) => ({ ...m, [key]: null }));
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("party-price lookup failed", { party_id: currentPartyId, item_id: itemId, thickness_mm: thicknessMm, err });
+      setLines((prev) => prev.map((l) => (l.key === key ? { ...l, unit_price: "0" } : l)));
+      setPriceFromList((m) => ({ ...m, [key]: "error" }));
+    }
+  }, []);
+
+  // Pre-fill line fields when an item is picked. unit_price is filled
+  // by applyPriceForLine — uses the line's currently-picked thickness.
+  const onLineItemChange = async (key: string, itemId: string) => {
+    let nextThickness = "";
     setLines((prev) =>
       prev.map((l) => {
         if (l.key !== key) return l;
+        nextThickness = l.thickness_mm;
         const item = itemMap.get(itemId);
         if (!item) return { ...l, item_id: itemId };
         return {
@@ -187,13 +241,41 @@ export default function NewInvoicePage() {
           item_id: itemId,
           hsn_code: item.hsn_code || l.hsn_code,
           description: item.name,
-          unit_price: item.default_sale_price || l.unit_price,
           rate_pct: item.default_tax_rate_pct || l.rate_pct,
           uom_id: item.base_uom_id || l.uom_id,
         };
       }),
     );
+    if (itemId) {
+      void applyPriceForLine(key, itemId, nextThickness, partyId);
+    } else {
+      setPriceFromList((m) => { const n = { ...m }; delete n[key]; return n; });
+    }
   };
+
+  // Called when the user changes the thickness picker on a line.
+  const onLineThicknessChange = (key: string, thicknessStr: string) => {
+    let itemId = "";
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.key !== key) return l;
+        itemId = l.item_id;
+        return { ...l, thickness_mm: thicknessStr };
+      }),
+    );
+    if (itemId) void applyPriceForLine(key, itemId, thicknessStr, partyId);
+  };
+
+  // Re-run the per-customer price lookup whenever the customer changes,
+  // for every line that already has an item picked. Depend ONLY on
+  // partyId — `applyPriceForLine` closes over `itemMap` which churns
+  // every render and would otherwise cause an infinite loop.
+  useEffect(() => {
+    for (const l of lines) {
+      if (l.item_id) void applyPriceForLine(l.key, l.item_id, l.thickness_mm, partyId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partyId]);
 
   const updateLine = (key: string, patch: Partial<DraftLine>) => {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -241,7 +323,7 @@ export default function NewInvoicePage() {
         due_date: dueDate || undefined,
         party_id: partyId,
         place_of_supply: placeOfSupply,
-        challan_id: challanId || undefined,    // ← link the source challan
+        estimate_id: estimateId || undefined,    // ← link the source estimate
         remarks: remarks || undefined,
       });
       // Then create lines in order. (The backend would accept a single
@@ -260,6 +342,7 @@ export default function NewInvoicePage() {
           discount_pct: l.discount_pct,
           rate_pct: l.rate_pct,
           cess_pct: l.cess_pct || "0",
+          thickness_mm: l.thickness_mm ? Number(l.thickness_mm) : undefined,
         });
       }
       if (postAfter) {
@@ -334,34 +417,34 @@ export default function NewInvoicePage() {
         <section className="bg-white border border-hairline rounded-md p-4 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold">Header</h2>
-            {challanId && (
+            {estimateId && (
               <Badge tone="blue">
-                Linked to challan ·{" "}
+                Linked to estimate ·{" "}
                 <span className="font-mono">
-                  {allChallans.find((c) => c.id === challanId)?.challan_number}
+                  {allEstimates.find((c) => c.id === estimateId)?.estimate_number}
                 </span>
               </Badge>
             )}
           </div>
 
-          {/* Source challan picker — sits at the TOP of the header so its
+          {/* Source estimate picker — sits at the TOP of the header so its
               effects (auto-pick customer, copy lines) are visible up-front */}
           <FormField
-            label="Source challan"
-            help="Optional. Pick a posted, unbilled challan to promote it. The customer, place-of-supply, and lines will pre-fill — you can still tweak per-line GST rate and pricing before posting."
+            label="Source estimate"
+            help="Optional. Pick a posted, unbilled estimate to promote it. The customer, place-of-supply, and lines will pre-fill — you can still tweak per-line GST rate and pricing before posting."
           >
             <select
-              value={challanId}
-              onChange={(e) => onChallanPick(e.target.value)}
+              value={estimateId}
+              onChange={(e) => onEstimatePick(e.target.value)}
               className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
             >
               <option value="">— None (direct invoice) —</option>
-              {eligibleChallans.length === 0 && partyId && (
-                <option disabled>No unbilled challans for this customer</option>
+              {eligibleEstimates.length === 0 && partyId && (
+                <option disabled>No unbilled estimates for this customer</option>
               )}
-              {eligibleChallans.map((c) => (
+              {eligibleEstimates.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.challan_number} · {formatChallanLabel(c.challan_date, c.grand_total)}
+                  {c.estimate_number} · {formatEstimateLabel(c.estimate_date, c.grand_total)}
                 </option>
               ))}
             </select>
@@ -372,7 +455,7 @@ export default function NewInvoicePage() {
               <select
                 value={partyId}
                 onChange={(e) => setPartyId(e.target.value)}
-                disabled={!!challanId}
+                disabled={!!estimateId}
                 className="w-full h-9 md:h-[30px] px-2.5 text-sm bg-white border border-hairline rounded focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-surface disabled:cursor-not-allowed"
               >
                 <option value="">— Pick a customer —</option>
@@ -431,6 +514,7 @@ export default function NewInvoicePage() {
                 <tr className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
                   <th className="text-left px-3 py-2.5 w-8">#</th>
                   <th className="text-left px-3 py-2.5">Item</th>
+                  <th className="text-left px-3 py-2.5 w-24">Thickness</th>
                   <th className="text-left px-3 py-2.5">HSN</th>
                   <th className="text-right px-3 py-2.5">Qty</th>
                   <th className="text-right px-3 py-2.5">Unit price</th>
@@ -482,6 +566,54 @@ export default function NewInvoicePage() {
                             <option key={it.id} value={it.id}>
                               {it.item_code} · {it.name}
                             </option>
+                          ))}
+                        </select>
+                        {l.item_id && priceFromList[l.key] === "need-customer" && (
+                          <div className="mt-1 text-[10px] text-foreground-muted bg-bg-subtle rounded px-1.5 py-0.5 inline-block">
+                            Pick a customer to load the price
+                          </div>
+                        )}
+                        {l.item_id && priceFromList[l.key] === "need-thickness" && (
+                          <div className="mt-1 text-[10px] text-status-amber-text bg-status-amber-bg/40 rounded px-1.5 py-0.5 inline-block">
+                            Pick a thickness to load the price
+                          </div>
+                        )}
+                        {l.item_id && priceFromList[l.key] === "loading" && (
+                          <div className="mt-1 text-[10px] text-foreground-muted bg-bg-subtle rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                            <Spinner size={10} /> looking up customer price…
+                          </div>
+                        )}
+                        {l.item_id && priceFromList[l.key] && priceFromList[l.key] !== "loading" && priceFromList[l.key] !== "error" && priceFromList[l.key] !== "need-customer" && priceFromList[l.key] !== "need-thickness" && (
+                          <div className="mt-1 text-[10px] text-status-green-text bg-status-green-bg/40 rounded px-1.5 py-0.5 inline-block">
+                            From customer pricelist · eff. {priceFromList[l.key]}
+                          </div>
+                        )}
+                        {l.item_id && partyId && priceFromList[l.key] === null && (
+                          <Link
+                            href={`/parties/${partyId}?tab=sale-prices`}
+                            target="_blank"
+                            className="mt-1 text-[10px] text-status-amber-text bg-status-amber-bg/40 hover:bg-status-amber-bg/70 rounded px-1.5 py-0.5 inline-block"
+                          >
+                            No price on file for this customer × thickness · manage prices →
+                          </Link>
+                        )}
+                        {l.item_id && partyId && priceFromList[l.key] === "error" && (
+                          <div className="mt-1 text-[10px] text-status-red-text bg-status-red-bg/40 rounded px-1.5 py-0.5 inline-block">
+                            ⚠ Pricelist lookup failed — see DevTools console
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={l.thickness_mm}
+                          onChange={(e) => onLineThicknessChange(l.key, e.target.value)}
+                          className={`w-full h-9 px-2 text-sm bg-white border rounded focus:outline-none focus:ring-2 focus:ring-brand/20 ${
+                            l.item_id && !l.thickness_mm ? "border-status-amber" : "border-hairline"
+                          }`}
+                        >
+                          <option value="">—</option>
+                          {THICKNESSES_MM.map((mm) => (
+                            <option key={mm} value={mm}>{mm} mm</option>
                           ))}
                         </select>
                       </td>
@@ -600,6 +732,12 @@ export default function NewInvoicePage() {
             {parseFloat(totals.igst_total) > 0 && <Row label="IGST" value={totals.igst_total} />}
             {parseFloat(totals.cess_total) > 0 && <Row label="Cess" value={totals.cess_total} />}
             <Row label="Tax total" value={totals.tax_total} />
+            {Number(totals.round_off) !== 0 && (
+              <Row
+                label="Round off"
+                value={(Number(totals.round_off) > 0 ? "+ " : "− ") + Math.abs(Number(totals.round_off)).toFixed(2)}
+              />
+            )}
             <div className="pt-2 mt-2 border-t border-hairline">
               <Row label="Grand total" value={`₹ ${totals.grand_total}`} bold />
             </div>
@@ -637,8 +775,8 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   );
 }
 
-/** Compact label for the challan picker dropdown. */
-function formatChallanLabel(date: string, grandTotal: string): string {
+/** Compact label for the estimate picker dropdown. */
+function formatEstimateLabel(date: string, grandTotal: string): string {
   const formatted = parseFloat(grandTotal).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

@@ -141,11 +141,15 @@ export const itemBrandService = {
 export const itemCategoryService = {
   list: (params?: { limit?: number; cursor?: string; parent_id?: string }) =>
     api.get<PaginatedResponse<ItemCategory>>(ITEM_CATEGORIES.LIST, params),
-  create: (data: { code: string; name: string; parent_id?: string | null }) =>
-    api.post<ItemCategory>(ITEM_CATEGORIES.LIST, data),
+  create: (data: {
+    code: string;
+    name: string;
+    parent_id?: string | null;
+    gst_rate_pct?: string;
+  }) => api.post<ItemCategory>(ITEM_CATEGORIES.LIST, data),
   update: (
     id: string,
-    data: Partial<{ name: string; parent_id: string | null }>
+    data: Partial<{ name: string; parent_id: string | null; gst_rate_pct: string }>
   ) => api.patch<ItemCategory>(ITEM_CATEGORIES.DETAIL(id), data),
   delete: (id: string) => api.delete<void>(ITEM_CATEGORIES.DETAIL(id)),
 };

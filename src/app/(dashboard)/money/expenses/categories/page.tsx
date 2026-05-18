@@ -44,7 +44,7 @@ export default function ExpenseCategoriesPage() {
   const balanceByAcc = new Map((accs ?? []).map((a) => [a.id, Number(a.current_balance)]));
 
   const create = useMutation({
-    mutationFn: (data: { code: string; name: string; is_capital?: boolean }) => expenseCategoryService.create(data),
+    mutationFn: (data: { code: string; name: string; is_capital?: boolean; is_fuel?: boolean }) => expenseCategoryService.create(data),
     onSuccess: () => {
       toast.success("Category added");
       qc.invalidateQueries({ queryKey: ["expense-categories"] });
@@ -93,7 +93,10 @@ export default function ExpenseCategoriesPage() {
                       <td className="px-3 py-2 font-mono text-[12px]">{c.code}</td>
                       <td className="px-3 py-2 font-medium">{c.name}</td>
                       <td className="px-3 py-2 text-text-tertiary">
-                        {c.is_capital ? <Badge tone="amber">capital</Badge> : <span>opex</span>}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {c.is_capital ? <Badge tone="amber">capital</Badge> : <span>opex</span>}
+                          {c.is_fuel && <Badge tone="blue">fuel</Badge>}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {balance > 0 ? formatCurrency(balance, "INR", "en-IN") : <span className="text-text-tertiary">—</span>}
@@ -115,10 +118,11 @@ export default function ExpenseCategoriesPage() {
   );
 }
 
-function CreateCategoryDialog({ onClose, onSubmit, loading }: { onClose: () => void; onSubmit: (d: { code: string; name: string; is_capital?: boolean }) => void; loading: boolean }) {
+function CreateCategoryDialog({ onClose, onSubmit, loading }: { onClose: () => void; onSubmit: (d: { code: string; name: string; is_capital?: boolean; is_fuel?: boolean }) => void; loading: boolean }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [isCapital, setIsCapital] = useState(false);
+  const [isFuel, setIsFuel] = useState(false);
   const valid = code.trim().length > 0 && name.trim().length > 0;
   return (
     <Dialog open onClose={onClose} title="New expense category" width="sm">
@@ -130,10 +134,15 @@ function CreateCategoryDialog({ onClose, onSubmit, loading }: { onClose: () => v
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Office rent" />
         </FormField>
         <Checkbox checked={isCapital} onChange={setIsCapital} label="Capital expense (vs opex)" />
+        <Checkbox
+          checked={isFuel}
+          onChange={setIsFuel}
+          label="Fuel category — require vehicle number on each entry"
+        />
       </div>
       <div className="flex justify-end gap-2 mt-4">
         <Button kind="ghost" onClick={onClose}>Cancel</Button>
-        <Button kind="primary" disabled={!valid || loading} onClick={() => valid && onSubmit({ code, name, is_capital: isCapital })}>
+        <Button kind="primary" disabled={!valid || loading} onClick={() => valid && onSubmit({ code, name, is_capital: isCapital, is_fuel: isFuel })}>
           {loading ? <Spinner size={14} /> : "Create"}
         </Button>
       </div>

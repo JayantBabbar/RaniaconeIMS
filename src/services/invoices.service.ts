@@ -24,15 +24,15 @@ export interface InvoiceCreate {
   due_date?: string;
   party_id: string;
   place_of_supply: string;       // 2-digit state code
-  /** Optional source challan id. When set, the server should:
-   *  1. Validate the challan is posted, unbilled, and belongs to
+  /** Optional source estimate id. When set, the server should:
+   *  1. Validate the estimate is posted, unbilled, and belongs to
    *     the same party as `party_id`.
-   *  2. Mark the challan `is_billed=true` and set `invoice_id` to
+   *  2. Mark the estimate `is_billed=true` and set `invoice_id` to
    *     this new invoice on success.
-   *  3. Reject with 409 CHALLAN_ALREADY_BILLED if the challan is
+   *  3. Reject with 409 ESTIMATE_ALREADY_BILLED if the estimate is
    *     already linked to another invoice.
    */
-  challan_id?: string;
+  estimate_id?: string;
   remarks?: string;
 }
 
@@ -55,6 +55,7 @@ export interface InvoiceLineCreate {
   rate_pct: string;              // GST rate, e.g. "18"
   cess_pct?: string;
   remarks?: string;
+  thickness_mm?: number;
 }
 
 export interface InvoiceLineUpdate {

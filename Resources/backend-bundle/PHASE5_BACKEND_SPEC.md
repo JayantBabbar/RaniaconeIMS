@@ -89,7 +89,7 @@ For any document with posting_date ≤ lock_before_date:
 This MUST be enforced server-side as a generic middleware on
 every transactional resource, not per-route. Resources covered:
 - invoices, invoice_lines
-- challans, challan_lines
+- estimates, estimate_lines
 - vendor_bills, vendor_bill_lines
 - payments, payment_allocations
 - expenses

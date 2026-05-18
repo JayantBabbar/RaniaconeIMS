@@ -89,7 +89,41 @@ export function computeGstLine(input: GstLineInput): GstLineOutput {
   };
 }
 
-/** Aggregate totals for a posted/draft invoice. Sums line outputs. */
+/**
+ * Reverse-GST: given a customer-visible GST-inclusive amount and a GST
+ * rate %, return the taxable base and the tax component.
+ *
+ * Inverse of computeGstLine — useful when promoting an Estimate (which
+ * stores the GST-inclusive per-unit price) to an Invoice line (which
+ * stores the taxable base). Worked example: `reverseGst(100, 18) →
+ * { baseAmount: "84.75", taxAmount: "15.25" }`. Sums to ₹100 exactly
+ * up to half-up rounding at 2dp.
+ */
+export function reverseGst(
+  inclusiveAmount: string | number,
+  ratePct: string | number,
+): { baseAmount: string; taxAmount: string } {
+  const total = num(inclusiveAmount);
+  const r = num(ratePct);
+  const base = total / (1 + r / 100);
+  const tax = total - base;
+  return { baseAmount: round(base), taxAmount: round(tax) };
+}
+
+/** Round to the nearest whole rupee (half-up). Indian invoicing standard:
+ *  every printed invoice's grand total is rounded to ₹0; the difference
+ *  shows as a separate "Round off" line so the math reconciles. */
+export function roundRupees(amount: string | number): string {
+  const n = num(amount);
+  if (!Number.isFinite(n)) return "0.00";
+  return Math.round(n).toFixed(2);
+}
+
+/** Aggregate totals for a posted/draft invoice. Sums line outputs and
+ *  applies the Indian "round off to nearest rupee" rule on grand_total:
+ *  the exact arithmetic sum is stored as `grand_total_exact`, the
+ *  rounded payable as `grand_total`, and the difference as `round_off`
+ *  so consumers can render a "Round off" line. */
 export function aggregateInvoiceTotals(lines: GstLineOutput[]): {
   subtotal: string;
   cgst_total: string;
@@ -97,7 +131,13 @@ export function aggregateInvoiceTotals(lines: GstLineOutput[]): {
   igst_total: string;
   cess_total: string;
   tax_total: string;
+  /** Pre-rounding sum (subtotal + tax_total) — for reconciliation. */
+  grand_total_exact: string;
+  /** Rounded to the nearest rupee — the amount the customer pays. */
   grand_total: string;
+  /** Signed adjustment: grand_total − grand_total_exact. Positive when
+   *  we rounded UP (added paise), negative when we rounded DOWN. */
+  round_off: string;
 } {
   let subtotal = 0;
   let cgst = 0;
@@ -112,6 +152,8 @@ export function aggregateInvoiceTotals(lines: GstLineOutput[]): {
     cess += num(l.cess_amount);
   }
   const taxTotal = cgst + sgst + igst + cess;
+  const exact = subtotal + taxTotal;
+  const rounded = Math.round(exact);
   return {
     subtotal: round(subtotal),
     cgst_total: round(cgst),
@@ -119,7 +161,9 @@ export function aggregateInvoiceTotals(lines: GstLineOutput[]): {
     igst_total: round(igst),
     cess_total: round(cess),
     tax_total: round(taxTotal),
-    grand_total: round(subtotal + taxTotal),
+    grand_total_exact: round(exact),
+    grand_total: rounded.toFixed(2),
+    round_off: round(rounded - exact),
   };
 }
 

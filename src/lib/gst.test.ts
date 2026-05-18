@@ -6,6 +6,7 @@ import {
   isValidHsn,
   amountInWords,
   stateName,
+  reverseGst,
 } from "./gst";
 
 describe("computeGstLine — same-state (CGST + SGST)", () => {
@@ -250,6 +251,34 @@ describe("amountInWords", () => {
 
   it("string input", () => {
     expect(amountInWords("250.00")).toBe("Two Hundred Fifty Rupees");
+  });
+});
+
+describe("reverseGst", () => {
+  it("inverse of computeGstLine: 100 inclusive @ 18% → 84.75 base + 15.25 tax", () => {
+    const { baseAmount, taxAmount } = reverseGst(100, 18);
+    expect(baseAmount).toBe("84.75");
+    expect(taxAmount).toBe("15.25");
+  });
+
+  it("handles strings for both inputs", () => {
+    expect(reverseGst("1000", "18")).toEqual({ baseAmount: "847.46", taxAmount: "152.54" });
+  });
+
+  it("zero rate is a pass-through", () => {
+    expect(reverseGst(100, 0)).toEqual({ baseAmount: "100.00", taxAmount: "0.00" });
+  });
+
+  it("5% rate: 100 → 95.24 + 4.76", () => {
+    expect(reverseGst(100, 5)).toEqual({ baseAmount: "95.24", taxAmount: "4.76" });
+  });
+
+  it("12% rate: 50 → 44.64 + 5.36", () => {
+    expect(reverseGst(50, 12)).toEqual({ baseAmount: "44.64", taxAmount: "5.36" });
+  });
+
+  it("28% rate: 1280 → 1000.00 + 280.00", () => {
+    expect(reverseGst(1280, 28)).toEqual({ baseAmount: "1000.00", taxAmount: "280.00" });
   });
 });
 

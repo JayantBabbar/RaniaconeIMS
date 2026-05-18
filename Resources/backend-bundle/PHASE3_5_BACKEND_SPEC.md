@@ -39,7 +39,7 @@ A `bill_post` does NOT create stock IN movements. Stock IN happens through the G
 
 This separates physical inventory (GRN) from financial accounting (bill). Tenants who don't track stock in this system can use bills standalone; tenants who do receive goods first via GRN, then enter the supplier's invoice as a bill when it arrives.
 
-A future enhancement (Phase 4 candidate): link a bill to one or more GRN documents the same way invoice links to challan, so the bill can reuse the GRN's line data. **Out of scope for Phase 3.5.**
+A future enhancement (Phase 4 candidate): link a bill to one or more GRN documents the same way invoice links to estimate, so the bill can reuse the GRN's line data. **Out of scope for Phase 3.5.**
 
 ### 2.2 Expense categories own their own ledger account
 
@@ -266,7 +266,7 @@ ALTER TABLE payment_allocations ADD COLUMN bill_id UUID REFERENCES vendor_bills(
 -- to be set. Drop and re-add:
 ALTER TABLE payment_allocations DROP CONSTRAINT IF EXISTS payment_allocations_check;
 ALTER TABLE payment_allocations ADD CONSTRAINT payment_allocations_check
-  CHECK ((invoice_id IS NOT NULL)::int + (challan_id IS NOT NULL)::int + (bill_id IS NOT NULL)::int = 1);
+  CHECK ((invoice_id IS NOT NULL)::int + (estimate_id IS NOT NULL)::int + (bill_id IS NOT NULL)::int = 1);
 
 CREATE INDEX idx_alloc_bill ON payment_allocations(bill_id) WHERE bill_id IS NOT NULL;
 
@@ -529,7 +529,7 @@ test_super_admin_can_act_cross_tenant_via_x_acting_tenant_id
 ## 8. Out of scope for Phase 3.5
 
 - **Salary auto-debit cron + payslip generation** — Phase 4. Needs scheduled-job runner.
-- **Bill linked to GRN** — like invoice/challan, copy lines from a GRN. Phase 4.
+- **Bill linked to GRN** — like invoice/estimate, copy lines from a GRN. Phase 4.
 - **Reports**: P&L summary, debt aging, expense-by-category. Phase 4.
 - **Period close** (locking ledger entries before a date).
 - **Multi-currency bills** — INR-only.

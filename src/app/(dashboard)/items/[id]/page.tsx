@@ -19,7 +19,8 @@ import {
   brandService,
   categoryService,
 } from "@/services/items.service";
-import { pricingService } from "@/services/pricing.service";
+import { partyPricingService } from "@/services/party-pricing.service";
+import { partyService } from "@/services/parties.service";
 import type {
   ItemIdentifier,
   ItemVariant,
@@ -51,8 +52,9 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
-  DollarSign,
   ExternalLink,
+  Truck,
+  Users,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
@@ -61,7 +63,8 @@ import {
 
 const TABS = [
   { id: "general", label: "General", icon: Box },
-  { id: "pricing", label: "Pricing", icon: DollarSign },
+  { id: "suppliers", label: "Suppliers", icon: Truck },
+  { id: "customers", label: "Customers", icon: Users },
   { id: "identifiers", label: "Identifiers", icon: Barcode },
   { id: "variants", label: "Variants", icon: Layers },
   { id: "uoms", label: "UoMs", icon: Ruler },
@@ -183,7 +186,8 @@ export default function ItemDetailPage() {
       {/* Tab content */}
       <div className="flex-1 overflow-auto p-5">
         {activeTab === "general" && <GeneralTab item={item} />}
-        {activeTab === "pricing" && <PricingTab itemId={id} />}
+        {activeTab === "suppliers" && <SuppliersTab itemId={id} />}
+        {activeTab === "customers" && <CustomersTab itemId={id} />}
         {activeTab === "identifiers" && <IdentifiersTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "variants" && <VariantsTab itemId={id} canWrite={canItemsWrite} />}
         {activeTab === "uoms" && <UoMsTab itemId={id} canWrite={canItemsWrite} />}
@@ -350,115 +354,178 @@ function AddIdentifierDialog({ open, onClose, itemId }: { open: boolean; onClose
   );
 }
 
-// ── Pricing Tab ───────────────────────────────────────────
-//
-// Shows the active sale-price grid for this item, indexed by
-// thickness × size. Read-only here; clicking any cell takes
-// the user to the master pricing config page pre-filtered to
-// this item where they can update prices and see history.
-//
-// Empty cell = no rule yet for that combination. Filled cell
-// shows the current price + the date it became effective.
+// ── Suppliers Tab ─────────────────────────────────────────
+// Read-only view of which suppliers carry this item and at what cost.
+// Edits happen on the supplier's party detail page.
 
-function PricingTab({ itemId }: { itemId: string }) {
-  const { data: rules, isLoading } = useQuery({
-    queryKey: ["pricing-rules", itemId],
-    queryFn: () => pricingService.list({ item_id: itemId, active_only: true, limit: 200 }),
+function SuppliersTab({ itemId }: { itemId: string }) {
+  const router = useRouter();
+  const { can } = useCan();
+  const canReadCosts = can("inventory.party_costs.read");
+  const { data: rowsRes, isLoading } = useQuery({
+    queryKey: ["partyItemCosts", { item_id: itemId, active_only: true }],
+    queryFn: () => partyPricingService.costs.list({ item_id: itemId, active_only: true, limit: 200 }),
+    enabled: canReadCosts,
   });
-  const { data: thicknessOptions } = useQuery({
-    queryKey: ["pricing-dimension-options", "thickness"],
-    queryFn: () => pricingService.listThicknessOptions(),
+  const { data: partiesRes } = useQuery({
+    queryKey: ["parties"],
+    queryFn: () => partyService.list({ limit: 500 }),
+    staleTime: 5 * 60 * 1000,
+    enabled: canReadCosts,
   });
-  const { data: sizeOptions } = useQuery({
-    queryKey: ["pricing-dimension-options", "size"],
-    queryFn: () => pricingService.listSizeOptions(),
-  });
-  const thicknesses = thicknessOptions ?? [];
-  const sizes = sizeOptions ?? [];
+  const partyById = new Map((partiesRes?.data ?? []).map((p) => [p.id, p]));
 
-  // Build a quick (thickness|size) → rule lookup so the grid renders fast.
-  const ruleMap = new Map(
-    (rules ?? []).map((r) => [`${r.thickness_mm}|${r.size_code}`, r] as const),
-  );
-
-  const filledCount = rules?.length ?? 0;
-  const totalCells = thicknesses.length * sizes.length;
-
+  if (!canReadCosts) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">Cost visibility is restricted</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Your role doesn&apos;t include access to supplier cost data. Ask your admin to grant <code className="font-mono text-[11px]">inventory.party_costs.read</code> if you need to see this.
+        </p>
+      </div>
+    );
+  }
+  if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
+  const rows = rowsRes?.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">No supplier costs recorded for this item</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Open a supplier&apos;s Party page and add an Item Cost to seed this list.
+        </p>
+      </div>
+    );
+  }
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Pricing</h2>
-          <p className="text-[12.5px] text-foreground-secondary mt-0.5 max-w-2xl">
-            Sale price per sheet, by thickness × size. Mr. Arpit can update any cell — the previous price stays in history; old invoices keep their original snapshotted price.
-          </p>
-        </div>
-        <Link
-          href={`/master-data/item-pricing?item_id=${encodeURIComponent(itemId)}`}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand hover:underline"
-        >
-          Manage prices <ExternalLink size={13} />
-        </Link>
-      </div>
-
-      <div className="text-[11px] text-foreground-muted">
-        {filledCount} of {totalCells} dimension combinations have a price set.
-        {filledCount < totalCells && (
-          <span className="ml-1 text-amber-700">
-            Empty cells need a price before invoices/challans can auto-fill for that combination.
-          </span>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : (
-        <div className="rounded-md border border-hairline bg-white overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead className="bg-surface text-[10.5px] text-foreground-muted font-medium uppercase tracking-wider">
-              <tr>
-                <th className="text-left px-3 py-2.5 border-b border-hairline">Thickness ↓ &nbsp; Size →</th>
-                {sizes.map((s) => (
-                  <th key={s.code} className="text-right px-3 py-2.5 border-b border-hairline">
-                    <div className="text-[10px] font-mono opacity-80">{s.code}</div>
-                    <div className="text-[9.5px] font-mono opacity-60">{s.label}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {thicknesses.map((t) => (
-                <tr key={t} className="border-b border-hairline-light hover:bg-surface/50">
-                  <td className="px-3 py-3 font-medium">{t} mm</td>
-                  {sizes.map((s) => {
-                    const rule = ruleMap.get(`${t}|${s.code}`);
-                    return (
-                      <td key={s.code} className="px-3 py-3 text-right">
-                        {rule ? (
-                          <div>
-                            <div className="tabular-nums font-semibold text-foreground">
-                              {formatCurrency(rule.sale_price, "INR", "en-IN")}
-                            </div>
-                            <div className="text-[10.5px] text-foreground-muted">
-                              since {formatDate(rule.valid_from, "short")}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-foreground-muted italic">— not set —</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <p className="text-[11px] text-foreground-muted">
-        Use this view as a quick price reference. To update a price, click <span className="font-medium">Manage prices</span> above — the master pricing page handles version-history and effective dates.
+    <div className="space-y-3">
+      <p className="text-xs text-foreground-muted">
+        Suppliers who currently carry this item, sorted by cost. Click a row to manage that supplier&apos;s pricelist.
       </p>
+      <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead className="bg-bg-subtle text-text-tertiary text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium">Supplier</th>
+              <th className="text-right px-3 py-2 font-medium">Current cost</th>
+              <th className="text-left px-3 py-2 font-medium">Effective since</th>
+              <th className="text-left px-3 py-2 font-medium">Notes</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...rows].sort((a, b) => Number(a.cost) - Number(b.cost)).map((r) => {
+              const p = partyById.get(r.party_id);
+              return (
+                <tr
+                  key={r.id}
+                  className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
+                  onClick={() => router.push(`/parties/${r.party_id}?tab=item-costs`)}
+                >
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{p?.name ?? r.party_id}</div>
+                    <div className="text-[11px] text-foreground-muted font-mono">{p?.code}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">
+                    {formatCurrency(r.cost, "INR", "en-IN")}
+                  </td>
+                  <td className="px-3 py-2 text-foreground-muted">{formatDate(r.valid_from)}</td>
+                  <td className="px-3 py-2 text-foreground-muted truncate max-w-[200px]">{r.notes ?? ""}</td>
+                  <td className="px-3 py-2 text-foreground-muted"><ExternalLink size={12} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Customers Tab ─────────────────────────────────────────
+// Read-only view of which customers have a negotiated per-unit price
+// for this item. Edits happen on the customer's party detail page.
+
+function CustomersTab({ itemId }: { itemId: string }) {
+  const router = useRouter();
+  const { can } = useCan();
+  const canReadPrices = can("inventory.party_prices.read");
+  const { data: rowsRes, isLoading } = useQuery({
+    queryKey: ["partyItemSalePrices", { item_id: itemId, active_only: true }],
+    queryFn: () => partyPricingService.prices.list({ item_id: itemId, active_only: true, limit: 200 }),
+    enabled: canReadPrices,
+  });
+  const { data: partiesRes } = useQuery({
+    queryKey: ["parties"],
+    queryFn: () => partyService.list({ limit: 500 }),
+    staleTime: 5 * 60 * 1000,
+    enabled: canReadPrices,
+  });
+  const partyById = new Map((partiesRes?.data ?? []).map((p) => [p.id, p]));
+
+  if (!canReadPrices) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">Customer price visibility is restricted</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Your role doesn&apos;t include access to per-customer price data. Ask your admin to grant <code className="font-mono text-[11px]">inventory.party_prices.read</code>.
+        </p>
+      </div>
+    );
+  }
+  if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
+  const rows = rowsRes?.data ?? [];
+  if (rows.length === 0) {
+    return (
+      <div className="bg-white border border-hairline rounded-md p-8 text-center">
+        <p className="text-sm font-medium">No customer-specific prices for this item</p>
+        <p className="text-xs text-foreground-muted mt-1">
+          Without per-customer rows, every customer&apos;s invoice line falls back to this item&apos;s default sale price.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-foreground-muted">
+        Customers who currently have negotiated pricing for this item. Click a row to manage that customer&apos;s pricelist.
+      </p>
+      <div className="bg-white border border-hairline rounded-md overflow-hidden">
+        <table className="w-full text-[13px]">
+          <thead className="bg-bg-subtle text-text-tertiary text-[11px] uppercase tracking-wider">
+            <tr>
+              <th className="text-left px-3 py-2 font-medium">Customer</th>
+              <th className="text-right px-3 py-2 font-medium">Current price</th>
+              <th className="text-left px-3 py-2 font-medium">Effective since</th>
+              <th className="text-left px-3 py-2 font-medium">Notes</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...rows].sort((a, b) => Number(b.sale_price) - Number(a.sale_price)).map((r) => {
+              const p = partyById.get(r.party_id);
+              return (
+                <tr
+                  key={r.id}
+                  className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
+                  onClick={() => router.push(`/parties/${r.party_id}?tab=sale-prices`)}
+                >
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{p?.name ?? r.party_id}</div>
+                    <div className="text-[11px] text-foreground-muted font-mono">{p?.code}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">
+                    {formatCurrency(r.sale_price, "INR", "en-IN")}
+                  </td>
+                  <td className="px-3 py-2 text-foreground-muted">{formatDate(r.valid_from)}</td>
+                  <td className="px-3 py-2 text-foreground-muted truncate max-w-[200px]">{r.notes ?? ""}</td>
+                  <td className="px-3 py-2 text-foreground-muted"><ExternalLink size={12} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

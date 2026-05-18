@@ -78,8 +78,8 @@ the employee's pocket but is not the employer's expense.
 
 Initial implementation: sum of `valuation_layer.consumed_cost`
 on stock-out movements caused by **posted** invoices (and only
-those without `challan_id`, since challan-promoted invoices reuse
-the challan's stock-out — never double-count).
+those without `estimate_id`, since estimate-promoted invoices reuse
+the estimate's stock-out — never double-count).
 
 The FE prototype currently uses `revenue × 0.6` as a stand-in for
 demo numbers; backend MUST replace this with the real valuation
@@ -251,7 +251,7 @@ Sourcing:
   invoice_date in [start, end]
 - `cogs` — SUM(`valuation_layers.consumed_cost`) on stock-out
   moves caused by posted invoices in range (excluding invoices
-  with `challan_id` — challan-promoted ones reuse the challan's
+  with `estimate_id` — estimate-promoted ones reuse the estimate's
   stock-out)
 - `expenses[]` — SUM(`expenses.amount`) GROUP BY `category_id`
   WHERE status='posted' AND expense_date in [start, end]
@@ -313,7 +313,7 @@ Backend test coverage targets:
    on day 31 lands in `bucket_31_60`.
 4. **Aging exclusion** — fully-allocated doc disappears from rows
    even when `posted`.
-5. **P&L revenue exclusion** — challan-promoted invoice's
+5. **P&L revenue exclusion** — estimate-promoted invoice's
    stock-out is NOT double-counted in COGS (this is the most
    load-bearing invariant — a regression here destroys the P&L).
 6. **P&L empty range** — date range with no transactional data

@@ -67,7 +67,7 @@ export interface PaymentUpdate {
 
 export interface AllocationCreate {
   invoice_id?: string;
-  challan_id?: string;
+  estimate_id?: string;
   /** Phase 3.5 — vendor bill, for direction='paid' allocations. */
   bill_id?: string;
   amount: string;
