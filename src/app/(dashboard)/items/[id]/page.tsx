@@ -56,7 +56,7 @@ import {
   ExternalLink,
   Truck,
   Users,
-  DollarSign,
+  IndianRupee,
   Save,
 } from "lucide-react";
 
@@ -66,7 +66,7 @@ import {
 
 const TABS = [
   { id: "general", label: "General", icon: Box },
-  { id: "set-prices", label: "Set Prices", icon: DollarSign },
+  { id: "set-prices", label: "Set Prices", icon: IndianRupee },
   { id: "suppliers", label: "Suppliers", icon: Truck },
   { id: "customers", label: "Customers", icon: Users },
   { id: "identifiers", label: "Identifiers", icon: Barcode },
@@ -558,6 +558,9 @@ function SetPricesTab({ itemId }: { itemId: string }) {
     <div className="space-y-5">
       <div className="rounded-md bg-bg-subtle border border-hairline px-4 py-3 text-[12.5px] text-foreground-secondary">
         Fill in the per-thickness prices for each party. Empty cells stay un-priced; filled cells become the new active price (the prior version gets auto-closed). One click of <span className="font-semibold">Save</span> commits every changed cell.
+        <div className="mt-1.5 text-[11.5px] text-foreground-muted">
+          Every save creates a new row in the version history. To see the full audit trail (with effective-from / effective-until dates per thickness), open the party&apos;s page and expand the row on <span className="font-medium">Item costs</span> / <span className="font-medium">Sale prices</span>.
+        </div>
       </div>
 
       {renderMatrix(

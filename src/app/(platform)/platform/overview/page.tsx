@@ -10,7 +10,7 @@ import { tenantService, currencyService, healthService } from "@/services/platfo
 import Link from "next/link";
 import {
   Building2,
-  DollarSign,
+  IndianRupee,
   Activity,
   AlertTriangle,
   Plus,
@@ -93,7 +93,7 @@ export default function PlatformOverviewPage() {
             label="Currencies"
             value={String(currencies.length)}
             subtitle="Configured globally"
-            icon={<DollarSign size={15} />}
+            icon={<IndianRupee size={15} />}
           />
           <KPICard
             label="API Status"

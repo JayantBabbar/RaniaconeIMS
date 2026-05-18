@@ -10,7 +10,7 @@ import { useSidebar } from "@/components/layout/sidebar-context";
 import {
   LayoutDashboard,
   Building2,
-  DollarSign,
+  IndianRupee,
   Activity,
   Users,
   LogOut,
@@ -70,7 +70,7 @@ const PLATFORM_NAV: NavSection[] = [
       {
         id: "currencies",
         label: "Currencies",
-        icon: DollarSign,
+        icon: IndianRupee,
         href: "/platform/currencies",
       },
     ],

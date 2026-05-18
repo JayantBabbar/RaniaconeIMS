@@ -17,7 +17,7 @@ import { billService } from "@/services/bills.service";
 import { documentTypeService } from "@/services/master-data.service";
 import { useCanSeeCost } from "@/components/ui/cost-mask";
 import {
-  DollarSign, Box, FileText, ClipboardList, FileWarning,
+  IndianRupee, Box, FileText, ClipboardList, FileWarning,
   ArrowRight,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
@@ -124,7 +124,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {canSeeCost && (
             <KpiCard
-              icon={<DollarSign size={14} />}
+              icon={<IndianRupee size={14} />}
               label="Inventory value"
               value={balancesLoading ? "—" : totalValue.toFixed(2)}
               hint={`${distinctItems} distinct items`}

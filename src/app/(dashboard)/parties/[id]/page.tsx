@@ -189,15 +189,25 @@ function ItemCostsTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
   const items = (itemsRes?.data ?? []) as Item[];
   const itemById = new Map(items.map((i) => [i.id, i]));
 
-  // Group rows by item_id; within each group sort by valid_from desc so
-  // the active row (valid_until=null) is first.
-  const grouped = new Map<string, PartyItemCost[]>();
+  // Group rows by (item, thickness) — each combo is its own pricing
+  // slot with its own version history. Group key is `${item_id}|${mm}`.
+  // Within each group sort by valid_from desc so the active row
+  // (valid_until=null) is first, then historical rows below.
+  const grouped = new Map<string, { itemId: string; thicknessMm: number; rows: PartyItemCost[] }>();
   rows.forEach((r) => {
-    const list = grouped.get(r.item_id) ?? [];
-    list.push(r);
-    grouped.set(r.item_id, list);
+    const key = `${r.item_id}|${r.thickness_mm}`;
+    const bucket = grouped.get(key) ?? { itemId: r.item_id, thicknessMm: r.thickness_mm, rows: [] };
+    bucket.rows.push(r);
+    grouped.set(key, bucket);
   });
-  grouped.forEach((list) => list.sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1)));
+  grouped.forEach((b) => b.rows.sort((a, c) => (a.valid_from < c.valid_from ? 1 : -1)));
+  // Stable sort the outer list: by item code, then thickness ascending.
+  const sortedGroups = Array.from(grouped.entries()).sort(([, a], [, b]) => {
+    const ia = itemById.get(a.itemId)?.item_code ?? a.itemId;
+    const ib = itemById.get(b.itemId)?.item_code ?? b.itemId;
+    if (ia !== ib) return ia < ib ? -1 : 1;
+    return a.thicknessMm - b.thicknessMm;
+  });
 
   if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
 
@@ -242,25 +252,26 @@ function ItemCostsTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
             <tr>
               <th className="text-left px-3 py-2 font-medium w-8"></th>
               <th className="text-left px-3 py-2 font-medium">Item</th>
+              <th className="text-left px-3 py-2 font-medium">Thickness</th>
               <th className="text-right px-3 py-2 font-medium">Current cost</th>
               <th className="text-left px-3 py-2 font-medium">Effective since</th>
               <th className="text-left px-3 py-2 font-medium">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {Array.from(grouped.entries()).map(([itemId, list]) => {
-              const active = list.find((r) => r.valid_until === null);
-              const history = list.filter((r) => r.valid_until !== null);
-              const item = itemById.get(itemId);
-              const isOpen = expanded.has(itemId);
+            {sortedGroups.map(([key, group]) => {
+              const active = group.rows.find((r) => r.valid_until === null);
+              const history = group.rows.filter((r) => r.valid_until !== null);
+              const item = itemById.get(group.itemId);
+              const isOpen = expanded.has(key);
               return (
-                <React.Fragment key={itemId}>
+                <React.Fragment key={key}>
                   <tr
                     className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
                     onClick={() => {
                       setExpanded((s) => {
                         const n = new Set(s);
-                        if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+                        if (n.has(key)) n.delete(key); else n.add(key);
                         return n;
                       });
                     }}
@@ -269,9 +280,10 @@ function ItemCostsTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
                       {history.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-medium">{item?.name ?? itemId}</div>
+                      <div className="font-medium">{item?.name ?? group.itemId}</div>
                       <div className="text-[11px] text-foreground-muted font-mono">{item?.item_code}</div>
                     </td>
+                    <td className="px-3 py-2 text-foreground-secondary tabular-nums">{group.thicknessMm} mm</td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium">
                       {active ? formatCurrency(active.cost, "INR", "en-IN") : "—"}
                     </td>
@@ -284,8 +296,10 @@ function ItemCostsTab({ partyId, canWrite }: { partyId: string; canWrite: boolea
                   </tr>
                   {isOpen && history.length > 0 && (
                     <tr>
-                      <td colSpan={5} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
-                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">History</div>
+                      <td colSpan={6} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
+                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">
+                          History — {item?.name ?? group.itemId} · {group.thicknessMm} mm
+                        </div>
                         <table className="w-full text-[12.5px]">
                           <thead className="text-text-tertiary text-[10.5px]">
                             <tr>
@@ -462,13 +476,21 @@ function SalePricesTab({ partyId, canWrite }: { partyId: string; canWrite: boole
   const items = (itemsRes?.data ?? []) as Item[];
   const itemById = new Map(items.map((i) => [i.id, i]));
 
-  const grouped = new Map<string, PartyItemSalePrice[]>();
+  // Group by (item, thickness) — each combo is its own pricing slot.
+  const grouped = new Map<string, { itemId: string; thicknessMm: number; rows: PartyItemSalePrice[] }>();
   rows.forEach((r) => {
-    const list = grouped.get(r.item_id) ?? [];
-    list.push(r);
-    grouped.set(r.item_id, list);
+    const key = `${r.item_id}|${r.thickness_mm}`;
+    const bucket = grouped.get(key) ?? { itemId: r.item_id, thicknessMm: r.thickness_mm, rows: [] };
+    bucket.rows.push(r);
+    grouped.set(key, bucket);
   });
-  grouped.forEach((list) => list.sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1)));
+  grouped.forEach((b) => b.rows.sort((a, c) => (a.valid_from < c.valid_from ? 1 : -1)));
+  const sortedGroups = Array.from(grouped.entries()).sort(([, a], [, b]) => {
+    const ia = itemById.get(a.itemId)?.item_code ?? a.itemId;
+    const ib = itemById.get(b.itemId)?.item_code ?? b.itemId;
+    if (ia !== ib) return ia < ib ? -1 : 1;
+    return a.thicknessMm - b.thicknessMm;
+  });
 
   if (isLoading) return <div className="flex justify-center py-10"><Spinner /></div>;
 
@@ -513,25 +535,26 @@ function SalePricesTab({ partyId, canWrite }: { partyId: string; canWrite: boole
             <tr>
               <th className="text-left px-3 py-2 font-medium w-8"></th>
               <th className="text-left px-3 py-2 font-medium">Item</th>
+              <th className="text-left px-3 py-2 font-medium">Thickness</th>
               <th className="text-right px-3 py-2 font-medium">Current price</th>
               <th className="text-left px-3 py-2 font-medium">Effective since</th>
               <th className="text-left px-3 py-2 font-medium">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {Array.from(grouped.entries()).map(([itemId, list]) => {
-              const active = list.find((r) => r.valid_until === null);
-              const history = list.filter((r) => r.valid_until !== null);
-              const item = itemById.get(itemId);
-              const isOpen = expanded.has(itemId);
+            {sortedGroups.map(([key, group]) => {
+              const active = group.rows.find((r) => r.valid_until === null);
+              const history = group.rows.filter((r) => r.valid_until !== null);
+              const item = itemById.get(group.itemId);
+              const isOpen = expanded.has(key);
               return (
-                <React.Fragment key={itemId}>
+                <React.Fragment key={key}>
                   <tr
                     className="border-t border-hairline hover:bg-bg-subtle cursor-pointer"
                     onClick={() => {
                       setExpanded((s) => {
                         const n = new Set(s);
-                        if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
+                        if (n.has(key)) n.delete(key); else n.add(key);
                         return n;
                       });
                     }}
@@ -540,9 +563,10 @@ function SalePricesTab({ partyId, canWrite }: { partyId: string; canWrite: boole
                       {history.length > 0 ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-medium">{item?.name ?? itemId}</div>
+                      <div className="font-medium">{item?.name ?? group.itemId}</div>
                       <div className="text-[11px] text-foreground-muted font-mono">{item?.item_code}</div>
                     </td>
+                    <td className="px-3 py-2 text-foreground-secondary tabular-nums">{group.thicknessMm} mm</td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium">
                       {active ? formatCurrency(active.sale_price, "INR", "en-IN") : "—"}
                     </td>
@@ -555,8 +579,10 @@ function SalePricesTab({ partyId, canWrite }: { partyId: string; canWrite: boole
                   </tr>
                   {isOpen && history.length > 0 && (
                     <tr>
-                      <td colSpan={5} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
-                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">History</div>
+                      <td colSpan={6} className="bg-bg-subtle/50 px-3 py-3 border-t border-hairline">
+                        <div className="text-[11px] uppercase tracking-wider text-text-tertiary mb-2">
+                          History — {item?.name ?? group.itemId} · {group.thicknessMm} mm
+                        </div>
                         <table className="w-full text-[12.5px]">
                           <thead className="text-text-tertiary text-[10.5px]">
                             <tr>

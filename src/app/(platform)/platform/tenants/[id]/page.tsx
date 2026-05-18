@@ -24,7 +24,7 @@ import {
   ArrowLeft,
   Calendar,
   Globe,
-  DollarSign,
+  IndianRupee,
   Layers,
   Clock,
   UserPlus,
@@ -156,7 +156,7 @@ export default function TenantDetailPage() {
           <div className="bg-white border border-hairline rounded-md p-5 space-y-4">
             <h2 className="text-sm font-semibold">Configuration</h2>
             <DetailRow
-              icon={<DollarSign size={13} />}
+              icon={<IndianRupee size={13} />}
               label="Base Currency"
               value={
                 currency

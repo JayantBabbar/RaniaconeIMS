@@ -394,6 +394,52 @@ export const demoAdapter: AxiosAdapter = async (config) => {
       }),
     );
   }
+  if (method === "POST" && path === "/items") {
+    const reqBody = (typeof body === "object" && body) ? body as {
+      item_code?: string; name?: string; description?: string;
+      category_id?: string; brand_id?: string; item_type?: string;
+      base_uom_id?: string; default_tax_rate_pct?: string;
+      default_sale_price?: string; hsn_code?: string;
+      is_batch_tracked?: boolean; is_serial_tracked?: boolean;
+      is_active?: boolean;
+    } : {};
+    if (!reqBody.item_code || !(reqBody.item_code ?? "").trim()) {
+      throw fail(400, "BAD_REQUEST", "item_code is required");
+    }
+    const code = reqBody.item_code.trim();
+    const exists = (F.ITEMS as Array<{ item_code: string }>)
+      .some((it) => it.item_code.toUpperCase() === code.toUpperCase());
+    if (exists) throw fail(409, "CODE_EXISTS", `Item code "${code}" already exists`);
+    // GST rate cascade: explicit → category default → "18" fallback.
+    const cat = reqBody.category_id
+      ? (F.CATEGORIES as Array<{ id: string; gst_rate_pct?: string }>).find((c) => c.id === reqBody.category_id)
+      : null;
+    const taxRate = reqBody.default_tax_rate_pct?.trim() || cat?.gst_rate_pct || "18";
+    const newItem = {
+      id: F.uid("item"),
+      tenant_id: tid as string,
+      item_code: code,
+      name: (reqBody.name ?? "").trim() || code,
+      description: reqBody.description ?? null,
+      category_id: reqBody.category_id ?? null,
+      brand_id: reqBody.brand_id ?? null,
+      item_type: reqBody.item_type ?? "goods",
+      base_uom_id: reqBody.base_uom_id ?? null,
+      is_batch_tracked: !!reqBody.is_batch_tracked,
+      is_serial_tracked: !!reqBody.is_serial_tracked,
+      is_active: reqBody.is_active !== false,
+      hsn_code: reqBody.hsn_code ?? null,
+      default_sale_price: reqBody.default_sale_price ?? "0",
+      default_tax_rate_pct: taxRate,
+      version: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: user?.email ?? null,
+      updated_by: null,
+    };
+    (F.ITEMS as Array<unknown>).push(newItem);
+    return delay(ok(newItem, 201));
+  }
   const im = match(path, "/items/:id");
   if (method === "GET" && im) {
     const it = F.ITEMS.find((x) => x.id === im.id);

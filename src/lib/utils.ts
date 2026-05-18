@@ -26,12 +26,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format currency values consistently.
+ * Format currency values consistently. Defaults to Indian rupees with
+ * the `en-IN` locale so calls without explicit args render as ₹ with
+ * lakh/crore-style grouping ("₹1,23,456.78"). Pass explicit `currency`
+ * and `locale` when displaying a non-INR amount (vendor in USD, etc.).
  */
 export function formatCurrency(
   value: number | string,
-  currency = "USD",
-  locale = "en-US"
+  currency = "INR",
+  locale = "en-IN"
 ): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
   return new Intl.NumberFormat(locale, {

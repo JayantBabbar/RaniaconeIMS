@@ -15,7 +15,7 @@ import {
 import { useTableFilters, type ColumnDef } from "@/hooks";
 import { currencyService } from "@/services/platform.service";
 import type { Currency } from "@/types";
-import { DollarSign } from "lucide-react";
+import { IndianRupee } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════
 // Currency Catalog — Read-only browser for ISO 4217 currencies
@@ -105,7 +105,7 @@ export default function CurrencyCatalogPage() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              icon={<DollarSign size={22} />}
+              icon={<IndianRupee size={22} />}
               title={activeFilterCount > 0 ? "No currencies match those filters" : "No currencies"}
               description={
                 activeFilterCount > 0
